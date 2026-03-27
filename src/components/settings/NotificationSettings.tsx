@@ -323,15 +323,6 @@ export default function NotificationSettings() {
                 onChange={() => handleToggle('sound_enabled')}
                 icon={preferences.sound_enabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
               />
-
-              <NotificationToggle
-                label="Email Notifications"
-                description="Receive email copies of in-app notifications (coming soon)"
-                enabled={preferences.email_notifications_enabled}
-                onChange={() => handleToggle('email_notifications_enabled')}
-                icon={<Mail className="w-5 h-5" />}
-                disabled
-              />
             </div>
           </div>
 
