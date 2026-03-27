@@ -30,9 +30,29 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
     }
   }, [initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed]);
 
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.quoteView === 'list') {
+        setView('list');
+        setSelectedQuoteId(null);
+      } else if (event.state?.quoteView === 'detail' && event.state?.quoteId) {
+        setView('detail');
+        setSelectedQuoteId(event.state.quoteId);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleSelectQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
     setView('detail');
+    window.history.pushState(
+      { quoteView: 'detail', quoteId },
+      '',
+      `#production/quotes/${quoteId}`
+    );
   };
 
   const handleEditQuote = (quoteId: string) => {
@@ -52,6 +72,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
     setPreselectedCustomerId(undefined);
     setPreselectedContactId(undefined);
     setView('list');
+    window.history.back();
   };
 
   if (view === 'detail' && selectedQuoteId) {

@@ -41,6 +41,17 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
     loadTypesOfWork();
   }, []);
 
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.productionTab) {
+        setActiveTab(event.state.productionTab);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const loadTypesOfWork = async () => {
     try {
       // Get current user's company_id
@@ -201,7 +212,14 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  window.history.pushState(
+                    { productionTab: tab.id },
+                    '',
+                    `#production/${tab.id}`
+                  );
+                }}
                 className={`p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
                   isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}
