@@ -6147,11 +6147,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           {showSsaApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                       </div>
-                      {ssaHasCredentials && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Enter a new API key only if you want to update it
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {ssaHasCredentials
+                          ? 'Enter a new API key only if you want to update it'
+                          : (
+                            <>
+                              Email <a href="mailto:api@ssactivewear.com" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">api@ssactivewear.com</a> to request an API token
+                            </>
+                          )
+                        }
+                      </p>
                     </div>
 
                     <div>
