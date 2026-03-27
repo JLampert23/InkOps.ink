@@ -22,7 +22,6 @@
 
 - [ ] Web browser (Chrome, Firefox, Safari, or Edge recommended)
 - [ ] Email address for account creation
-- [ ] Printavo account credentials (required for data sync)
 
 ### Your First 15 Minutes
 
@@ -32,23 +31,26 @@
 - Create a secure password
 - You're automatically logged in
 
-**2. Configure Printavo Integration (3 minutes)**
+**2. Set Up Your Company Profile (3 minutes)**
 - Click your email at the bottom of the sidebar
 - Select "Account Settings"
-- Go to "Integrations" tab
-- Enter your Printavo email and API token
-- Click "Test Connection" then "Save"
-
-**3. Sync Your Data (5 minutes)**
-- Click "Sync from Printavo" button in sidebar
-- Wait for sync to complete (progress shown)
-- Your invoices, customers, and orders are now loaded
-
-**4. Set Up Your Company Profile (3 minutes)**
-- In Account Settings, go to "Company Profile"
+- Go to "Company Profile" tab
 - Enter company name, address, phone
 - Upload your logo (optional but recommended)
 - Click "Save"
+
+**3. Configure Integrations (5 minutes)**
+- Go to "Integrations" tab in Account Settings
+- Set up the integrations you need (Stripe, Square, Email, etc.)
+- Test each connection
+- Save your settings
+
+**4. Create Your First Quote or Invoice (3 minutes)**
+- Navigate to Production → Quotes or Accounting → Invoices
+- Click "Create New"
+- Add customer information
+- Add line items and pricing
+- Save or send to customer
 
 **5. Explore Your Dashboard (2 minutes)**
 - View Billing Queue (outstanding invoices)
@@ -91,33 +93,6 @@ Your company information appears on invoices, quotes, and all customer communica
 ### Integration Configuration
 
 InkOps integrates with multiple services. Configure only what you use.
-
-#### Printavo Integration (REQUIRED)
-
-Printavo is your core data source for invoices, orders, and customers.
-
-**What You Need:**
-- Printavo account email
-- Printavo API token (get from Printavo Settings → API)
-
-**Setup Steps:**
-1. Account Settings → Integrations → Printavo
-2. Enter your Printavo email
-3. Paste your API token
-4. Click "Test Connection" (should show success)
-5. Click "Save"
-6. Click "Sync from Printavo" in sidebar
-
-**What Gets Synced:**
-- All invoices (open, paid, overdue)
-- All customers with contact information
-- Line items and product details
-- Payment history
-- Custom fields from Printavo
-
-**Sync Schedule:**
-- Manual: Click "Sync from Printavo" anytime
-- Automatic: Every 4 hours (configurable)
 
 #### Stripe Integration (OPTIONAL)
 
@@ -1651,31 +1626,6 @@ Purchase orders, receiving, and inventory.
 
 ## Integration Guides
 
-### Printavo Sync
-
-**Initial Setup:**
-1. Get API token from Printavo (Settings → API)
-2. Enter credentials in InkOps
-3. Test connection
-4. First sync loads all data
-
-**What Gets Synced:**
-- Invoices (all statuses)
-- Customers with contact info
-- Line items and products
-- Payments
-- Custom fields
-- Order details
-
-**Sync Frequency:**
-- Manual: Click "Sync from Printavo" anytime
-- Auto: Every 4 hours (default)
-
-**Troubleshooting:**
-- "Cannot connect": Verify email and token
-- "Sync not updating": Wait for completion, refresh page
-- "Data missing": Check Printavo account has data
-
 ### Stripe Payments
 
 **Setup:**
@@ -1890,34 +1840,6 @@ Required for deliverability:
 
 ### Common Issues
 
-**Cannot connect to Printavo**
-
-Possible causes:
-- Incorrect email or API token
-- Printavo account inactive
-- Network issue
-
-Solutions:
-1. Verify credentials in Printavo
-2. Generate new API token
-3. Test credentials in Printavo first
-4. Check Printavo account is active
-5. Try again in a few minutes
-
-**Sync not updating data**
-
-Possible causes:
-- Sync still in progress
-- Cached data displayed
-- API rate limit hit
-
-Solutions:
-1. Wait for sync progress indicator to complete
-2. Refresh browser page
-3. Clear browser cache
-4. Wait 5 minutes and try again
-5. Check Printavo status page
-
 **Cannot send invoice email**
 
 Possible causes:
@@ -2082,7 +2004,7 @@ Generate and attach PDF before sending PO.
 1. This documentation
 2. Tooltips (hover over ? icons in app)
 3. Error messages (read carefully for solutions)
-4. Integration documentation (Printavo, Stripe, Square, etc.)
+4. Integration documentation (Stripe, Square, etc.)
 
 **Support Channels:**
 1. In-app help (click help icon)
@@ -2211,14 +2133,8 @@ Not supported:
 
 ## FAQs
 
-**Q: Do I need a Printavo account?**
-A: Yes, Printavo is the core data source. You need an active Printavo account with API access.
-
 **Q: Can I use this on mobile?**
 A: Yes, the application is fully responsive and works on phones and tablets.
-
-**Q: How often does data sync from Printavo?**
-A: Automatically every 4 hours, or manually anytime by clicking "Sync from Printavo".
 
 **Q: Is my data secure?**
 A: Yes, all data is encrypted in transit and at rest. Industry best practices followed.
@@ -2230,7 +2146,7 @@ A: Click "Forgot Password" on login screen, enter email, follow reset link.
 A: Yes, administrators can add unlimited users with different roles.
 
 **Q: Can I edit invoices?**
-A: Invoices from Printavo are read-only. Edit in Printavo, then sync. You can record payments and send invoices.
+A: Yes, you can edit draft invoices. Once sent or locked, invoices are read-only to maintain financial integrity. You can always record payments and send invoices.
 
 **Q: How do I accept credit card payments?**
 A: Set up Stripe integration, then use "Send Invoice" with payment link option.
