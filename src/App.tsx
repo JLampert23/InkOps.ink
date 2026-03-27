@@ -211,6 +211,7 @@ function AppContent() {
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
   const [quoteContactId, setQuoteContactId] = useState<string | undefined>(undefined);
+  const [navigateToQuoteId, setNavigateToQuoteId] = useState<string | undefined>(undefined);
   const previousTabRef = useRef<Tab | null>(null);
   const isNavigatingRef = useRef(false);
   const { signOut, user } = useAuth();
@@ -360,6 +361,11 @@ function AppContent() {
   const handleCreateQuoteForCustomer = (customerId: string, contactId?: string) => {
     setQuoteCustomerId(customerId);
     setQuoteContactId(contactId);
+    setActiveTab('production');
+  };
+
+  const handleViewQuote = (quoteId: string) => {
+    setNavigateToQuoteId(quoteId);
     setActiveTab('production');
   };
 
@@ -654,6 +660,7 @@ function AppContent() {
                 key={customersKey}
                 initialSearchTerm={customerSearchTerm}
                 onCreateQuote={handleCreateQuoteForCustomer}
+                onViewQuote={handleViewQuote}
               />
             </Suspense>
           )}
@@ -703,9 +710,11 @@ function AppContent() {
                 }}
                 initialCustomerId={quoteCustomerId}
                 initialContactId={quoteContactId}
+                initialQuoteId={navigateToQuoteId}
                 onCustomerIdConsumed={() => {
                   setQuoteCustomerId(undefined);
                   setQuoteContactId(undefined);
+                  setNavigateToQuoteId(undefined);
                 }}
               />
             </Suspense>

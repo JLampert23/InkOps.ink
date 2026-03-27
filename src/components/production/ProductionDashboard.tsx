@@ -13,24 +13,29 @@ interface ProductionDashboardProps {
   onNavigateToCustomers: () => void;
   initialCustomerId?: string;
   initialContactId?: string;
+  initialQuoteId?: string;
   onCustomerIdConsumed?: () => void;
 }
 
-export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, initialContactId, onCustomerIdConsumed }: ProductionDashboardProps) {
+export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: ProductionDashboardProps) {
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
   const [contactIdForQuote, setContactIdForQuote] = useState<string | undefined>(initialContactId);
+  const [quoteIdToView, setQuoteIdToView] = useState<string | undefined>(initialQuoteId);
   const [typesOfWork, setTypesOfWork] = useState<Array<{ id: string; work_type_name: string }>>([]);
   const [selectedScheduleType, setSelectedScheduleType] = useState<string>('');
   const [navigateToWorkOrderId, setNavigateToWorkOrderId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialCustomerId) {
+    if (initialQuoteId) {
+      setActiveTab('quotes');
+      setQuoteIdToView(initialQuoteId);
+    } else if (initialCustomerId) {
       setActiveTab('quotes');
       setCustomerIdForQuote(initialCustomerId);
       setContactIdForQuote(initialContactId);
     }
-  }, [initialCustomerId, initialContactId]);
+  }, [initialCustomerId, initialContactId, initialQuoteId]);
 
   useEffect(() => {
     loadTypesOfWork();
@@ -95,6 +100,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
           <QuotesManager
             initialCustomerId={customerIdForQuote}
             initialContactId={contactIdForQuote}
+            initialQuoteId={quoteIdToView}
             onCustomerIdConsumed={handleQuoteCustomerConsumed}
           />
         );

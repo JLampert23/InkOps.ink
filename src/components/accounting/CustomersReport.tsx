@@ -53,9 +53,10 @@ interface FundraisingCredit {
 interface CustomersReportProps {
   initialSearchTerm?: string;
   onCreateQuote?: (customerId: string, contactId?: string) => void;
+  onViewQuote?: (quoteId: string) => void;
 }
 
-export default function CustomersReport({ initialSearchTerm, onCreateQuote }: CustomersReportProps = {}) {
+export default function CustomersReport({ initialSearchTerm, onCreateQuote, onViewQuote }: CustomersReportProps = {}) {
   const { showNotification } = useNotification();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -758,12 +759,12 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                           quotes.map((quote) => (
                             <tr key={quote.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
                               <td className="px-4 py-3">
-                                <a
-                                  href={`/production?tab=quotes&quote=${quote.id}`}
+                                <button
+                                  onClick={() => onViewQuote?.(quote.id)}
                                   className="text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline cursor-pointer"
                                 >
                                   {quote.quote_number}
-                                </a>
+                                </button>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                                 {format(new Date(quote.created_at), 'MMM dd, yyyy')}

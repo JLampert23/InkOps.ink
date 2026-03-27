@@ -6,17 +6,21 @@ import { QuoteBuilder } from './QuoteBuilder';
 interface QuotesManagerProps {
   initialCustomerId?: string;
   initialContactId?: string;
+  initialQuoteId?: string;
   onCustomerIdConsumed?: () => void;
 }
 
-export function QuotesManager({ initialCustomerId, initialContactId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
+export function QuotesManager({ initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
   const [view, setView] = useState<'list' | 'detail' | 'edit' | 'create'>('list');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | undefined>(initialCustomerId);
   const [preselectedContactId, setPreselectedContactId] = useState<string | undefined>(initialContactId);
 
   useEffect(() => {
-    if (initialCustomerId) {
+    if (initialQuoteId) {
+      setSelectedQuoteId(initialQuoteId);
+      setView('detail');
+    } else if (initialCustomerId) {
       setView('create');
       setPreselectedCustomerId(initialCustomerId);
       setPreselectedContactId(initialContactId);
@@ -24,7 +28,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, onCustomerI
         onCustomerIdConsumed();
       }
     }
-  }, [initialCustomerId, initialContactId, onCustomerIdConsumed]);
+  }, [initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed]);
 
   const handleSelectQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
