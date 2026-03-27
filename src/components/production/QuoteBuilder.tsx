@@ -3,6 +3,7 @@ import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Sea
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
@@ -189,6 +190,7 @@ function UnitPriceTooltip({ item, groupImprints, garmentMarkup }: {
 export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initialContactId, onSave, onCancel }: QuoteBuilderProps) {
   const { user, session } = useAuth();
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -3051,7 +3053,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                                     <button
                                                       onClick={async (e) => {
                                                         e.stopPropagation();
-                                                        if (confirm('Delete this mockup?')) {
+                                                        const confirmed = await confirm({
+                                                          title: 'Delete Mockup',
+                                                          message: 'Are you sure you want to delete this mockup? This action cannot be undone.',
+                                                          confirmLabel: 'Delete',
+                                                          cancelLabel: 'Cancel',
+                                                          variant: 'danger',
+                                                          icon: <Trash2 className="w-6 h-6" />,
+                                                        });
+
+                                                        if (confirmed) {
                                                           try {
                                                             const updatedMockups = imprint.mockups.filter((_: any, idx: number) => idx !== mockupIdx);
                                                             const { error } = await supabase
