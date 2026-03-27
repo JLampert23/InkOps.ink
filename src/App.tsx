@@ -412,7 +412,7 @@ function AppContent() {
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
                     <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                      Production<br />Dashboard
+                      Production
                     </div>
                   </div>
                   {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
