@@ -1028,7 +1028,7 @@ export default function MockupGenerator({
         message: 'Company information not loaded yet. Please try again in a moment.',
         confirmLabel: 'OK',
         variant: 'warning',
-        icon: AlertTriangle,
+        icon: <AlertTriangle className="w-6 h-6" />,
       });
       event.target.value = '';
       return;
@@ -1109,7 +1109,7 @@ export default function MockupGenerator({
         message: 'Company information not loaded yet. Please try again in a moment.',
         confirmLabel: 'OK',
         variant: 'warning',
-        icon: AlertTriangle,
+        icon: <AlertTriangle className="w-6 h-6" />,
       });
       event.target.value = '';
       return;
@@ -2279,7 +2279,7 @@ export default function MockupGenerator({
                                         confirmLabel: 'Remove',
                                         cancelLabel: 'Cancel',
                                         variant: 'danger',
-                                        icon: Trash2,
+                                        icon: <Trash2 className="w-6 h-6" />,
                                       });
                                       if (confirmed) {
                                         setImprintArtwork(prev => ({
@@ -2329,7 +2329,7 @@ export default function MockupGenerator({
                                           confirmLabel: 'Delete',
                                           cancelLabel: 'Cancel',
                                           variant: 'danger',
-                                          icon: Trash2,
+                                          icon: <Trash2 className="w-6 h-6" />,
                                         });
                                         if (confirmed) {
                                           try {
@@ -2407,7 +2407,7 @@ export default function MockupGenerator({
                       confirmLabel: 'Clear All',
                       cancelLabel: 'Cancel',
                       variant: 'danger',
-                      icon: Trash2,
+                      icon: <Trash2 className="w-6 h-6" />,
                     });
                     if (confirmed) {
                       setSelectedArtwork([]);
@@ -2885,7 +2885,7 @@ function CustomerArtworkLibraryModal({
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       variant: 'danger',
-      icon: Trash2,
+      icon: <Trash2 className="w-6 h-6" />,
     });
 
     if (!confirmed) {
@@ -2928,7 +2928,7 @@ function CustomerArtworkLibraryModal({
         message: 'Failed to delete artwork. Please try again.',
         confirmLabel: 'OK',
         variant: 'danger',
-        icon: AlertTriangle,
+        icon: <AlertTriangle className="w-6 h-6" />,
       });
     } finally {
       setDeleting(null);
