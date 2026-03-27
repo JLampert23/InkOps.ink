@@ -458,6 +458,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   }, [companySettings]);
 
+  // Sync customerUrl state with database value
+  useEffect(() => {
+    if (companySettings?.customer_url !== undefined) {
+      setCustomerUrl(companySettings.customer_url || '');
+    }
+  }, [companySettings?.customer_url]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
