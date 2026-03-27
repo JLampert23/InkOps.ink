@@ -744,60 +744,55 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                     </table>
                     </div>
                   ) : (
-                    <div className="p-4">
-                      {quotes.length > 0 ? (
-                        <div className="space-y-3">
-                          {quotes.map((quote) => {
-                            const statusColors: Record<string, string> = {
-                              draft: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
-                              pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-                              approved: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-                              rejected: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-                              converted: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                            };
-
-                            return (
-                              <div key={quote.id} className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
-                                <div className="flex justify-between items-start mb-2">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-gray-900 dark:text-white">
-                                        {quote.quote_number}
-                                      </span>
-                                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[quote.status] || statusColors.draft}`}>
-                                        {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-                                      </span>
-                                    </div>
-                                    {quote.nickname && (
-                                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                        {quote.nickname}
-                                      </div>
-                                    )}
-                                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                      Created: {format(new Date(quote.created_at), 'MMM d, yyyy')}
-                                      {quote.delivery_date && (
-                                        <span className="ml-3">
-                                          Due: {format(new Date(quote.delivery_date), 'MMM d, yyyy')}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                                      ${quote.total_amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                          No quotes found
-                        </div>
-                      )}
-                    </div>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Quote #</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                        {quotes.length > 0 ? (
+                          quotes.map((quote) => (
+                            <tr key={quote.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                              <td className="px-4 py-3">
+                                <a
+                                  href={`/production?tab=quotes&quote=${quote.id}`}
+                                  className="text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline cursor-pointer"
+                                >
+                                  {quote.quote_number}
+                                </a>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                {format(new Date(quote.created_at), 'MMM dd, yyyy')}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                ${quote.total_amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  quote.status === 'approved' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' :
+                                  quote.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' :
+                                  quote.status === 'rejected' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' :
+                                  quote.status === 'converted' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400' :
+                                  'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-400'
+                                }`}>
+                                  {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                              No quotes found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   )}
                 </div>
 
