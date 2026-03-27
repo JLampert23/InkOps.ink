@@ -460,7 +460,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   // Sync customerUrl state with database value
   useEffect(() => {
+    console.log('[useEffect] companySettings changed:', {
+      customer_url: companySettings?.customer_url,
+      customer_url_is_undefined: companySettings?.customer_url === undefined
+    });
     if (companySettings?.customer_url !== undefined) {
+      console.log('[useEffect] Setting customerUrl state to:', companySettings.customer_url || '(empty)');
       setCustomerUrl(companySettings.customer_url || '');
     }
   }, [companySettings?.customer_url]);
@@ -493,6 +498,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
+
+      console.log('[AccountSettings] Loaded company_settings data:', {
+        customer_url: data?.customer_url,
+        verification_status: data?.customer_url_verification_status,
+        verification_token: data?.customer_url_verification_token
+      });
 
       if (data) {
         setCompanySettings(data);
