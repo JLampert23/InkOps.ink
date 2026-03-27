@@ -818,7 +818,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
                                 {format(new Date(quote.created_at), 'MMM dd, yyyy')}
                               </td>
                               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                                ${quote.total_amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                                ${quote.total?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
