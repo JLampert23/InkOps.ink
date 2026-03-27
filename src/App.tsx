@@ -369,6 +369,11 @@ function AppContent() {
     setActiveTab('production');
   };
 
+  const handleDuplicateQuote = (quoteId: string) => {
+    setNavigateToQuoteId(quoteId);
+    setActiveTab('production');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 transition-colors">
       {/* Sidebar */}
@@ -661,6 +666,7 @@ function AppContent() {
                 initialSearchTerm={customerSearchTerm}
                 onCreateQuote={handleCreateQuoteForCustomer}
                 onViewQuote={handleViewQuote}
+                onDuplicateQuote={handleDuplicateQuote}
               />
             </Suspense>
           )}

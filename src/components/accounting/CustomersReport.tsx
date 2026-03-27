@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink, Receipt } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink, Receipt, Copy } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import EditCustomerModal from './EditCustomerModal';
 import ContactSelectionModal from './ContactSelectionModal';
 import { CustomerArtworkLibrary } from './CustomerArtworkLibrary';
@@ -54,10 +55,12 @@ interface CustomersReportProps {
   initialSearchTerm?: string;
   onCreateQuote?: (customerId: string, contactId?: string) => void;
   onViewQuote?: (quoteId: string) => void;
+  onDuplicateQuote?: (quoteId: string) => void;
 }
 
-export default function CustomersReport({ initialSearchTerm, onCreateQuote, onViewQuote }: CustomersReportProps = {}) {
+export default function CustomersReport({ initialSearchTerm, onCreateQuote, onViewQuote, onDuplicateQuote }: CustomersReportProps = {}) {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm || '');
@@ -84,6 +87,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
   const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
   const [portalEnabled, setPortalEnabled] = useState(false);
   const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
   const [showContactSelection, setShowContactSelection] = useState(false);
   const [selectedCustomerForQuote, setSelectedCustomerForQuote] = useState<Customer | null>(null);
   const [activeTab, setActiveTab] = useState<'invoices' | 'quotes'>('invoices');
@@ -377,6 +381,49 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
     loadCustomers();
     if (selectedCustomer) {
       loadCustomerDetails(selectedCustomer);
+    }
+  };
+
+  const handleDuplicate = async (quoteId: string) => {
+    const confirmed = await confirm({
+      title: 'Duplicate Quote',
+      message: 'Create a copy of this quote?',
+      confirmLabel: 'Duplicate',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    setDuplicating(quoteId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('You must be logged in to duplicate quotes');
+      }
+
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/duplicate`, {
+        method: 'POST',
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to duplicate quote');
+      }
+
+      showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
+
+      // Reload customer details to show the new quote
+      if (selectedCustomer) {
+        loadCustomerDetails(selectedCustomer);
+      }
+
+      // If a callback is provided, call it
+      if (onDuplicateQuote) {
+        onDuplicateQuote(data.quote.id);
+      }
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to duplicate quote', 'error');
+    } finally {
+      setDuplicating(null);
     }
   };
 
@@ -752,6 +799,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
                           <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
@@ -783,11 +831,25 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
                                   {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
                                 </span>
                               </td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={() => handleDuplicate(quote.id)}
+                                  disabled={duplicating === quote.id}
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Duplicate Quote"
+                                >
+                                  {duplicating === quote.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Copy className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </td>
                             </tr>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={4} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <td colSpan={5} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                               No quotes found
                             </td>
                           </tr>
