@@ -93,21 +93,13 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
         </div>
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          {/* Logo and PRO badge */}
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-blue-400 to-blue-300 p-3 rounded-2xl shadow-lg">
-              <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
-                <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-white text-3xl font-bold">ink<span className="font-light">ops</span></h1>
-            </div>
-            <div className="bg-blue-800/50 px-3 py-1 rounded-full">
-              <span className="text-white text-sm font-semibold">PRO</span>
-            </div>
+          {/* Logo */}
+          <div className="flex items-center">
+            <img
+              src="/InkOps-01-copy.png"
+              alt="InkOps Pro"
+              className="h-16 w-auto"
+            />
           </div>
 
           {/* Main messaging */}
@@ -139,18 +131,12 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
 
           {/* Mobile Logo - Only shown on small screens */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center gap-2 mb-6">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 rounded-xl">
-                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
-                  <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h1 className="text-gray-900 text-2xl font-bold">ink<span className="font-light">ops</span></h1>
-              <div className="bg-blue-600 px-2 py-0.5 rounded-full">
-                <span className="text-white text-xs font-semibold">PRO</span>
-              </div>
+            <div className="inline-flex items-center justify-center mb-6">
+              <img
+                src="/InkOps-01-copy.png"
+                alt="InkOps Pro"
+                className="h-12 w-auto"
+              />
             </div>
           </div>
 

@@ -18,18 +18,12 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-slate-700/50 transition-colors">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
-            <div className="flex items-center gap-2">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-xl shadow-lg">
-                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
-                  <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h1 className="text-gray-900 dark:text-white text-2xl font-bold">ink<span className="font-light">ops</span></h1>
-              <div className="bg-blue-600 px-2 py-0.5 rounded-full">
-                <span className="text-white text-xs font-semibold">PRO</span>
-              </div>
+            <div className="flex items-center">
+              <img
+                src="/InkOps-01-copy.png"
+                alt="InkOps Pro"
+                className="h-12 w-auto"
+              />
             </div>
             <div className="flex items-center gap-3">
               <button

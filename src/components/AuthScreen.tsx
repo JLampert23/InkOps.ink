@@ -52,18 +52,12 @@ export function AuthScreen() {
       <div className="w-full max-w-md">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 sm:p-10 backdrop-blur-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 mb-6 justify-center">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2.5 rounded-xl shadow-lg">
-                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
-                  <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <h1 className="text-gray-900 dark:text-white text-2xl font-bold">ink<span className="font-light">ops</span></h1>
-              <div className="bg-blue-600 px-2 py-0.5 rounded-full">
-                <span className="text-white text-xs font-semibold">PRO</span>
-              </div>
+            <div className="inline-flex items-center justify-center mb-6">
+              <img
+                src="/InkOps-01-copy.png"
+                alt="InkOps Pro"
+                className="h-12 w-auto"
+              />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
               {isSignUp ? 'Create Account' : 'Welcome Back'}
