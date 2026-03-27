@@ -169,13 +169,19 @@ export function FeaturesPage({ onLoginClick, onBackToHome }: FeaturesPageProps) 
           <div className="flex items-center justify-between h-20">
             <button
               onClick={onBackToHome}
-              className="flex items-center hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
-              <img
-                src={darkMode ? "/headerlogo.png" : "/inkops_logo-01.png"}
-                alt="INKOPS"
-                className="h-10 w-auto transition-opacity duration-200"
-              />
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-xl shadow-lg">
+                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
+                  <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <h1 className="text-gray-900 dark:text-white text-2xl font-bold">ink<span className="font-light">ops</span></h1>
+              <div className="bg-blue-600 px-2 py-0.5 rounded-full">
+                <span className="text-white text-xs font-semibold">PRO</span>
+              </div>
             </button>
             <div className="flex items-center gap-3">
               <button
