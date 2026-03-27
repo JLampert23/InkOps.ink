@@ -1212,7 +1212,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       )}
 
       {/* Invoices & Quotes Tabs */}
-      {(customer.invoices.length > 0 || quotes.length > 0) && (
+      {databaseCustomer && (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
           {/* Tab Headers */}
           <div className="border-b border-gray-200 dark:border-slate-700">
