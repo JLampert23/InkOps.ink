@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
@@ -85,6 +85,8 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
   const [showContactSelection, setShowContactSelection] = useState(false);
   const [selectedCustomerForQuote, setSelectedCustomerForQuote] = useState<Customer | null>(null);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'quotes'>('invoices');
+  const [quotes, setQuotes] = useState<any[]>([]);
 
   useEffect(() => {
     loadCustomers();
@@ -250,6 +252,17 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
       });
 
       setCustomerInvoices(details);
+
+      // Load quotes for this customer
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false });
+
+      if (!quotesError && quotesData) {
+        setQuotes(quotesData);
+      }
     } catch (error) {
       console.error('Error loading customer details:', error);
     } finally {
@@ -649,17 +662,47 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                 </div>
               </div>
 
-              <div className="overflow-y-auto mt-4" style={{ maxHeight: '520px' }}>
-                {/* Invoice History */}
-                {loadingDetails ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
+              <div className="mt-4">
+                {/* Tabs */}
+                <div className="border-b border-gray-200 dark:border-slate-700">
+                  <div className="flex">
+                    <button
+                      onClick={() => setActiveTab('invoices')}
+                      className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'invoices'
+                          ? 'border-green-500 text-green-600 dark:text-green-400'
+                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Invoice History ({customerInvoices.length})
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('quotes')}
+                      className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'quotes'
+                          ? 'border-green-500 text-green-600 dark:text-green-400'
+                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Receipt className="w-4 h-4" />
+                        Quotes ({quotes.length})
+                      </div>
+                    </button>
                   </div>
-                ) : (
-                  <div className="border-b border-gray-200 dark:border-slate-700">
-                    <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Invoice History</h4>
+                </div>
+
+                {/* Tab Content */}
+                <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+                  {loadingDetails ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
                     </div>
+                  ) : activeTab === 'invoices' ? (
+                    <div className="border-b border-gray-200 dark:border-slate-700">
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0">
                         <tr>
@@ -699,8 +742,64 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <div className="p-4">
+                      {quotes.length > 0 ? (
+                        <div className="space-y-3">
+                          {quotes.map((quote) => {
+                            const statusColors: Record<string, string> = {
+                              draft: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
+                              pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
+                              approved: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+                              rejected: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+                              converted: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                            };
+
+                            return (
+                              <div key={quote.id} className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-900 dark:text-white">
+                                        {quote.quote_number}
+                                      </span>
+                                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[quote.status] || statusColors.draft}`}>
+                                        {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                                      </span>
+                                    </div>
+                                    {quote.nickname && (
+                                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                        {quote.nickname}
+                                      </div>
+                                    )}
+                                    <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                      Created: {format(new Date(quote.created_at), 'MMM d, yyyy')}
+                                      {quote.delivery_date && (
+                                        <span className="ml-3">
+                                          Due: {format(new Date(quote.delivery_date), 'MMM d, yyyy')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      ${quote.total_amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                          No quotes found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Fundraising Credits Section */}
                 <div className="border-b border-gray-200 dark:border-slate-700">
