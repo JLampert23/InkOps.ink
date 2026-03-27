@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 import { sanitizeImageUrl, isPlaceholderUrl } from '../../utils/image-validator';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import {
   X,
   Upload,
@@ -19,6 +20,7 @@ import {
   Loader2,
   Plus,
   Minus,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface MockupGeneratorProps {
@@ -92,6 +94,7 @@ export default function MockupGenerator({
   onClose,
   onSave,
 }: MockupGeneratorProps) {
+  const { confirm } = useConfirmation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingGarment, setUploadingGarment] = useState(false);
@@ -1020,7 +1023,13 @@ export default function MockupGenerator({
     if (!files || files.length === 0) return;
 
     if (!companyId || companyId.trim() === '') {
-      alert('Unable to upload: Company information not loaded yet. Please try again in a moment.');
+      await confirm({
+        title: 'Upload Not Available',
+        message: 'Company information not loaded yet. Please try again in a moment.',
+        confirmLabel: 'OK',
+        variant: 'warning',
+        icon: AlertTriangle,
+      });
       event.target.value = '';
       return;
     }
@@ -1095,7 +1104,13 @@ export default function MockupGenerator({
     if (!file) return;
 
     if (!companyId || companyId.trim() === '') {
-      alert('Unable to upload: Company information not loaded yet. Please try again in a moment.');
+      await confirm({
+        title: 'Upload Not Available',
+        message: 'Company information not loaded yet. Please try again in a moment.',
+        confirmLabel: 'OK',
+        variant: 'warning',
+        icon: AlertTriangle,
+      });
       event.target.value = '';
       return;
     }
@@ -2256,9 +2271,17 @@ export default function MockupGenerator({
                                     />
                                   </div>
                                   <button
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
-                                      if (confirm('Remove this artwork from the list?')) {
+                                      const confirmed = await confirm({
+                                        title: 'Remove Artwork',
+                                        message: 'Remove this artwork from the list?',
+                                        confirmLabel: 'Remove',
+                                        cancelLabel: 'Cancel',
+                                        variant: 'danger',
+                                        icon: Trash2,
+                                      });
+                                      if (confirmed) {
                                         setImprintArtwork(prev => ({
                                           ...prev,
                                           [imprint.id]: prev[imprint.id].filter(a => a.id !== artwork.id),
@@ -2300,7 +2323,15 @@ export default function MockupGenerator({
                                     <button
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        if (confirm('Delete this mockup?')) {
+                                        const confirmed = await confirm({
+                                          title: 'Delete Mockup',
+                                          message: 'Are you sure you want to delete this mockup?',
+                                          confirmLabel: 'Delete',
+                                          cancelLabel: 'Cancel',
+                                          variant: 'danger',
+                                          icon: Trash2,
+                                        });
+                                        if (confirmed) {
                                           try {
                                             const updatedMockups = imprint.mockups.filter((_: any, idx: number) => idx !== mockupIndex);
                                             const { error } = await supabase
@@ -2369,8 +2400,16 @@ export default function MockupGenerator({
 
               {selectedArtwork.length > 0 && (
                 <button
-                  onClick={() => {
-                    if (confirm('Clear all artwork from the canvas?')) {
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      title: 'Clear Canvas',
+                      message: 'Clear all artwork from the canvas? This action cannot be undone.',
+                      confirmLabel: 'Clear All',
+                      cancelLabel: 'Cancel',
+                      variant: 'danger',
+                      icon: Trash2,
+                    });
+                    if (confirmed) {
                       setSelectedArtwork([]);
                       setActiveArtworkIndex(0);
                     }
@@ -2840,7 +2879,16 @@ function CustomerArtworkLibraryModal({
   };
 
   const handleDeleteArtwork = async (artworkId: string, fileUrl: string) => {
-    if (!confirm('Are you sure you want to delete this artwork? This action cannot be undone.')) {
+    const confirmed = await confirm({
+      title: 'Delete Artwork',
+      message: 'Are you sure you want to delete this artwork? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+      icon: Trash2,
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -2875,7 +2923,13 @@ function CustomerArtworkLibraryModal({
       setArtwork(artwork.filter(a => a.id !== artworkId));
     } catch (error) {
       console.error('Error deleting artwork:', error);
-      alert('Failed to delete artwork');
+      await confirm({
+        title: 'Delete Failed',
+        message: 'Failed to delete artwork. Please try again.',
+        confirmLabel: 'OK',
+        variant: 'danger',
+        icon: AlertTriangle,
+      });
     } finally {
       setDeleting(null);
     }
