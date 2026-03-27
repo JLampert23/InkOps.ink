@@ -171,6 +171,7 @@ export default function MockupGenerator({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [initialScale, setInitialScale] = useState(1);
   const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
+  const [hasMovedPastThreshold, setHasMovedPastThreshold] = useState(false);
 
   useEffect(() => {
     loadProofData();
@@ -1622,16 +1623,31 @@ export default function MockupGenerator({
     const centerX = artwork.position_x + canvas.width / 2;
     const centerY = artwork.position_y + canvas.height / 2;
 
-    const handleSize = 40;
-    const handles = [
-      { name: 'nw', x: centerX - width / 2, y: centerY - height / 2 },
-      { name: 'ne', x: centerX + width / 2, y: centerY - height / 2 },
-      { name: 'sw', x: centerX - width / 2, y: centerY + height / 2 },
-      { name: 'se', x: centerX + width / 2, y: centerY + height / 2 },
+    const handleSize = 14; // Match the drawing code
+    const hitRadius = 20; // Larger hit area for easier clicking
+
+    // Calculate handle positions with rotation applied
+    const cos = Math.cos((artwork.rotation * Math.PI) / 180);
+    const sin = Math.sin((artwork.rotation * Math.PI) / 180);
+
+    const handleOffsets = [
+      { name: 'nw', x: -width / 2, y: -height / 2 },
+      { name: 'ne', x: width / 2, y: -height / 2 },
+      { name: 'sw', x: -width / 2, y: height / 2 },
+      { name: 'se', x: width / 2, y: height / 2 },
     ];
 
-    for (const handle of handles) {
-      if (Math.abs(x - handle.x) <= handleSize && Math.abs(y - handle.y) <= handleSize) {
+    for (const handle of handleOffsets) {
+      const rotatedX = handle.x * cos - handle.y * sin;
+      const rotatedY = handle.x * sin + handle.y * cos;
+      const screenX = centerX + rotatedX;
+      const screenY = centerY + rotatedY;
+
+      const distance = Math.sqrt(
+        Math.pow(x - screenX, 2) + Math.pow(y - screenY, 2)
+      );
+
+      if (distance <= hitRadius) {
         return handle.name;
       }
     }
@@ -1682,6 +1698,7 @@ export default function MockupGenerator({
         y: selectedArtwork[activeArtworkIndex].position_y
       });
       setDragStart({ x, y });
+      setHasMovedPastThreshold(false);
       return;
     }
 
@@ -1703,6 +1720,7 @@ export default function MockupGenerator({
         x: selectedArtwork[clickedArtworkIndex].position_x,
         y: selectedArtwork[clickedArtworkIndex].position_y
       });
+      setHasMovedPastThreshold(false);
     } else {
       // Clicked outside all artwork - deselect
       setActiveArtworkIndex(-1);
@@ -1758,6 +1776,19 @@ export default function MockupGenerator({
     } else if (isDragging) {
       const dx = x - dragStart.x;
       const dy = y - dragStart.y;
+
+      // Movement threshold to prevent micro-adjustments
+      const MOVEMENT_THRESHOLD = 2; // pixels
+      const distanceMoved = Math.sqrt(dx * dx + dy * dy);
+
+      if (!hasMovedPastThreshold && distanceMoved < MOVEMENT_THRESHOLD) {
+        // Not enough movement yet, don't update
+        return;
+      }
+
+      if (!hasMovedPastThreshold) {
+        setHasMovedPastThreshold(true);
+      }
 
       tempArtworkPosition.current = {
         position_x: initialPosition.x + dx,
@@ -1944,32 +1975,6 @@ export default function MockupGenerator({
         ctx.lineWidth = 1.5 / currentArtwork.scale;
         ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
-        // Reset shadow for handles
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-
-        const handleSize = 32 / currentArtwork.scale;
-        const handles = [
-          { x: -artworkWidth / 2, y: -artworkHeight / 2 },
-          { x: artworkWidth / 2, y: -artworkHeight / 2 },
-          { x: -artworkWidth / 2, y: artworkHeight / 2 },
-          { x: artworkWidth / 2, y: artworkHeight / 2 },
-        ];
-
-        // Draw handle shadows
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-        ctx.shadowBlur = 4 / currentArtwork.scale;
-        ctx.fillStyle = '#3b82f6';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5 / currentArtwork.scale;
-
-        handles.forEach(handle => {
-          ctx.beginPath();
-          ctx.arc(handle.x, handle.y, handleSize / 2, 0, 2 * Math.PI);
-          ctx.fill();
-          ctx.stroke();
-        });
-
         // Reset shadow
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
@@ -1977,10 +1982,48 @@ export default function MockupGenerator({
 
       ctx.restore();
 
+      // Draw handles in screen space (after ctx.restore()) for consistent sizing
       if (index === activeArtworkIndex) {
-        const deleteButtonSize = 36;
+        const handleSize = 14; // Fixed screen-space size
         const scaledWidth = artworkWidth * currentArtwork.scale;
         const scaledHeight = artworkHeight * currentArtwork.scale;
+
+        // Calculate handle positions in screen space
+        const cos = Math.cos((currentArtwork.rotation * Math.PI) / 180);
+        const sin = Math.sin((currentArtwork.rotation * Math.PI) / 180);
+
+        const handles = [
+          { x: -scaledWidth / 2, y: -scaledHeight / 2 }, // top-left
+          { x: scaledWidth / 2, y: -scaledHeight / 2 },  // top-right
+          { x: -scaledWidth / 2, y: scaledHeight / 2 },  // bottom-left
+          { x: scaledWidth / 2, y: scaledHeight / 2 },   // bottom-right
+        ];
+
+        // Transform handles by rotation and draw in screen space
+        ctx.fillStyle = '#3b82f6';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        ctx.shadowBlur = 4;
+
+        handles.forEach(handle => {
+          const rotatedX = handle.x * cos - handle.y * sin;
+          const rotatedY = handle.x * sin + handle.y * cos;
+          const screenX = centerX + rotatedX;
+          const screenY = centerY + rotatedY;
+
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, handleSize / 2, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.stroke();
+        });
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // Draw delete button
+        const deleteButtonSize = 36;
         const deleteButtonX = centerX + scaledWidth / 2;
         const deleteButtonY = centerY - scaledHeight / 2;
 
