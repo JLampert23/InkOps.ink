@@ -102,10 +102,10 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
 
           {/* Main messaging - Centered */}
           <div className="space-y-6">
-            <h2 className="text-white text-5xl font-bold leading-tight">
+            <h2 className="text-[#001f3f] text-5xl font-bold leading-tight">
               Imprinted Apparel<br />Operations System
             </h2>
-            <p className="text-white text-xl font-light">
+            <p className="text-[#001f3f] text-xl font-light">
               Quote - Art - Receive - Schedule - Invoice - Payment
             </p>
           </div>
