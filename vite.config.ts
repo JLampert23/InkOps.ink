@@ -51,7 +51,7 @@ function copyPublicPlugin() {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), copyPublicPlugin()],
-  publicDir: false,
+  publicDir: 'public',
   optimizeDeps: {
     include: [
       'react',
