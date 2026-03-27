@@ -1212,10 +1212,9 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       )}
 
       {/* Invoices & Quotes Tabs */}
-      {databaseCustomer && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
-          {/* Tab Headers */}
-          <div className="border-b border-gray-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
+        {/* Tab Headers */}
+        <div className="border-b border-gray-200 dark:border-slate-700">
             <div className="flex">
               <button
                 onClick={() => setActiveTab('invoices')}
@@ -1348,7 +1347,6 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
             )}
           </div>
         </div>
-      )}
 
       {/* Artwork Library Modal */}
       {showArtworkLibrary && (
