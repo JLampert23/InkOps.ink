@@ -80,39 +80,35 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Blue Branding */}
-      <div className="hidden lg:flex lg:w-[40%] bg-gradient-to-br from-[#2563eb] via-[#1d4ed8] to-[#1e40af] relative overflow-hidden">
-        {/* Decorative circles */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-400/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 flex gap-3">
-          <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-          <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-          <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-          <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-          <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+      <div className="hidden lg:flex lg:w-[40%] relative overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <img
+            src="/image.png"
+            alt="Background"
+            className="w-full h-full object-cover"
+          />
         </div>
 
-        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-          {/* Logo */}
-          <div className="flex items-center">
+        <div className="relative z-10 flex flex-col justify-center items-center p-12 w-full text-center">
+          {/* Logo - Centered and Bigger */}
+          <div className="mb-8">
             <img
               src="/InkOps-01-copy.png"
               alt="InkOps Pro"
-              className="h-16 w-auto"
+              className="h-24 w-auto mx-auto"
             />
           </div>
 
-          {/* Main messaging */}
+          {/* Main messaging - Centered */}
           <div className="space-y-6">
             <h2 className="text-white text-5xl font-bold leading-tight">
               Imprinted Apparel<br />Operations System
             </h2>
-            <p className="text-blue-100 text-xl font-light">
+            <p className="text-white text-xl font-light">
               Quote - Art - Receive - Schedule - Invoice - Payment
             </p>
           </div>
-
-          <div className="h-20"></div>
         </div>
       </div>
 

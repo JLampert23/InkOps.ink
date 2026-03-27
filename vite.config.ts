@@ -45,6 +45,7 @@ export default defineConfig({
       overlay: true,
     },
   },
+  publicDir: false,
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
