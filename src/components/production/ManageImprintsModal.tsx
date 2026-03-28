@@ -655,23 +655,23 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/70">
-          <h2 className="text-lg font-semibold text-white">
+      <div className="bg-white dark:bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-slate-700/70">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Imprints{initialGroupLabel ? ` - ${initialGroupLabel}` : ''}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="flex-1 overflow-auto px-5 py-4">
           <div className="space-y-3">
-            <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+            <div className="bg-gray-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    Type of Work <span className="text-red-400">*</span>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">
+                    Type of Work <span className="text-red-600 dark:text-red-400">*</span>
                   </label>
                   <select
                     value={currentImprint.type_of_work}
@@ -680,7 +680,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                       type_of_work: e.target.value,
                       thread_ink_color: ''
                     })}
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
                   >
                     <option value="">Select type of work</option>
                     {workTypes.map((workType) => (
@@ -692,13 +692,13 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    Decoration Location <span className="text-red-400">*</span>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">
+                    Decoration Location <span className="text-red-600 dark:text-red-400">*</span>
                   </label>
                   <select
                     value={currentImprint.location}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, location: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
                   >
                     <option value="">Select location</option>
                     {decorationLocations.map((loc) => (
@@ -712,7 +712,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Pricing Matrix</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">Pricing Matrix</label>
                   <select
                     value={currentImprint.price_matrix_id}
                     onChange={(e) => {
@@ -727,7 +727,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                       });
                       setSelectedMatrixColumns(columns);
                     }}
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
                   >
                     <option value="">Select pricing matrix</option>
                     {priceMatrices.map((matrix) => (
@@ -739,7 +739,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Column</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">Column</label>
                   <select
                     value={currentImprint.pricing_matrix_column}
                     onChange={(e) => setCurrentImprint({
@@ -748,7 +748,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                       num_colors: extractNumColors(e.target.value)
                     })}
                     disabled={!currentImprint.price_matrix_id || selectedMatrixColumns.length === 0}
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {!currentImprint.price_matrix_id ? 'Select matrix first' : 'Select column'}
@@ -763,13 +763,13 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Details</label>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">Details</label>
                 <textarea
                   value={currentImprint.details}
                   onChange={(e) => setCurrentImprint({ ...currentImprint, details: e.target.value })}
                   rows={2}
                   placeholder="Enter imprint details (colors, size, special instructions)..."
-                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm resize-none"
+                  className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm resize-none"
                 />
               </div>
 
@@ -778,20 +778,20 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             <div className="flex items-center gap-2">
               <button
                 onClick={handleAddImprint}
-                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium flex items-center gap-1.5 transition-colors"
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500 text-white rounded text-xs font-medium flex items-center gap-1.5 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 {editingIndex !== null ? 'Update Imprint' : 'Add Imprint'}
               </button>
               <button
                 onClick={handleDone}
-                className="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-xs font-medium transition-colors"
+                className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 dark:hover:bg-green-500 text-white rounded text-xs font-medium transition-colors"
               >
                 Save
               </button>
               <button
                 onClick={onClose}
-                className="px-2.5 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors"
+                className="px-2.5 py-1.5 bg-gray-600 dark:bg-slate-600 hover:bg-gray-700 dark:hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors"
               >
                 Close
               </button>
@@ -799,35 +799,35 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
             {imprints.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                   Added Imprints{initialGroupLabel ? ` for ${initialGroupLabel}` : ''} ({imprints.length})
                 </h3>
                 {imprints.map((imprint, idx) => (
                   <div
                     key={idx}
-                    className="bg-slate-800/70 rounded-lg p-3 hover:bg-slate-800 cursor-pointer transition-colors border border-slate-700/50"
+                    className="bg-gray-100 dark:bg-slate-800/70 rounded-lg p-3 hover:bg-gray-200 dark:hover:bg-slate-800 cursor-pointer transition-colors border border-gray-300 dark:border-slate-700/50"
                     onClick={() => handleEditImprint(idx)}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-white font-medium text-sm">{imprint.location || imprint.matrix}</span>
-                          <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded">
+                          <span className="text-gray-900 dark:text-white font-medium text-sm">{imprint.location || imprint.matrix}</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded">
                             {imprint.type_of_work}
                           </span>
                           {imprint.pricing_matrix_column && (
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-gray-600 dark:text-gray-400">
                               {imprint.pricing_matrix_column}
                             </span>
                           )}
                           {imprint.price !== undefined && imprint.price > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-300 rounded font-medium">
+                            <span className="text-xs px-1.5 py-0.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 rounded font-medium">
                               ${imprint.price.toFixed(2)}
                             </span>
                           )}
                         </div>
                         {imprint.details && (
-                          <p className="text-xs text-gray-400 mb-1.5 line-clamp-1">{imprint.details}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5 line-clamp-1">{imprint.details}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
@@ -836,7 +836,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                             e.stopPropagation();
                             await handleSaveImprintBeforeMockup(idx);
                           }}
-                          className="text-blue-400 hover:text-blue-300 flex-shrink-0"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex-shrink-0"
                           title="Create Mockup"
                         >
                           <Palette className="w-4 h-4" />
@@ -846,7 +846,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                             e.stopPropagation();
                             handleDeleteImprint(idx);
                           }}
-                          className="text-red-400 hover:text-red-300 flex-shrink-0"
+                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 flex-shrink-0"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
