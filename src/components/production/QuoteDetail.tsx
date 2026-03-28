@@ -85,6 +85,9 @@ interface Quote {
   company_website: string | null;
   company_email: string | null;
   company_logo_url: string | null;
+  followup_count?: number;
+  last_followup_sent_at?: string | null;
+  next_followup_due_at?: string | null;
 }
 
 interface LineItem {
@@ -160,6 +163,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
   const [reopening, setReopening] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [sendingFollowup, setSendingFollowup] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -336,6 +340,76 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF');
+    }
+  };
+
+  const handleSendFollowup = async () => {
+    if (!quote) return;
+
+    const confirmed = await confirm(
+      'Send Follow-Up Email',
+      `Send a follow-up email to ${quote.customer_name || quote.customer_email}? This will count toward the maximum follow-up attempts for this quote.`
+    );
+
+    if (!confirmed) return;
+
+    setSendingFollowup(true);
+    try {
+      // Queue the follow-up in automation queue
+      const { error: queueError } = await supabase
+        .from('automation_queue')
+        .insert({
+          company_id: quote.company_id,
+          trigger_type: 'quote_followup',
+          trigger_data: {
+            quote_id: quote.id,
+            quote_number: quote.quote_number,
+            customer_id: quote.customer_id,
+            contact_id: quote.contact_id,
+            followup_number: (quote.followup_count || 0) + 1,
+          },
+          status: 'pending',
+          scheduled_for: new Date().toISOString(),
+          attempts: 0,
+          max_attempts: 3,
+        });
+
+      if (queueError) throw queueError;
+
+      // Update the quote with follow-up info
+      const { error: updateError } = await supabase
+        .from('quotes')
+        .update({
+          followup_count: (quote.followup_count || 0) + 1,
+          last_followup_sent_at: new Date().toISOString(),
+        })
+        .eq('id', quote.id);
+
+      if (updateError) throw updateError;
+
+      // Log the manual follow-up
+      await supabase
+        .from('quote_activity_log')
+        .insert({
+          company_id: quote.company_id,
+          quote_id: quote.id,
+          action: 'manual_followup',
+          meta: {
+            followup_number: (quote.followup_count || 0) + 1,
+            recipient_email: quote.customer_email,
+          },
+          performed_at: new Date().toISOString(),
+        });
+
+      showNotification('success', 'Follow-Up Sent', 'The follow-up email has been queued and will be sent shortly.');
+
+      // Reload quote details to show updated count
+      await loadQuoteDetails();
+    } catch (error) {
+      console.error('Error sending follow-up:', error);
+      showNotification('error', 'Error', error instanceof Error ? error.message : 'Failed to send follow-up email');
+    } finally {
+      setSendingFollowup(false);
     }
   };
 
@@ -561,6 +635,26 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <Send className="w-3 h-3" />
             {quote.status === 'draft' ? 'Send to Customer' : 'Resend'}
           </button>
+          {(quote.status === 'sent' || quote.status === 'pending') && (
+            <button
+              onClick={handleSendFollowup}
+              disabled={sendingFollowup}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={`Follow-up count: ${quote.followup_count || 0}`}
+            >
+              {sendingFollowup ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-3 h-3" />
+                  Send Follow-Up {quote.followup_count ? `(${quote.followup_count})` : ''}
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
