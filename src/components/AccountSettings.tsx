@@ -350,12 +350,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [defaultGarmentMarkup, setDefaultGarmentMarkup] = useState(0);
   const [savingGarmentMarkup, setSavingGarmentMarkup] = useState(false);
 
-  const [quoteFollowupEnabled, setQuoteFollowupEnabled] = useState(false);
-  const [quoteFollowupDays, setQuoteFollowupDays] = useState(7);
-  const [quoteFollowupMaxAttempts, setQuoteFollowupMaxAttempts] = useState(2);
-  const [quoteFollowupIntervalDays, setQuoteFollowupIntervalDays] = useState(7);
-  const [savingFollowupSettings, setSavingFollowupSettings] = useState(false);
-
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
   const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
@@ -540,10 +534,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setInvoiceTerms(data.invoice_terms || '');
         setQuoteTerms(data.quote_terms || '');
         setDefaultGarmentMarkup(data.default_garment_markup || 0);
-        setQuoteFollowupEnabled(data.quote_followup_enabled || false);
-        setQuoteFollowupDays(data.quote_followup_days || 7);
-        setQuoteFollowupMaxAttempts(data.quote_followup_max_attempts || 2);
-        setQuoteFollowupIntervalDays(data.quote_followup_interval_days || 7);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -793,36 +783,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const saveFollowupSettings = async () => {
-    if (!companySettings) {
-      showNotification('error', 'Error', 'Company settings not loaded');
-      return;
-    }
-
-    try {
-      setSavingFollowupSettings(true);
-
-      const { error } = await supabase
-        .from('company_settings')
-        .update({
-          quote_followup_enabled: quoteFollowupEnabled,
-          quote_followup_days: quoteFollowupDays,
-          quote_followup_max_attempts: quoteFollowupMaxAttempts,
-          quote_followup_interval_days: quoteFollowupIntervalDays,
-        })
-        .eq('id', companySettings.id);
-
-      if (error) throw error;
-
-      showNotification('success', 'Settings Saved', 'Quote follow-up settings have been updated successfully!');
-      await loadSettings();
-    } catch (err) {
-      console.error('Error saving follow-up settings:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save follow-up settings');
-    } finally {
-      setSavingFollowupSettings(false);
-    }
-  };
 
   const loadStatusesFromDatabase = async () => {
     try {
@@ -7966,152 +7926,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               </div>
 
-              {/* Quote Follow-Up Settings */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Quote Follow-Up Automation</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Automatically send follow-up emails to customers who haven't responded to quotes</p>
-                </div>
-
-                <div className="space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
-                  {/* Enable Follow-ups */}
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center h-9">
-                      <input
-                        type="checkbox"
-                        id="enable-followups"
-                        checked={quoteFollowupEnabled}
-                        onChange={(e) => setQuoteFollowupEnabled(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <label htmlFor="enable-followups" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Enable Automatic Follow-Ups
-                      </label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        When enabled, the system will automatically send follow-up emails for quotes that are in "sent" or "pending" status
-                      </p>
-                    </div>
-                  </div>
-
-                  {quoteFollowupEnabled && (
-                    <>
-                      {/* Days Before First Follow-up */}
-                      <div>
-                        <label htmlFor="followup-days" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Days Before First Follow-Up
-                        </label>
-                        <input
-                          type="number"
-                          id="followup-days"
-                          value={quoteFollowupDays}
-                          onChange={(e) => setQuoteFollowupDays(Math.max(1, Math.min(365, parseInt(e.target.value) || 7)))}
-                          min="1"
-                          max="365"
-                          className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-                        />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Number of days to wait after sending a quote before sending the first follow-up (1-365 days)
-                        </p>
-                      </div>
-
-                      {/* Maximum Attempts */}
-                      <div>
-                        <label htmlFor="followup-max-attempts" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Maximum Follow-Up Attempts
-                        </label>
-                        <input
-                          type="number"
-                          id="followup-max-attempts"
-                          value={quoteFollowupMaxAttempts}
-                          onChange={(e) => setQuoteFollowupMaxAttempts(Math.max(1, Math.min(10, parseInt(e.target.value) || 2)))}
-                          min="1"
-                          max="10"
-                          className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-                        />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Maximum number of follow-up emails to send per quote (1-10 attempts)
-                        </p>
-                      </div>
-
-                      {/* Interval Between Follow-ups */}
-                      <div>
-                        <label htmlFor="followup-interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Days Between Follow-Ups
-                        </label>
-                        <input
-                          type="number"
-                          id="followup-interval"
-                          value={quoteFollowupIntervalDays}
-                          onChange={(e) => setQuoteFollowupIntervalDays(Math.max(1, Math.min(90, parseInt(e.target.value) || 7)))}
-                          min="1"
-                          max="90"
-                          className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-                        />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Number of days to wait between subsequent follow-up emails (1-90 days)
-                        </p>
-                      </div>
-
-                      {/* Preview Timeline */}
-                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                        <p className="text-xs font-medium text-blue-900 dark:text-blue-300 mb-3 flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          Follow-Up Timeline Preview
-                        </p>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="text-blue-600 dark:text-blue-400 font-medium">Day 0:</span>
-                            <span className="text-gray-700 dark:text-gray-300">Quote sent to customer</span>
-                          </div>
-                          {Array.from({ length: quoteFollowupMaxAttempts }, (_, i) => (
-                            <div key={i} className="flex items-center gap-2 text-sm">
-                              <span className="text-blue-600 dark:text-blue-400 font-medium">
-                                Day {i === 0 ? quoteFollowupDays : quoteFollowupDays + (i * quoteFollowupIntervalDays)}:
-                              </span>
-                              <span className="text-gray-700 dark:text-gray-300">
-                                Follow-up #{i + 1} sent automatically
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Template Note */}
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
-                        <p className="text-xs font-medium text-yellow-900 dark:text-yellow-300 mb-2 flex items-center gap-2">
-                          <Mail className="w-4 h-4" />
-                          Email Template Configuration
-                        </p>
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                          Follow-up emails use the "Quote Follow-Up" template from the Communication Templates section.
-                          You can customize the email content, subject line, and attachments in the templates manager.
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Save Button */}
-                  <button
-                    onClick={saveFollowupSettings}
-                    disabled={savingFollowupSettings}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {savingFollowupSettings ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Follow-Up Settings
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
 
               {/* REMOVED: Old Payment Terms section replaced by rich text editors above */}
               {false && <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
