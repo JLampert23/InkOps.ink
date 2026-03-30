@@ -100,10 +100,10 @@ BEGIN
   END IF;
 
   -- Get quote details
-  SELECT 
+  SELECT
     created_at,
     status,
-    expiration_date,
+    valid_until,
     followup_count,
     last_followup_sent_at
   INTO v_quote
@@ -116,7 +116,7 @@ BEGIN
   END IF;
 
   -- Don't send if expired
-  IF v_quote.expiration_date IS NOT NULL AND v_quote.expiration_date < CURRENT_DATE THEN
+  IF v_quote.valid_until IS NOT NULL AND v_quote.valid_until < CURRENT_DATE THEN
     RETURN NULL;
   END IF;
 
@@ -164,7 +164,7 @@ BEGIN
       AND q.next_followup_due_at IS NOT NULL
       AND q.next_followup_due_at <= now()
       AND q.followup_count < cs.quote_followup_max_attempts
-      AND (q.expiration_date IS NULL OR q.expiration_date >= CURRENT_DATE)
+      AND (q.valid_until IS NULL OR q.valid_until >= CURRENT_DATE)
   LOOP
     -- Queue automation for this quote follow-up
     INSERT INTO automation_queue (
