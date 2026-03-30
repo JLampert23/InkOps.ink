@@ -491,14 +491,20 @@ Deno.serve(async (req: Request) => {
 
       if (approvalError) throw approvalError;
 
-      // Update quote status to sent
-      await supabase
+      // Update quote status to sent (use admin client to ensure update succeeds)
+      const { error: updateError } = await supabaseAdmin
         .from("quotes")
         .update({
           status: "sent",
           sent_at: new Date().toISOString(),
         })
-        .eq("id", quoteId);
+        .eq("id", quoteId)
+        .eq("company_id", profile.company_id);
+
+      if (updateError) {
+        console.error('Error updating quote status:', updateError);
+        throw new Error(`Failed to update quote status: ${updateError.message}`);
+      }
 
       // Get company settings to retrieve the inkops subdomain and company info (use admin client to bypass RLS)
       const { data: companySettings } = await supabaseAdmin
