@@ -172,7 +172,7 @@ function renderQuotePage(
       <h3 style="font-size:18px;font-weight:700;color:#111827;margin:0 0 20px;">Your Response</h3>
       <div class="form-group">
         <label>Your Name <span class="req">*</span></label>
-        <input type="text" id="approver-name" class="form-input" placeholder="Enter your name" value="${escapeHtml(quote.customer_name)}" required>
+        <input type="text" id="approver-name" class="form-input" placeholder="Enter your name" value="${escapeHtml(quote.contact_name || quote.customer_name)}" required>
       </div>
       <div class="form-group">
         <label>Your Email <span class="req">*</span></label>
@@ -225,10 +225,11 @@ function renderQuotePage(
 
       <div class="grid-2">
         <div>
-          <div class="label">Customer</div>
-          <div class="value"><strong>${escapeHtml(quote.customer_name)}</strong></div>
-          ${quote.customer_company ? `<div class="value">${escapeHtml(quote.customer_company)}</div>` : ''}
+          <div class="label">Contact</div>
+          ${quote.contact_name ? `<div class="value"><strong>${escapeHtml(quote.contact_name)}</strong></div>` : `<div class="value"><strong>${escapeHtml(quote.customer_name)}</strong></div>`}
+          ${quote.customer_company || quote.customer_name ? `<div class="value">${escapeHtml(quote.customer_company || quote.customer_name)}</div>` : ''}
           ${quote.contact_email || quote.customer_email ? `<div class="value">${escapeHtml(quote.contact_email || quote.customer_email)}</div>` : ''}
+          ${quote.contact_phone || quote.customer_phone ? `<div class="value">${escapeHtml(quote.contact_phone || quote.customer_phone)}</div>` : ''}
         </div>
         <div>
           <div class="label">Quote Details</div>
@@ -465,6 +466,25 @@ Deno.serve(async (req: Request) => {
         .eq("id", approval.company_id)
         .maybeSingle();
 
+      // Fetch contact information if contact_id exists
+      let contactInfo = null;
+      if (approval.quote?.contact_id) {
+        const { data: contact } = await supabase
+          .from("customer_contacts")
+          .select("full_name, email, phone")
+          .eq("id", approval.quote.contact_id)
+          .maybeSingle();
+        contactInfo = contact;
+      }
+
+      // Merge contact info into quote object
+      const quoteWithContact = {
+        ...approval.quote,
+        contact_name: contactInfo?.full_name || null,
+        contact_email: contactInfo?.email || null,
+        contact_phone: contactInfo?.phone || null,
+      };
+
       let approvalStatus = 'pending';
       if (approval.is_used) {
         const quoteStatus = approval.quote?.status;
@@ -475,7 +495,7 @@ Deno.serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({
-          quote: approval.quote,
+          quote: quoteWithContact,
           line_items: lineItems || [],
           imprints: imprints || [],
           company_settings: companySettings || {},
