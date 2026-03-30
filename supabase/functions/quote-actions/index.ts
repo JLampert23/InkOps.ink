@@ -479,8 +479,8 @@ Deno.serve(async (req: Request) => {
 
       if (approvalError) throw approvalError;
 
-      // Update quote status to sent
-      await supabase
+      // Update quote status to sent (use admin client to bypass RLS)
+      await supabaseAdmin
         .from("quotes")
         .update({
           status: "sent",
