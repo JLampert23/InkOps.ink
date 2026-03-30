@@ -352,10 +352,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const handleSendFollowup = async () => {
     if (!quote) return;
 
-    const confirmed = await confirm(
-      'Send Follow-Up Email',
-      `Send a follow-up email to ${quote.customer_name || quote.customer_email}? This will count toward the maximum follow-up attempts for this quote.`
-    );
+    const confirmed = await confirm({
+      title: 'Send Follow-Up Email',
+      message: 'This will send a reminder email about the pending quote. Click Confirm to Send.',
+      confirmLabel: 'Confirm',
+      variant: 'info',
+    });
 
     if (!confirmed) return;
 
