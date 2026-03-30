@@ -11,6 +11,8 @@ export interface QuotePDFData {
   customer_phone: string;
   bill_company?: string;
   bill_name?: string;
+  bill_first_name?: string;
+  bill_last_name?: string;
   bill_address_1?: string;
   bill_address_2?: string;
   bill_city?: string;
@@ -358,7 +360,11 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     billY += 3.2;
     doc.setFont('helvetica', 'normal');
   }
-  if (quote.bill_name) {
+  if (quote.bill_first_name || quote.bill_last_name) {
+    doc.setTextColor(55, 65, 81);
+    doc.text(`${quote.bill_first_name || ''} ${quote.bill_last_name || ''}`.trim(), billToX, billY);
+    billY += 3.2;
+  } else if (quote.bill_name) {
     doc.setTextColor(55, 65, 81);
     doc.text(quote.bill_name, billToX, billY);
     billY += 3.2;
@@ -388,7 +394,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     doc.text(quote.bill_phone || quote.customer_phone, billToX, billY);
     billY += 3.2;
   }
-  if (!quote.bill_company && !quote.bill_name && !quote.bill_address_1) {
+  if (!quote.bill_company && !quote.bill_name && !quote.bill_first_name && !quote.bill_last_name && !quote.bill_address_1) {
     doc.setTextColor(156, 163, 175);
     doc.setFont('helvetica', 'italic');
     doc.text('No billing address provided', billToX, billY);

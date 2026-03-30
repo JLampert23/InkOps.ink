@@ -683,8 +683,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
             <div className="text-sm space-y-0.5">
               {quote.bill_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.bill_company}</p>}
-              {quote.bill_name && <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>}
-              {quote.contact_name && quote.contact_name !== quote.bill_name && (
+              {(quote.bill_first_name || quote.bill_last_name) && (
+                <p className="text-gray-700 dark:text-gray-300">
+                  {quote.bill_first_name} {quote.bill_last_name}
+                </p>
+              )}
+              {!quote.bill_first_name && !quote.bill_last_name && quote.bill_name && (
+                <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>
+              )}
+              {quote.contact_name && quote.contact_name !== quote.bill_name && quote.contact_name !== `${quote.bill_first_name} ${quote.bill_last_name}`.trim() && (
                 <p className="text-gray-600 dark:text-gray-400 text-xs italic">Contact: {quote.contact_name}</p>
               )}
               {quote.bill_address_1 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_1}</p>}
@@ -704,7 +711,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               {(quote.contact_phone || quote.bill_phone || quote.customer_phone) && (
                 <p className="text-gray-700 dark:text-gray-300">{quote.contact_phone || quote.bill_phone || quote.customer_phone}</p>
               )}
-              {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
+              {!quote.bill_company && !quote.bill_name && !quote.bill_first_name && !quote.bill_last_name && !quote.bill_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
               )}
             </div>

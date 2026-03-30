@@ -316,7 +316,15 @@ export default function PublicQuoteApprovalPage() {
               <div>
                 <h3 className="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wide">Customer Billing</h3>
                 <div className="text-xs text-gray-700 leading-tight space-y-0">
-                  <p className="font-medium">{quote.bill_name || quote.customer_name || ''}</p>
+                  {(quote.bill_first_name || quote.bill_last_name) && (
+                    <p className="font-medium">{quote.bill_first_name} {quote.bill_last_name}</p>
+                  )}
+                  {!quote.bill_first_name && !quote.bill_last_name && quote.bill_name && (
+                    <p className="font-medium">{quote.bill_name}</p>
+                  )}
+                  {!quote.bill_first_name && !quote.bill_last_name && !quote.bill_name && quote.customer_name && (
+                    <p className="font-medium">{quote.customer_name}</p>
+                  )}
                   {(quote.bill_company || quote.customer_company) && <p>{quote.bill_company || quote.customer_company}</p>}
                   {quote.bill_address_1 && <p>{quote.bill_address_1}</p>}
                   {quote.bill_address_2 && <p>{quote.bill_address_2}</p>}
