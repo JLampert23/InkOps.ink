@@ -428,6 +428,8 @@ Deno.serve(async (req: Request) => {
     // POST /quotes/:id/send
     if (action === "send") {
       const body = await req.json();
+      const deliveryMethod = body.delivery_method || 'email';
+      const customerPhone = body.customer_phone || '';
 
       // Check if quote exists
       const { data: quote, error: fetchError } = await supabase
@@ -442,16 +444,21 @@ Deno.serve(async (req: Request) => {
 
       // Determine recipient email - prioritize contact email if contact_id exists
       let recipientEmail = quote.customer_email;
+      let recipientPhone = customerPhone || quote.customer_phone;
       if (quote.contact_id) {
         const { data: contact } = await supabase
           .from("customer_contacts")
-          .select("email")
+          .select("email, phone")
           .eq("id", quote.contact_id)
           .maybeSingle();
 
         if (contact?.email) {
           recipientEmail = contact.email;
           console.log('Using contact email:', recipientEmail, 'for contact_id:', quote.contact_id);
+        }
+        if (contact?.phone && !customerPhone) {
+          recipientPhone = contact.phone;
+          console.log('Using contact phone:', recipientPhone, 'for contact_id:', quote.contact_id);
         }
       }
 
@@ -499,134 +506,232 @@ Deno.serve(async (req: Request) => {
       const subdomain = companySettings?.inkops_subdomain || 'app';
       const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
 
-      // Send email with template or default
-      try {
-        let subject = `Quote ${quote.quote_number} - Review and Approve`;
-        let html = `
-          <p>Hello ${quote.customer_name || 'valued customer'},</p>
-          <p>Your quote ${quote.quote_number} is ready for review.</p>
-          <p><strong>Total: $${(quote.total || 0).toFixed(2)}</strong></p>
-          <p>
-            <a href="${approvalUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              View and Approve Quote
-            </a>
-          </p>
-          ${expiresAt ? `<p><small>This link expires on ${new Date(expiresAt).toLocaleDateString()}</small></p>` : ''}
-          <p>Thank you for your business!</p>
-        `;
+      // Send email if delivery method includes email
+      if (deliveryMethod === 'email' || deliveryMethod === 'both') {
+        try {
+          let subject = `Quote ${quote.quote_number} - Review and Approve`;
+          let html = `
+            <p>Hello ${quote.customer_name || 'valued customer'},</p>
+            <p>Your quote ${quote.quote_number} is ready for review.</p>
+            <p><strong>Total: $${(quote.total || 0).toFixed(2)}</strong></p>
+            <p>
+              <a href="${approvalUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View and Approve Quote
+              </a>
+            </p>
+            ${expiresAt ? `<p><small>This link expires on ${new Date(expiresAt).toLocaleDateString()}</small></p>` : ''}
+            <p>Thank you for your business!</p>
+          `;
 
-        // If template_id is provided, use the communication template
-        if (body.template_id) {
-          const { data: template } = await supabase
-            .from("communication_templates")
-            .select("*")
-            .eq("id", body.template_id)
-            .eq("company_id", profile.company_id)
-            .maybeSingle();
+          // If template_id is provided, use the communication template
+          if (body.template_id) {
+            const { data: template } = await supabase
+              .from("communication_templates")
+              .select("*")
+              .eq("id", body.template_id)
+              .eq("company_id", profile.company_id)
+              .maybeSingle();
 
-          if (template) {
-            // Format quote number: "QTE-0038" -> "Quote 0038"
-            const formattedQuoteNumber = quote.quote_number
-              ? quote.quote_number.replace(/^QTE-/, 'Quote ').replace(/^INV-/, 'Invoice ')
-              : '';
+            if (template) {
+              // Format quote number: "QTE-0038" -> "Quote 0038"
+              const formattedQuoteNumber = quote.quote_number
+                ? quote.quote_number.replace(/^QTE-/, 'Quote ').replace(/^INV-/, 'Invoice ')
+                : '';
 
-            // Build shortcode data for template processing
-            const shortcodeData: ShortCodeData = {
-              customer_first_name: quote.customer_name?.split(' ')[0] || '',
-              customer_last_name: quote.customer_name?.split(' ').slice(1).join(' ') || '',
-              customer_full_name: quote.customer_name || '',
-              customer_company: quote.customer_company || '',
-              customer_email: quote.customer_email || '',
-              customer_phone: quote.customer_phone || '',
-              customer_address: quote.bill_address_1 || '',
-              customer_city: quote.bill_city || '',
-              customer_state: quote.bill_state || '',
-              customer_zip: quote.bill_zip || '',
-              quote_number: formattedQuoteNumber,
-              quote_total: `$${quote.total?.toFixed(2) || '0.00'}`,
-              quote_subtotal: `$${quote.subtotal?.toFixed(2) || '0.00'}`,
-              quote_tax: `$${quote.tax_amount?.toFixed(2) || '0.00'}`,
-              quote_discount: quote.discount_amount ? `$${quote.discount_amount.toFixed(2)}` : '$0.00',
-              quote_link: approvalUrl,
-              quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
-              quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
-              quote_status: quote.status || 'sent',
-              company_name: companySettings?.company_name || '',
-              company_address: companySettings?.company_address || '',
-              company_city: companySettings?.company_city || '',
-              company_state: companySettings?.company_state || '',
-              company_zip: companySettings?.company_zip || '',
-              company_phone: companySettings?.company_phone || '',
-              company_email: companySettings?.email_from_address || '',
-              company_website: companySettings?.company_website || '',
-              user_name: profile.full_name || '',
-              user_first_name: profile.full_name?.split(' ')[0] || '',
-              user_last_name: profile.full_name?.split(' ').slice(1).join(' ') || '',
-              user_email: profile.email || '',
-              current_date: new Date().toLocaleDateString(),
-              current_year: new Date().getFullYear().toString(),
-            };
+              // Build shortcode data for template processing
+              const shortcodeData: ShortCodeData = {
+                customer_first_name: quote.customer_name?.split(' ')[0] || '',
+                customer_last_name: quote.customer_name?.split(' ').slice(1).join(' ') || '',
+                customer_full_name: quote.customer_name || '',
+                customer_company: quote.customer_company || '',
+                customer_email: quote.customer_email || '',
+                customer_phone: quote.customer_phone || '',
+                customer_address: quote.bill_address_1 || '',
+                customer_city: quote.bill_city || '',
+                customer_state: quote.bill_state || '',
+                customer_zip: quote.bill_zip || '',
+                quote_number: formattedQuoteNumber,
+                quote_total: `$${quote.total?.toFixed(2) || '0.00'}`,
+                quote_subtotal: `$${quote.subtotal?.toFixed(2) || '0.00'}`,
+                quote_tax: `$${quote.tax_amount?.toFixed(2) || '0.00'}`,
+                quote_discount: quote.discount_amount ? `$${quote.discount_amount.toFixed(2)}` : '$0.00',
+                quote_link: approvalUrl,
+                quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
+                quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
+                quote_status: quote.status || 'sent',
+                company_name: companySettings?.company_name || '',
+                company_address: companySettings?.company_address || '',
+                company_city: companySettings?.company_city || '',
+                company_state: companySettings?.company_state || '',
+                company_zip: companySettings?.company_zip || '',
+                company_phone: companySettings?.company_phone || '',
+                company_email: companySettings?.email_from_address || '',
+                company_website: companySettings?.company_website || '',
+                user_name: profile.full_name || '',
+                user_first_name: profile.full_name?.split(' ')[0] || '',
+                user_last_name: profile.full_name?.split(' ').slice(1).join(' ') || '',
+                user_email: profile.email || '',
+                current_date: new Date().toLocaleDateString(),
+                current_year: new Date().getFullYear().toString(),
+              };
 
-            // Process shortcodes in subject and body
-            subject = renderTemplate(template.subject_template, shortcodeData);
-            html = renderTemplate(template.body_template, shortcodeData);
+              // Process shortcodes in subject and body
+              subject = renderTemplate(template.subject_template, shortcodeData);
+              html = renderTemplate(template.body_template, shortcodeData);
+            }
           }
-        }
 
-        console.log('Attempting to send email to:', recipientEmail);
-        console.log('Email payload:', {
-          to: recipientEmail,
-          subject,
-          hasHtml: !!html,
-          company_id: profile.company_id,
-        });
-
-        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+          console.log('Attempting to send email to:', recipientEmail);
+          console.log('Email payload:', {
             to: recipientEmail,
             subject,
-            html,
+            hasHtml: !!html,
             company_id: profile.company_id,
-          }),
-        });
-
-        if (!emailResponse.ok) {
-          const errorText = await emailResponse.text();
-          console.error('send-email function failed:', {
-            status: emailResponse.status,
-            statusText: emailResponse.statusText,
-            error: errorText,
           });
 
-          // Try to parse error as JSON for better error messages
-          let errorMessage = errorText;
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error || errorText;
-          } catch {
-            // If not JSON, use the text as-is
+          const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: recipientEmail,
+              subject,
+              html,
+              company_id: profile.company_id,
+            }),
+          });
+
+          if (!emailResponse.ok) {
+            const errorText = await emailResponse.text();
+            console.error('send-email function failed:', {
+              status: emailResponse.status,
+              statusText: emailResponse.statusText,
+              error: errorText,
+            });
+
+            // Try to parse error as JSON for better error messages
+            let errorMessage = errorText;
+            try {
+              const errorData = JSON.parse(errorText);
+              errorMessage = errorData.error || errorText;
+            } catch {
+              // If not JSON, use the text as-is
+            }
+
+            throw new Error(`Email sending failed: ${errorMessage}`);
           }
 
-          throw new Error(`Email sending failed: ${errorMessage}`);
+          const emailResult = await emailResponse.json();
+          console.log('Email sent successfully:', emailResult);
+        } catch (emailError) {
+          console.error('Error in email sending process:', emailError);
+          throw new Error(`Failed to send quote email: ${emailError.message || 'Unknown error'}`);
         }
-
-        const emailResult = await emailResponse.json();
-        console.log('Email sent successfully:', emailResult);
-      } catch (emailError) {
-        console.error('Error in email sending process:', emailError);
-        throw new Error(`Failed to send quote email: ${emailError.message || 'Unknown error'}`);
       }
+
+      // Send SMS if delivery method includes SMS
+      if ((deliveryMethod === 'sms' || deliveryMethod === 'both') && recipientPhone) {
+        try {
+          console.log('Attempting to send SMS to:', recipientPhone);
+
+          // Get SMS template from communication template
+          let smsBody = `Hi ${quote.customer_name?.split(' ')[0] || 'there'}, your quote ${quote.quote_number} for $${(quote.total || 0).toFixed(2)} is ready. Review & approve: ${approvalUrl}`;
+
+          if (body.template_id) {
+            const { data: template } = await supabase
+              .from("communication_templates")
+              .select("sms_body_template")
+              .eq("id", body.template_id)
+              .eq("company_id", profile.company_id)
+              .maybeSingle();
+
+            if (template?.sms_body_template) {
+              const formattedQuoteNumber = quote.quote_number
+                ? quote.quote_number.replace(/^QTE-/, 'Quote ').replace(/^INV-/, 'Invoice ')
+                : '';
+
+              const smsShortcodeData: ShortCodeData = {
+                customer_first_name: quote.customer_name?.split(' ')[0] || '',
+                customer_last_name: quote.customer_name?.split(' ').slice(1).join(' ') || '',
+                customer_full_name: quote.customer_name || '',
+                customer_company: quote.customer_company || '',
+                customer_email: quote.customer_email || '',
+                customer_phone: quote.customer_phone || '',
+                quote_number: formattedQuoteNumber,
+                quote_total: `$${quote.total?.toFixed(2) || '0.00'}`,
+                quote_subtotal: `$${quote.subtotal?.toFixed(2) || '0.00'}`,
+                quote_link: approvalUrl,
+                quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
+                quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
+                company_name: companySettings?.company_name || '',
+                company_phone: companySettings?.company_phone || '',
+                current_date: new Date().toLocaleDateString(),
+              };
+
+              smsBody = renderTemplate(template.sms_body_template, smsShortcodeData);
+            }
+          }
+
+          // Send SMS via twilio-sms edge function
+          const smsResponse = await fetch(`${supabaseUrl}/functions/v1/twilio-sms`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              invoiceId: quoteId,
+              customerId: quote.customer_id || null,
+              phoneNumber: recipientPhone,
+              messageBody: smsBody,
+              quoteId: quoteId,
+            }),
+          });
+
+          if (!smsResponse.ok) {
+            const smsError = await smsResponse.text();
+            console.error('SMS sending failed:', smsError);
+            if (deliveryMethod === 'sms') {
+              throw new Error(`SMS sending failed: ${smsError}`);
+            }
+          } else {
+            const smsResult = await smsResponse.json();
+            console.log('SMS sent successfully:', smsResult);
+
+            // Log SMS to sms_logs table with quote_id
+            await supabaseAdmin.from('sms_logs').insert([{
+              quote_id: quoteId,
+              company_id: profile.company_id,
+              customer_id: quote.customer_id || null,
+              phone_number: recipientPhone,
+              message_body: smsBody,
+              delivery_status: 'sent',
+              twilio_sid: smsResult.sid || null,
+              sent_at: new Date().toISOString(),
+            }]);
+          }
+        } catch (smsError) {
+          console.error('Error in SMS sending process:', smsError);
+          if (deliveryMethod === 'sms') {
+            throw new Error(`Failed to send quote SMS: ${smsError.message || 'Unknown error'}`);
+          }
+        }
+      }
+
+      const deliveryMessage = deliveryMethod === 'both'
+        ? 'Quote sent via email and SMS successfully'
+        : deliveryMethod === 'sms'
+          ? 'Quote sent via SMS successfully'
+          : 'Quote sent successfully';
 
       return new Response(
         JSON.stringify({
           approval,
           approvalUrl,
-          message: "Quote sent successfully",
+          message: deliveryMessage,
+          deliveryMethod,
         }),
         {
           headers: {

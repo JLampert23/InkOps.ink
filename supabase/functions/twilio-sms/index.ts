@@ -8,10 +8,12 @@ const corsHeaders = {
 };
 
 interface SendSMSRequest {
-  invoiceId: string;
-  customerId: string;
+  invoiceId?: string;
+  quoteId?: string;
+  customerId?: string;
   phoneNumber: string;
   messageBody: string;
+  companyId?: string;
 }
 
 interface TwilioResponse {
@@ -77,11 +79,11 @@ Deno.serve(async (req: Request) => {
 
     const companyId = userProfile.company_id;
 
-    const { invoiceId, customerId, phoneNumber, messageBody }: SendSMSRequest = await req.json();
+    const { invoiceId, quoteId, customerId, phoneNumber, messageBody }: SendSMSRequest = await req.json();
 
-    if (!invoiceId || !phoneNumber || !messageBody) {
+    if (!phoneNumber || !messageBody) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Missing required fields: phoneNumber and messageBody are required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -177,8 +179,10 @@ Deno.serve(async (req: Request) => {
 
     // Log SMS to database
     const smsLog = {
-      invoice_id: invoiceId,
-      customer_id: customerId,
+      invoice_id: invoiceId || null,
+      quote_id: quoteId || null,
+      company_id: companyId,
+      customer_id: customerId || null,
       phone_number: phoneNumber,
       message_body: messageBody,
       delivery_status: twilioResponse.ok ? "sent" : "failed",
