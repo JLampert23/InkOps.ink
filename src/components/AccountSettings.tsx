@@ -3850,7 +3850,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
                     <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Email Templates
+                      Communication Templates
                     </div>
                   </div>
                   {activeTab === 'email-templates' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -4855,7 +4855,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
 
                 <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Available Email Templates:</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Available Communication Templates:</p>
                   <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1 ml-4 list-disc">
                     <li>Invoice Reminders</li>
                     <li>Payment Confirmations</li>
