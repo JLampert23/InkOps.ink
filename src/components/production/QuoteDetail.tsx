@@ -304,6 +304,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     console.log('QuoteDetail: handleDownloadQuote called');
     console.log('QuoteDetail: quote company_logo_url:', quote.company_logo_url);
     console.log('QuoteDetail: companySettings:', companySettings);
+    console.log('QuoteDetail: contact info in quote:', {
+      contact_name: quote.contact_name,
+      contact_email: quote.contact_email,
+      contact_phone: quote.contact_phone,
+      bill_email: quote.bill_email,
+      bill_phone: quote.bill_phone,
+      customer_email: quote.customer_email,
+      customer_phone: quote.customer_phone,
+    });
 
     const quotePDFData: QuotePDFData = {
       ...quote,

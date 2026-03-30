@@ -381,14 +381,26 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     doc.text(`${quote.bill_city}, ${quote.bill_state} ${quote.bill_zip}`, billToX, billY);
     billY += 3.2;
   }
+  console.log('PDF Export - Contact info check:', {
+    contact_email: quote.contact_email,
+    bill_email: quote.bill_email,
+    customer_email: quote.customer_email,
+    contact_phone: quote.contact_phone,
+    bill_phone: quote.bill_phone,
+    customer_phone: quote.customer_phone,
+  });
   if (quote.contact_email || quote.bill_email || quote.customer_email) {
     doc.setTextColor(37, 99, 235);
-    doc.text(quote.contact_email || quote.bill_email || quote.customer_email, billToX, billY);
+    const emailToShow = quote.contact_email || quote.bill_email || quote.customer_email;
+    console.log('PDF Export - Showing email:', emailToShow);
+    doc.text(emailToShow, billToX, billY);
     billY += 3.2;
   }
   if (quote.contact_phone || quote.bill_phone || quote.customer_phone) {
     doc.setTextColor(55, 65, 81);
-    doc.text(quote.contact_phone || quote.bill_phone || quote.customer_phone, billToX, billY);
+    const phoneToShow = quote.contact_phone || quote.bill_phone || quote.customer_phone;
+    console.log('PDF Export - Showing phone:', phoneToShow);
+    doc.text(phoneToShow, billToX, billY);
     billY += 3.2;
   }
   if (!quote.bill_company && !quote.bill_name && !quote.bill_address_1) {
