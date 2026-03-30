@@ -70,8 +70,12 @@ export default function PublicQuoteApprovalPage() {
       }
       const result = await response.json();
       setData(result);
-      if (result.quote?.customer_name) setApproverName(result.quote.customer_name);
-      if (result.quote?.customer_email) setApproverEmail(result.quote.customer_email);
+      if (result.quote?.bill_name || result.quote?.customer_name) {
+        setApproverName(result.quote.bill_name || result.quote.customer_name);
+      }
+      if (result.quote?.bill_email || result.quote?.customer_email) {
+        setApproverEmail(result.quote.bill_email || result.quote.customer_email);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -328,7 +332,7 @@ export default function PublicQuoteApprovalPage() {
                   {(quote.bill_city || quote.billing_address?.city) && (
                     <p>{quote.bill_city || quote.billing_address?.city}, {quote.bill_state || quote.billing_address?.state || ''} {quote.bill_zip || quote.billing_address?.zip || ''}</p>
                   )}
-                  {quote.customer_email && <p className="text-blue-600">{quote.customer_email}</p>}
+                  {(quote.bill_email || quote.customer_email) && <p className="text-blue-600">{quote.bill_email || quote.customer_email}</p>}
                   {(quote.bill_phone || quote.customer_phone) && <p>{quote.bill_phone || quote.customer_phone}</p>}
                 </div>
               </div>
