@@ -713,11 +713,20 @@ async function executeRequestApproval(supabase: any, config: any, triggerData: a
     throw new Error(`Failed to create approval: ${approvalError.message}`);
   }
 
+  // Get company settings for subdomain
+  const { data: companySettings } = await supabase
+    .from('company_settings')
+    .select('inkops_subdomain')
+    .eq('id', companyId)
+    .maybeSingle();
+
+  // Generate approval URL - always use inkops subdomain format
+  const subdomain = companySettings?.inkops_subdomain || 'app';
+  const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approval.approval_token}`;
+
   // Send approval request email
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-  const approvalUrl = `${supabaseUrl}/approve/${approval.id}`;
 
   await fetch(`${supabaseUrl}/functions/v1/send-email`, {
     method: 'POST',
