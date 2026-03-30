@@ -1231,7 +1231,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           quoteId={quoteId}
           quoteNumber={quote.quote_number}
           customerName={quote.customer_name}
-          customerEmail={quote.customer_email || quote.bill_email || ''}
+          customerEmail={quote.contact_email || quote.customer_email || quote.bill_email || ''}
           totalAmount={quote.total || 0}
           onClose={() => setShowSendModal(false)}
           onSuccess={() => {

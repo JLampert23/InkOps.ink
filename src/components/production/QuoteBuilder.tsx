@@ -3296,7 +3296,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           quoteId={quoteId!}
           quoteNumber={quoteNumber}
           customerName={customers.find(c => c.id === selectedCustomerId)?.company_name || ''}
-          customerEmail={customers.find(c => c.id === selectedCustomerId)?.email || ''}
+          customerEmail={
+            customerContacts.find(c => c.id === selectedContactId)?.email ||
+            customers.find(c => c.id === selectedCustomerId)?.email ||
+            ''
+          }
           totalAmount={totals.totalDue}
           onClose={() => setShowSendQuoteModal(false)}
           onSuccess={() => {

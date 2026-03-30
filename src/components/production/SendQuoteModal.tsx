@@ -212,7 +212,8 @@ export function SendQuoteModal({
 
       console.log('Quote sent successfully:', data);
 
-      showNotification('success', 'Quote Sent', `Quote sent successfully to ${customerEmail}`);
+      const sentTo = data?.recipientEmail || customerEmail;
+      showNotification('success', 'Quote Sent', `Quote sent successfully to ${sentTo}`);
       onSuccess();
       onClose();
     } catch (error) {

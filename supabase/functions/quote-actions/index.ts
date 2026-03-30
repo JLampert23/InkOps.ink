@@ -429,16 +429,41 @@ Deno.serve(async (req: Request) => {
     if (action === "send") {
       const body = await req.json();
 
-      // Check if quote exists
+      // Check if quote exists and fetch contact email if available
       const { data: quote, error: fetchError } = await supabase
         .from("quotes")
-        .select("*")
+        .select(`
+          *,
+          contact:customer_contacts(email, full_name)
+        `)
         .eq("id", quoteId)
         .eq("company_id", profile.company_id)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
+
+      // Determine recipient email: use override from body, then contact email, then customer email
+      let recipientEmail: string;
+      let recipientSource: string;
+
+      if (body.recipient_email) {
+        // Manual override provided
+        recipientEmail = body.recipient_email;
+        recipientSource = 'manual_override';
+      } else if (quote.contact && Array.isArray(quote.contact) && quote.contact.length > 0 && quote.contact[0]?.email) {
+        // Use contact person's email (contact is returned as array from Supabase)
+        recipientEmail = quote.contact[0].email;
+        recipientSource = 'contact_person';
+      } else if (quote.customer_email) {
+        // Fallback to customer billing email
+        recipientEmail = quote.customer_email;
+        recipientSource = 'customer_billing';
+      } else {
+        throw new Error("No valid email recipient found for this quote");
+      }
+
+      console.log(`Email recipient determined: ${recipientEmail} (source: ${recipientSource})`);
 
       // Generate approval token
       const approvalToken = crypto.randomUUID() + "-" + Date.now().toString(36);
@@ -558,12 +583,13 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        console.log('Attempting to send email to:', quote.customer_email);
+        console.log('Attempting to send email to:', recipientEmail);
         console.log('Email payload:', {
-          to: quote.customer_email,
+          to: recipientEmail,
           subject,
           hasHtml: !!html,
           company_id: profile.company_id,
+          recipientSource,
         });
 
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
@@ -573,7 +599,7 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            to: quote.customer_email,
+            to: recipientEmail,
             subject,
             html,
             company_id: profile.company_id,
@@ -598,6 +624,8 @@ Deno.serve(async (req: Request) => {
           approval,
           approvalUrl,
           message: "Quote sent successfully",
+          recipientEmail,
+          recipientSource,
         }),
         {
           headers: {
