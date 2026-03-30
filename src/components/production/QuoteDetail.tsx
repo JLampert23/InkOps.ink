@@ -180,22 +180,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       if (quoteError) throw quoteError;
 
-      // If quote has contact_id, fetch contact details
-      if (quoteData.contact_id) {
-        const { data: contactData } = await supabase
-          .from('customer_contacts')
-          .select('*')
-          .eq('id', quoteData.contact_id)
-          .maybeSingle();
-
-        if (contactData) {
-          // Add contact info to quote data for display
-          quoteData.contact_name = contactData.name;
-          quoteData.contact_email = contactData.email;
-          quoteData.contact_phone = contactData.phone;
-        }
-      }
-
       // If quote has customer_id, fetch customer details if billing info is missing
       if (quoteData.customer_id) {
         const { data: customerData } = await supabase
@@ -236,6 +220,28 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           if (!quoteData.ship_zip && customerData.shipping_zip) {
             quoteData.ship_zip = customerData.shipping_zip;
           }
+        }
+      }
+
+      // If quote has contact_id, fetch contact details and override billing contact info
+      if (quoteData.contact_id) {
+        const { data: contactData } = await supabase
+          .from('customer_contacts')
+          .select('*')
+          .eq('id', quoteData.contact_id)
+          .maybeSingle();
+
+        if (contactData) {
+          // Add contact info to quote data for display
+          quoteData.contact_name = contactData.name;
+          quoteData.contact_email = contactData.email;
+          quoteData.contact_phone = contactData.phone;
+
+          // Override billing contact information with selected contact
+          // Keep company name and address from customer, but use selected contact's personal details
+          quoteData.bill_name = contactData.name;
+          quoteData.bill_email = contactData.email;
+          quoteData.bill_phone = contactData.phone;
         }
       }
 
