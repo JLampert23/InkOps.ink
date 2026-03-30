@@ -440,6 +440,21 @@ Deno.serve(async (req: Request) => {
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
 
+      // Determine recipient email - prioritize contact email if contact_id exists
+      let recipientEmail = quote.customer_email;
+      if (quote.contact_id) {
+        const { data: contact } = await supabase
+          .from("customer_contacts")
+          .select("email")
+          .eq("id", quote.contact_id)
+          .maybeSingle();
+
+        if (contact?.email) {
+          recipientEmail = contact.email;
+          console.log('Using contact email:', recipientEmail, 'for contact_id:', quote.contact_id);
+        }
+      }
+
       // Generate approval token
       const approvalToken = crypto.randomUUID() + "-" + Date.now().toString(36);
       const expiresAt = body.expires_in_days
@@ -558,9 +573,9 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        console.log('Attempting to send email to:', quote.customer_email);
+        console.log('Attempting to send email to:', recipientEmail);
         console.log('Email payload:', {
-          to: quote.customer_email,
+          to: recipientEmail,
           subject,
           hasHtml: !!html,
           company_id: profile.company_id,
@@ -573,7 +588,7 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            to: quote.customer_email,
+            to: recipientEmail,
             subject,
             html,
             company_id: profile.company_id,
