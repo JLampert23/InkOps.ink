@@ -582,14 +582,28 @@ Deno.serve(async (req: Request) => {
 
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
-          console.error('Failed to send email:', errorText);
-          throw new Error(`Email sending failed: ${errorText}`);
+          console.error('send-email function failed:', {
+            status: emailResponse.status,
+            statusText: emailResponse.statusText,
+            error: errorText,
+          });
+
+          // Try to parse error as JSON for better error messages
+          let errorMessage = errorText;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorText;
+          } catch {
+            // If not JSON, use the text as-is
+          }
+
+          throw new Error(`Email sending failed: ${errorMessage}`);
         }
 
         const emailResult = await emailResponse.json();
         console.log('Email sent successfully:', emailResult);
       } catch (emailError) {
-        console.error('Error sending email:', emailError);
+        console.error('Error in email sending process:', emailError);
         throw new Error(`Failed to send quote email: ${emailError.message || 'Unknown error'}`);
       }
 

@@ -138,6 +138,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('ENCRYPTION_KEY environment variable not set');
     }
 
+    console.log('Calling crypto-service to decrypt Resend API key');
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: 'POST',
       headers: {
@@ -151,11 +152,22 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!decryptResponse.ok) {
-      const errorData = await decryptResponse.json();
-      throw new Error(`Failed to decrypt Resend API key: ${errorData.error || 'Unknown error'}`);
+      const errorText = await decryptResponse.text();
+      console.error('Crypto-service decryption failed:', {
+        status: decryptResponse.status,
+        statusText: decryptResponse.statusText,
+        error: errorText,
+      });
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(`Failed to decrypt Resend API key: ${errorData.error || errorText}`);
+      } catch {
+        throw new Error(`Failed to decrypt Resend API key: ${errorText}`);
+      }
     }
 
     const { result: decryptedApiKey } = await decryptResponse.json();
+    console.log('Resend API key decrypted successfully');
 
     // Trim any whitespace from the API key
     const RESEND_API_KEY = decryptedApiKey?.trim() || decryptedApiKey;
