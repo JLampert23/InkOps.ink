@@ -36,20 +36,11 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
 
-    // Use anon key to verify user JWT
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-
-    if (userError || !user) {
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Missing Authorization header" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -57,27 +48,57 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Use service role key for database operations
+    const bearerToken = authHeader.replace("Bearer ", "").trim();
+    const isServiceRole = bearerToken === supabaseServiceKey;
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's company_id
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .maybeSingle();
+    let companyId: string | null = null;
 
-    if (profileError || !userProfile?.company_id) {
-      return new Response(
-        JSON.stringify({ error: "User company not found" }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (isServiceRole) {
+      console.log("Service role authentication detected");
+      const body = await req.clone().json();
+      if (body.companyId) {
+        companyId = body.companyId;
+        console.log("Using companyId from request body:", companyId);
+      }
+    } else {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      });
+
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
+
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError || !userProfile?.company_id) {
+        return new Response(
+          JSON.stringify({ error: "User company not found" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      companyId = userProfile.company_id;
     }
-
-    const companyId = userProfile.company_id;
 
     const { invoiceId, quoteId, customerId, phoneNumber, messageBody }: SendSMSRequest = await req.json();
 
@@ -128,12 +149,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Use service role key for crypto-service calls to ensure proper authorization
+    const cryptoAuthHeader = `Bearer ${supabaseServiceKey}`;
+
     // Decrypt Twilio credentials
     const cryptoResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authHeader,
+        Authorization: cryptoAuthHeader,
       },
       body: JSON.stringify({
         action: "decrypt",
@@ -147,7 +171,7 @@ Deno.serve(async (req: Request) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: authHeader,
+        Authorization: cryptoAuthHeader,
       },
       body: JSON.stringify({
         action: "decrypt",

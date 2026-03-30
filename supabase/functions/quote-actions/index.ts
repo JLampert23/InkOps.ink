@@ -687,6 +687,7 @@ Deno.serve(async (req: Request) => {
               phoneNumber: recipientPhone,
               messageBody: smsBody,
               quoteId: quoteId,
+              companyId: profile.company_id,
             }),
           });
 
