@@ -59,7 +59,7 @@ BEGIN
 <p><strong>Quote Number:</strong> {{quote.number}}<br>
 <strong>Total Amount:</strong> {{quote.total_formatted}}</p>
 <p>Do you have any questions about this quote? I''m here to help!</p>
-<p>This quote is valid until {{quote.expiration_date}}.</p>
+<p>This quote is valid until {{quote.valid_until}}.</p>
 <p>Best regards,<br>
 {{company.name}}</p>',
         true,
