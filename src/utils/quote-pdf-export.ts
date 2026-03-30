@@ -9,6 +9,9 @@ export interface QuotePDFData {
   customer_email: string;
   customer_company: string;
   customer_phone: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
   bill_company?: string;
   bill_name?: string;
   bill_address_1?: string;
@@ -358,9 +361,9 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     billY += 3.2;
     doc.setFont('helvetica', 'normal');
   }
-  if (quote.bill_name) {
+  if (quote.contact_name || quote.bill_name) {
     doc.setTextColor(55, 65, 81);
-    doc.text(quote.bill_name, billToX, billY);
+    doc.text(quote.contact_name || quote.bill_name, billToX, billY);
     billY += 3.2;
   }
   if (quote.bill_address_1) {
@@ -378,14 +381,14 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     doc.text(`${quote.bill_city}, ${quote.bill_state} ${quote.bill_zip}`, billToX, billY);
     billY += 3.2;
   }
-  if (quote.bill_email || quote.customer_email) {
+  if (quote.contact_email || quote.bill_email || quote.customer_email) {
     doc.setTextColor(37, 99, 235);
-    doc.text(quote.bill_email || quote.customer_email, billToX, billY);
+    doc.text(quote.contact_email || quote.bill_email || quote.customer_email, billToX, billY);
     billY += 3.2;
   }
-  if (quote.bill_phone || quote.customer_phone) {
+  if (quote.contact_phone || quote.bill_phone || quote.customer_phone) {
     doc.setTextColor(55, 65, 81);
-    doc.text(quote.bill_phone || quote.customer_phone, billToX, billY);
+    doc.text(quote.contact_phone || quote.bill_phone || quote.customer_phone, billToX, billY);
     billY += 3.2;
   }
   if (!quote.bill_company && !quote.bill_name && !quote.bill_address_1) {
