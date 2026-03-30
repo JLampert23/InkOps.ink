@@ -443,24 +443,13 @@ Deno.serve(async (req: Request) => {
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
 
-      // Get company settings first to check for notification forwarding email
-      const { data: companySettingsForEmail } = await supabaseAdmin
-        .from("company_settings")
-        .select("notification_forwarding_email")
-        .eq("id", profile.company_id)
-        .maybeSingle();
-
-      // Determine recipient email: use notification_forwarding_email from company settings, then override from body, then contact email, then customer email
+      // Determine recipient email with correct priority
       let recipientEmail: string;
       let recipientSource: string;
       let recipientName: string | null = null;
 
-      if (companySettingsForEmail?.notification_forwarding_email) {
-        // Use notification forwarding email from company settings (additional contact info)
-        recipientEmail = companySettingsForEmail.notification_forwarding_email;
-        recipientSource = 'company_notification_email';
-      } else if (body.recipient_email) {
-        // Manual override provided
+      if (body.recipient_email) {
+        // Manual override provided - highest priority
         recipientEmail = body.recipient_email;
         recipientSource = 'manual_override';
       } else if (quote.contact && typeof quote.contact === 'object' && quote.contact.email) {
