@@ -328,7 +328,7 @@ export default function PublicQuoteApprovalPage() {
                   {(quote.bill_city || quote.billing_address?.city) && (
                     <p>{quote.bill_city || quote.billing_address?.city}, {quote.bill_state || quote.billing_address?.state || ''} {quote.bill_zip || quote.billing_address?.zip || ''}</p>
                   )}
-                  {(quote.bill_email || quote.customer_email) && <p className="text-blue-600">{quote.bill_email || quote.customer_email}</p>}
+                  {quote.customer_email && <p className="text-blue-600">{quote.customer_email}</p>}
                   {(quote.bill_phone || quote.customer_phone) && <p>{quote.bill_phone || quote.customer_phone}</p>}
                 </div>
               </div>
