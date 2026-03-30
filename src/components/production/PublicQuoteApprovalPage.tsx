@@ -316,23 +316,20 @@ export default function PublicQuoteApprovalPage() {
               <div>
                 <h3 className="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wide">Customer Billing</h3>
                 <div className="text-xs text-gray-700 leading-tight space-y-0">
+                  {quote.bill_company && <p className="font-bold text-gray-900">{quote.bill_company}</p>}
                   {(quote.bill_first_name || quote.bill_last_name) && (
                     <p className="font-medium">{quote.bill_first_name} {quote.bill_last_name}</p>
                   )}
                   {!quote.bill_first_name && !quote.bill_last_name && quote.bill_name && (
                     <p className="font-medium">{quote.bill_name}</p>
                   )}
-                  {!quote.bill_first_name && !quote.bill_last_name && !quote.bill_name && quote.customer_name && (
-                    <p className="font-medium">{quote.customer_name}</p>
-                  )}
-                  {(quote.bill_company || quote.customer_company) && <p>{quote.bill_company || quote.customer_company}</p>}
                   {quote.bill_address_1 && <p>{quote.bill_address_1}</p>}
                   {quote.bill_address_2 && <p>{quote.bill_address_2}</p>}
                   {(quote.bill_city || quote.billing_address?.city) && (
                     <p>{quote.bill_city || quote.billing_address?.city}, {quote.bill_state || quote.billing_address?.state || ''} {quote.bill_zip || quote.billing_address?.zip || ''}</p>
                   )}
-                  {(quote.bill_phone || quote.customer_phone) && <p>{quote.bill_phone || quote.customer_phone}</p>}
                   {(quote.bill_email || quote.customer_email) && <p className="text-blue-600">{quote.bill_email || quote.customer_email}</p>}
+                  {(quote.bill_phone || quote.customer_phone) && <p>{quote.bill_phone || quote.customer_phone}</p>}
                 </div>
               </div>
               <div>
