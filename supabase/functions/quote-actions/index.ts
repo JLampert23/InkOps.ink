@@ -434,7 +434,7 @@ Deno.serve(async (req: Request) => {
         .from("quotes")
         .select(`
           *,
-          contact:customer_contacts(email, full_name)
+          contact:customer_contacts!contact_id(email, full_name)
         `)
         .eq("id", quoteId)
         .eq("company_id", profile.company_id)
@@ -446,14 +446,16 @@ Deno.serve(async (req: Request) => {
       // Determine recipient email: use override from body, then contact email, then customer email
       let recipientEmail: string;
       let recipientSource: string;
+      let recipientName: string | null = null;
 
       if (body.recipient_email) {
         // Manual override provided
         recipientEmail = body.recipient_email;
         recipientSource = 'manual_override';
-      } else if (quote.contact && Array.isArray(quote.contact) && quote.contact.length > 0 && quote.contact[0]?.email) {
-        // Use contact person's email (contact is returned as array from Supabase)
-        recipientEmail = quote.contact[0].email;
+      } else if (quote.contact && typeof quote.contact === 'object' && quote.contact.email) {
+        // Use contact person's email (contact is returned as single object from Supabase foreign key)
+        recipientEmail = quote.contact.email;
+        recipientName = quote.contact.full_name;
         recipientSource = 'contact_person';
       } else if (quote.customer_email) {
         // Fallback to customer billing email
@@ -463,7 +465,7 @@ Deno.serve(async (req: Request) => {
         throw new Error("No valid email recipient found for this quote");
       }
 
-      console.log(`Email recipient determined: ${recipientEmail} (source: ${recipientSource})`);
+      console.log(`Email recipient determined: ${recipientEmail} (source: ${recipientSource}, name: ${recipientName || 'N/A'})`);
 
       // Generate approval token
       const approvalToken = crypto.randomUUID() + "-" + Date.now().toString(36);

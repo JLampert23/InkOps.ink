@@ -190,7 +190,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         if (contactData) {
           // Add contact info to quote data for display
-          quoteData.contact_name = contactData.name;
+          quoteData.contact_name = contactData.full_name;
           quoteData.contact_email = contactData.email;
           quoteData.contact_phone = contactData.phone;
         }
@@ -1232,6 +1232,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           quoteNumber={quote.quote_number}
           customerName={quote.customer_name}
           customerEmail={quote.contact_email || quote.customer_email || quote.bill_email || ''}
+          contactName={quote.contact_name}
           totalAmount={quote.total || 0}
           onClose={() => setShowSendModal(false)}
           onSuccess={() => {
