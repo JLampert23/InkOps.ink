@@ -176,7 +176,7 @@ function renderQuotePage(
       </div>
       <div class="form-group">
         <label>Your Email <span class="req">*</span></label>
-        <input type="email" id="approver-email" class="form-input" placeholder="Enter your email" value="${escapeHtml(quote.customer_email)}" required>
+        <input type="email" id="approver-email" class="form-input" placeholder="Enter your email" value="${escapeHtml(quote.contact_email || quote.customer_email)}" required>
       </div>
       <div class="form-group">
         <label>Notes (Optional)</label>
@@ -228,7 +228,7 @@ function renderQuotePage(
           <div class="label">Customer</div>
           <div class="value"><strong>${escapeHtml(quote.customer_name)}</strong></div>
           ${quote.customer_company ? `<div class="value">${escapeHtml(quote.customer_company)}</div>` : ''}
-          ${quote.customer_email ? `<div class="value">${escapeHtml(quote.customer_email)}</div>` : ''}
+          ${quote.contact_email || quote.customer_email ? `<div class="value">${escapeHtml(quote.contact_email || quote.customer_email)}</div>` : ''}
         </div>
         <div>
           <div class="label">Quote Details</div>
