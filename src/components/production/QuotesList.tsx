@@ -17,6 +17,7 @@ interface Quote {
   customer_name: string | null;
   customer_company: string | null;
   customer_email: string | null;
+  contact_name: string | null;
   total: number | null;
   status: string;
   created_at: string;
@@ -65,16 +66,36 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const loadQuotes = async () => {
     setLoading(true);
     try {
-      const query = supabase
+      const { data, error } = await supabase
         .from('quotes')
-        .select('id, quote_number, customer_name, customer_company, customer_email, total, status, created_at, sent_at, approved_at, valid_until, followup_count, last_followup_sent_at, next_followup_due_at')
+        .select(`
+          id,
+          quote_number,
+          customer_name,
+          customer_company,
+          customer_email,
+          total,
+          status,
+          created_at,
+          sent_at,
+          approved_at,
+          valid_until,
+          followup_count,
+          last_followup_sent_at,
+          next_followup_due_at,
+          contact_name:customer_contacts(full_name)
+        `)
         .order('created_at', { ascending: false });
-
-      const { data, error } = await query;
 
       if (error) throw error;
 
-      setQuotes(data || []);
+      // Flatten the contact_name from nested object
+      const formattedData = (data || []).map(quote => ({
+        ...quote,
+        contact_name: quote.contact_name?.[0]?.full_name || null
+      }));
+
+      setQuotes(formattedData);
     } catch (error) {
       console.error('Error loading quotes:', error);
       showNotification('Failed to load quotes', 'error');
@@ -249,6 +270,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       (quote.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.quote_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.contact_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesStatus = true;
@@ -460,8 +482,8 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                           {quote.customer_company && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_company}</div>
                           )}
-                          {quote.customer_email && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_email}</div>
+                          {quote.contact_name && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.contact_name}</div>
                           )}
                         </div>
                       </td>
