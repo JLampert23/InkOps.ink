@@ -190,7 +190,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         if (contactData) {
           // Add contact info to quote data for display
-          quoteData.contact_name = contactData.full_name;
+          quoteData.contact_name = contactData.name;
           quoteData.contact_email = contactData.email;
           quoteData.contact_phone = contactData.phone;
         }
@@ -304,15 +304,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     console.log('QuoteDetail: handleDownloadQuote called');
     console.log('QuoteDetail: quote company_logo_url:', quote.company_logo_url);
     console.log('QuoteDetail: companySettings:', companySettings);
-    console.log('QuoteDetail: contact info in quote:', {
-      contact_name: quote.contact_name,
-      contact_email: quote.contact_email,
-      contact_phone: quote.contact_phone,
-      bill_email: quote.bill_email,
-      bill_phone: quote.bill_phone,
-      customer_email: quote.customer_email,
-      customer_phone: quote.customer_phone,
-    });
 
     const quotePDFData: QuotePDFData = {
       ...quote,
@@ -1240,8 +1231,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           quoteId={quoteId}
           quoteNumber={quote.quote_number}
           customerName={quote.customer_name}
-          customerEmail={quote.contact_email || quote.customer_email || quote.bill_email || ''}
-          contactName={quote.contact_name}
+          customerEmail={quote.customer_email || quote.bill_email || ''}
           totalAmount={quote.total || 0}
           onClose={() => setShowSendModal(false)}
           onSuccess={() => {

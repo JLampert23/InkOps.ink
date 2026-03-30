@@ -429,43 +429,16 @@ Deno.serve(async (req: Request) => {
     if (action === "send") {
       const body = await req.json();
 
-      // Check if quote exists and fetch contact email if available
+      // Check if quote exists
       const { data: quote, error: fetchError } = await supabase
         .from("quotes")
-        .select(`
-          *,
-          contact:customer_contacts!contact_id(email, full_name)
-        `)
+        .select("*")
         .eq("id", quoteId)
         .eq("company_id", profile.company_id)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
-
-      // Determine recipient email with correct priority
-      let recipientEmail: string;
-      let recipientSource: string;
-      let recipientName: string | null = null;
-
-      if (body.recipient_email) {
-        // Manual override provided - highest priority
-        recipientEmail = body.recipient_email;
-        recipientSource = 'manual_override';
-      } else if (quote.contact && typeof quote.contact === 'object' && quote.contact.email) {
-        // Use contact person's email (contact is returned as single object from Supabase foreign key)
-        recipientEmail = quote.contact.email;
-        recipientName = quote.contact.full_name;
-        recipientSource = 'contact_person';
-      } else if (quote.customer_email) {
-        // Fallback to customer billing email
-        recipientEmail = quote.customer_email;
-        recipientSource = 'customer_billing';
-      } else {
-        throw new Error("No valid email recipient found for this quote");
-      }
-
-      console.log(`Email recipient determined: ${recipientEmail} (source: ${recipientSource}, name: ${recipientName || 'N/A'})`);
 
       // Generate approval token
       const approvalToken = crypto.randomUUID() + "-" + Date.now().toString(36);
@@ -491,25 +464,19 @@ Deno.serve(async (req: Request) => {
 
       if (approvalError) throw approvalError;
 
-      // Update quote status to sent (use admin client to ensure update succeeds)
-      const { error: updateError } = await supabaseAdmin
+      // Update quote status to sent
+      await supabase
         .from("quotes")
         .update({
           status: "sent",
           sent_at: new Date().toISOString(),
         })
-        .eq("id", quoteId)
-        .eq("company_id", profile.company_id);
-
-      if (updateError) {
-        console.error('Error updating quote status:', updateError);
-        throw new Error(`Failed to update quote status: ${updateError.message}`);
-      }
+        .eq("id", quoteId);
 
       // Get company settings to retrieve the inkops subdomain and company info (use admin client to bypass RLS)
       const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
-        .select("inkops_subdomain, company_name, company_address, company_city, company_state, company_zip, company_phone, email_from_address, company_website, notification_forwarding_email")
+        .select("inkops_subdomain, company_name, company_address, company_city, company_state, company_zip, company_phone, email_from_address, company_website")
         .eq("id", profile.company_id)
         .maybeSingle();
 
@@ -591,13 +558,12 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        console.log('Attempting to send email to:', recipientEmail);
+        console.log('Attempting to send email to:', quote.customer_email);
         console.log('Email payload:', {
-          to: recipientEmail,
+          to: quote.customer_email,
           subject,
           hasHtml: !!html,
           company_id: profile.company_id,
-          recipientSource,
         });
 
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
@@ -607,7 +573,7 @@ Deno.serve(async (req: Request) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            to: recipientEmail,
+            to: quote.customer_email,
             subject,
             html,
             company_id: profile.company_id,
@@ -632,8 +598,6 @@ Deno.serve(async (req: Request) => {
           approval,
           approvalUrl,
           message: "Quote sent successfully",
-          recipientEmail,
-          recipientSource,
         }),
         {
           headers: {

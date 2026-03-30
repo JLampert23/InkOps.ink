@@ -12,7 +12,6 @@ interface SendQuoteModalProps {
   quoteNumber: string;
   customerName: string;
   customerEmail: string;
-  contactName?: string;
   totalAmount: number;
   onClose: () => void;
   onSuccess: () => void;
@@ -32,7 +31,6 @@ export function SendQuoteModal({
   quoteNumber,
   customerName,
   customerEmail,
-  contactName,
   totalAmount,
   onClose,
   onSuccess,
@@ -214,8 +212,7 @@ export function SendQuoteModal({
 
       console.log('Quote sent successfully:', data);
 
-      const sentTo = data?.recipientEmail || customerEmail;
-      showNotification('success', 'Quote Sent', `Quote sent successfully to ${sentTo}`);
+      showNotification('success', 'Quote Sent', `Quote sent successfully to ${customerEmail}`);
       onSuccess();
       onClose();
     } catch (error) {
@@ -300,21 +297,8 @@ export function SendQuoteModal({
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">{customerName}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wide font-medium">Sending To</p>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {contactName ? (
-                    <>
-                      <span className="text-blue-600 dark:text-blue-400">{contactName}</span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">(Contact)</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{customerName}</span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">(Billing)</span>
-                    </>
-                  )}
-                </p>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{customerEmail || 'N/A'}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wide font-medium">Email</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{customerEmail || 'N/A'}</p>
               </div>
             </div>
           </div>

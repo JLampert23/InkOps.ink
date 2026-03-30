@@ -913,7 +913,7 @@ async function processQuoteFollowup(supabase: any, queueItem: any) {
             number: quote.quote_number,
             total: quote.total,
             created_date: quote.created_at,
-            expiration_date: quote.valid_until,
+            expiration_date: quote.expiration_date,
           },
           customer: {
             name: quote.customers?.name || quote.customer_name || quote.customers?.primary_contact_name,

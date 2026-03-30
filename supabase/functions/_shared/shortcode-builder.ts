@@ -59,7 +59,7 @@ export function buildQuoteShortCodes(
     quote_tax: formatCurrency(quote?.sales_tax || 0),
     quote_discount: formatCurrency(quote?.discount || 0),
     quote_date: quote?.created_date ? formatDate(quote.created_date) : '',
-    quote_expiry_date: quote?.valid_until ? formatDate(quote.valid_until) : '',
+    quote_expiry_date: quote?.expiry_date ? formatDate(quote.expiry_date) : '',
     quote_link: approvalUrl || '',
     quote_status: quote?.status || '',
 
