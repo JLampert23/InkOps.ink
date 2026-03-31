@@ -82,6 +82,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
         quoteId={selectedQuoteId}
         onBack={handleBack}
         onEdit={() => handleEditQuote(selectedQuoteId)}
+        onViewCustomer={onViewCustomer}
       />
     );
   }

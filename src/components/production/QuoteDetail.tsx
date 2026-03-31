@@ -19,6 +19,7 @@ interface QuoteDetailProps {
   quoteId: string;
   onBack: () => void;
   onEdit: () => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
 interface Quote {
@@ -147,7 +148,7 @@ interface CompanySettings {
   company_logo_secondary_url: string | null;
 }
 
-export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
+export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }: QuoteDetailProps) {
   const { showNotification } = useNotification();
   const { confirm } = useConfirmation();
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -684,7 +685,23 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
             <div className="text-sm space-y-0.5">
-              {quote.bill_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.bill_company}</p>}
+              {quote.bill_company && (
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {quote.customer_id && onViewCustomer ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewCustomer(quote.customer_id!);
+                      }}
+                      className="text-blue-600 dark:text-blue-400 hover:underline text-left"
+                    >
+                      {quote.bill_company}
+                    </button>
+                  ) : (
+                    quote.bill_company
+                  )}
+                </p>
+              )}
               {(quote.bill_first_name || quote.bill_last_name) && (
                 <p className="text-gray-700 dark:text-gray-300">
                   {quote.bill_first_name} {quote.bill_last_name}
