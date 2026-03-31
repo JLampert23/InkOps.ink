@@ -269,73 +269,79 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
       </header>
 
       <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto">
-          <div className="flex gap-1 min-w-max">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap gap-1">
             <button
               onClick={() => setActiveTab('quotes')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'quotes'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <FileText className="w-4 h-4" />
-              Quotes ({quotes.length})
+              <span className="hidden sm:inline">Quotes</span>
+              <span className="sm:hidden">Quotes</span>
             </button>
             <button
               onClick={() => setActiveTab('invoices')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'invoices'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Receipt className="w-4 h-4" />
-              Invoices ({invoices.length})
+              <span className="hidden sm:inline">Invoices</span>
+              <span className="sm:hidden">Invoices</span>
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'payments'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <CreditCard className="w-4 h-4" />
-              Payments
+              <span className="hidden sm:inline">Payments</span>
+              <span className="sm:hidden">Pay</span>
             </button>
             <button
               onClick={() => setActiveTab('proofs')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'proofs'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Image className="w-4 h-4" />
-              Proofs
+              <span className="hidden sm:inline">Proofs</span>
+              <span className="sm:hidden">Proofs</span>
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'orders'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Package className="w-4 h-4" />
-              Orders
+              <span className="hidden sm:inline">Orders</span>
+              <span className="sm:hidden">Orders</span>
             </button>
             <button
               onClick={() => setActiveTab('account')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'account'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <User className="w-4 h-4" />
-              Account
+              <span className="hidden sm:inline">Account</span>
+              <span className="sm:hidden">Acct</span>
             </button>
           </div>
         </div>
