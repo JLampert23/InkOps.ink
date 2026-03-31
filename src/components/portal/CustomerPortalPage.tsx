@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabaseAnon } from '../../lib/supabase-anon-client';
-import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package, User } from 'lucide-react';
+import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package, User, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { PortalPaymentsTab } from './PortalPaymentsTab';
 import { PortalPaymentModal } from './PortalPaymentModal';
 import { PortalProofsTab } from './PortalProofsTab';
 import { PortalOrdersTab } from './PortalOrdersTab';
 import { PortalCustomerInfoTab } from './PortalCustomerInfoTab';
+import { PortalQuoteViewerModal } from './PortalQuoteViewerModal';
 
 interface CustomerPortalPageProps {
   customerId: string;
@@ -64,6 +65,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
   const [stripeConfig, setStripeConfig] = useState<StripeConfig>({ enabled: false });
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [viewingQuoteId, setViewingQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomerData();
@@ -399,15 +401,13 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                           ${((quote.subtotal || 0) + (quote.tax_amount || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <a
-                            href={`/quote-approval/${quote.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                          <button
+                            onClick={() => setViewingQuoteId(quote.id)}
+                            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
                           >
+                            <Eye className="w-4 h-4" />
                             View
-                            <ChevronRight className="w-4 h-4" />
-                          </a>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -527,6 +527,17 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
             setSelectedInvoiceForPayment(null);
             loadCustomerData();
             setActiveTab('payments');
+          }}
+        />
+      )}
+
+      {viewingQuoteId && (
+        <PortalQuoteViewerModal
+          quoteId={viewingQuoteId}
+          onClose={() => setViewingQuoteId(null)}
+          onApprovalComplete={() => {
+            setViewingQuoteId(null);
+            loadCustomerData();
           }}
         />
       )}
