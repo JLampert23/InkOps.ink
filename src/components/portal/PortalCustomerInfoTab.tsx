@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Mail, Phone, MapPin, CreditCard, Plus, Trash2, Loader2, CreditCard as Edit3, Save, X, Copy, Star, CheckCircle, AlertCircle, Globe } from 'lucide-react';
+import { Building2, User, Mail, Phone, MapPin, CreditCard, Plus, Trash2, Loader2, Pencil, Save, X, Copy, Star, CheckCircle, AlertCircle, Globe } from 'lucide-react';
 import { supabaseAnon } from '../../lib/supabase-anon-client';
 
 interface PortalCustomerInfoTabProps {
@@ -454,7 +454,7 @@ export function PortalCustomerInfoTab({ customerId, companyId }: PortalCustomerI
               onClick={() => setEditingBasicInfo(true)}
               className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
             >
-              <Edit3 className="w-4 h-4" />
+              <Pencil className="w-4 h-4" />
               Edit
             </button>
           ) : (
@@ -587,7 +587,7 @@ export function PortalCustomerInfoTab({ customerId, companyId }: PortalCustomerI
                 onClick={() => setEditingBillingAddress(true)}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
               >
-                <Edit3 className="w-4 h-4" />
+                <Pencil className="w-4 h-4" />
                 Edit
               </button>
             ) : (
@@ -710,7 +710,7 @@ export function PortalCustomerInfoTab({ customerId, companyId }: PortalCustomerI
                   onClick={() => setEditingShippingAddress(true)}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 >
-                  <Edit3 className="w-4 h-4" />
+                  <Pencil className="w-4 h-4" />
                   Edit
                 </button>
               ) : (
@@ -1023,7 +1023,7 @@ export function PortalCustomerInfoTab({ customerId, companyId }: PortalCustomerI
                           }}
                           className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <Pencil className="w-4 h-4" />
                         </button>
                         {!contact.is_primary && (
                           <button
