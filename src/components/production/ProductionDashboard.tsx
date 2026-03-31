@@ -11,13 +11,14 @@ type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'kanban' | 'manag
 
 interface ProductionDashboardProps {
   onNavigateToCustomers: () => void;
+  onViewCustomer?: (customerId: string) => void;
   initialCustomerId?: string;
   initialContactId?: string;
   initialQuoteId?: string;
   onCustomerIdConsumed?: () => void;
 }
 
-export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: ProductionDashboardProps) {
+export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: ProductionDashboardProps) {
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
   const [contactIdForQuote, setContactIdForQuote] = useState<string | undefined>(initialContactId);
@@ -113,6 +114,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
             initialContactId={contactIdForQuote}
             initialQuoteId={quoteIdToView}
             onCustomerIdConsumed={handleQuoteCustomerConsumed}
+            onViewCustomer={onViewCustomer}
           />
         );
       case 'work-orders':

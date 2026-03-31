@@ -53,12 +53,13 @@ interface FundraisingCredit {
 
 interface CustomersReportProps {
   initialSearchTerm?: string;
+  initialCustomerId?: string;
   onCreateQuote?: (customerId: string, contactId?: string) => void;
   onViewQuote?: (quoteId: string) => void;
   onDuplicateQuote?: (quoteId: string) => void;
 }
 
-export default function CustomersReport({ initialSearchTerm, onCreateQuote, onViewQuote, onDuplicateQuote }: CustomersReportProps = {}) {
+export default function CustomersReport({ initialSearchTerm, initialCustomerId, onCreateQuote, onViewQuote, onDuplicateQuote }: CustomersReportProps = {}) {
   const { showNotification } = useNotification();
   const { confirm } = useConfirmation();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -100,7 +101,12 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
   }, []);
 
   useEffect(() => {
-    if (initialSearchTerm && customers.length > 0 && !selectedCustomer) {
+    if (initialCustomerId && customers.length > 0 && !selectedCustomer) {
+      const matchedCustomer = customers.find(c => c.id === initialCustomerId);
+      if (matchedCustomer) {
+        loadCustomerDetails(matchedCustomer);
+      }
+    } else if (initialSearchTerm && customers.length > 0 && !selectedCustomer) {
       const matchedCustomer = customers.find(c =>
         c.company_name.toLowerCase().includes(initialSearchTerm.toLowerCase()) ||
         c.email.toLowerCase().includes(initialSearchTerm.toLowerCase())
@@ -109,7 +115,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote, onVi
         loadCustomerDetails(matchedCustomer);
       }
     }
-  }, [initialSearchTerm, customers, selectedCustomer]);
+  }, [initialSearchTerm, initialCustomerId, customers, selectedCustomer]);
 
   useEffect(() => {
     if (selectedCustomer?.id && companyId) {

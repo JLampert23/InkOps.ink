@@ -207,6 +207,7 @@ function AppContent() {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
@@ -230,6 +231,10 @@ function AppContent() {
 
     if (ACCOUNTING_TABS.includes(activeTab)) {
       setAccountingExpanded(true);
+    }
+
+    if (activeTab !== 'customers') {
+      setSelectedCustomerId(undefined);
     }
   }, [activeTab]);
 
@@ -362,6 +367,13 @@ function AppContent() {
     setQuoteCustomerId(customerId);
     setQuoteContactId(contactId);
     setActiveTab('production');
+  };
+
+  const handleViewCustomer = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setCustomerSearchTerm('');
+    setActiveTab('customers');
+    setAccountingExpanded(true);
   };
 
   const handleViewQuote = (quoteId: string) => {
@@ -662,8 +674,9 @@ function AppContent() {
               </div>
             }>
               <CustomersReport
-                key={customersKey}
+                key={`${customersKey}-${selectedCustomerId || ''}`}
                 initialSearchTerm={customerSearchTerm}
+                initialCustomerId={selectedCustomerId}
                 onCreateQuote={handleCreateQuoteForCustomer}
                 onViewQuote={handleViewQuote}
                 onDuplicateQuote={handleDuplicateQuote}
@@ -714,6 +727,7 @@ function AppContent() {
                   setActiveTab('customers');
                   setAccountingExpanded(true);
                 }}
+                onViewCustomer={handleViewCustomer}
                 initialCustomerId={quoteCustomerId}
                 initialContactId={quoteContactId}
                 initialQuoteId={navigateToQuoteId}

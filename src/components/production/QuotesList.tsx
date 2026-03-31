@@ -9,11 +9,13 @@ interface QuotesListProps {
   onSelectQuote: (quoteId: string) => void;
   onCreateQuote: () => void;
   onEditQuote: (quoteId: string) => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
 interface Quote {
   id: string;
   quote_number: string | null;
+  customer_id: string | null;
   customer_name: string | null;
   customer_company: string | null;
   customer_email: string | null;
@@ -29,7 +31,7 @@ interface Quote {
   next_followup_due_at: string | null;
 }
 
-export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }: QuotesListProps) {
+export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, onViewCustomer }: QuotesListProps) {
   const { showNotification } = useNotification();
   const { confirm } = useConfirmation();
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -71,6 +73,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         .select(`
           id,
           quote_number,
+          customer_id,
           customer_name,
           customer_company,
           customer_email,
@@ -477,7 +480,19 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
+                          {quote.customer_id && onViewCustomer ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onViewCustomer(quote.customer_id!);
+                              }}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline text-left"
+                            >
+                              {quote.customer_name || 'N/A'}
+                            </button>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
+                          )}
                           {quote.contact_name && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{quote.contact_name}</div>
                           )}

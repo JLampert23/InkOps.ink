@@ -8,9 +8,10 @@ interface QuotesManagerProps {
   initialContactId?: string;
   initialQuoteId?: string;
   onCustomerIdConsumed?: () => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
-export function QuotesManager({ initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
+export function QuotesManager({ initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed, onViewCustomer }: QuotesManagerProps = {}) {
   const [view, setView] = useState<'list' | 'detail' | 'edit' | 'create'>('list');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | undefined>(initialCustomerId);
@@ -114,6 +115,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
       onSelectQuote={handleSelectQuote}
       onCreateQuote={handleCreateQuote}
       onEditQuote={handleEditQuote}
+      onViewCustomer={onViewCustomer}
     />
   );
 }
