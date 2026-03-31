@@ -594,15 +594,24 @@ Deno.serve(async (req: Request) => {
         updateFields.converted_at = new Date().toISOString();
       }
 
-      const { error: quoteUpdateError } = await supabase
+      const { data: updatedQuote, error: quoteUpdateError } = await supabase
         .from("quotes")
         .update(updateFields)
-        .eq("id", approval.quote_id);
+        .eq("id", approval.quote_id)
+        .select("id, status")
+        .single();
 
       if (quoteUpdateError) {
         console.error("Quote update failed:", quoteUpdateError);
         throw new Error("Failed to update quote status: " + quoteUpdateError.message);
       }
+
+      if (!updatedQuote || updatedQuote.status !== newStatus) {
+        console.error("Quote status verification failed. Expected:", newStatus, "Got:", updatedQuote?.status);
+        throw new Error("Quote status update could not be verified. Please try again.");
+      }
+
+      console.log(`Quote ${approval.quote_id} status successfully updated to: ${updatedQuote.status}`);
 
       if (approval.single_use) {
         await supabase
