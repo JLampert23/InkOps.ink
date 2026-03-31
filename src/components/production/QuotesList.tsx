@@ -83,16 +83,15 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
           followup_count,
           last_followup_sent_at,
           next_followup_due_at,
-          contact_name:customer_contacts(full_name)
+          customer_contacts(full_name)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Flatten the contact_name from nested object
       const formattedData = (data || []).map(quote => ({
         ...quote,
-        contact_name: quote.contact_name?.[0]?.full_name || null
+        contact_name: (quote.customer_contacts as { full_name: string } | null)?.full_name || null
       }));
 
       setQuotes(formattedData);
@@ -479,9 +478,6 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
-                          {quote.customer_company && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_company}</div>
-                          )}
                           {quote.contact_name && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{quote.contact_name}</div>
                           )}
