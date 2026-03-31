@@ -172,9 +172,9 @@ export function FeaturesPage({ onLoginClick, onBackToHome }: FeaturesPageProps) 
               className="flex items-center hover:opacity-80 transition-opacity"
             >
               <img
-                src={darkMode ? "/headerlogo.png" : "/inkops_logo-01.png"}
-                alt="INKOPS"
-                className="h-10 w-auto transition-opacity duration-200"
+                src="/InkOps-01-copy.png"
+                alt="InkOps Pro"
+                className="h-12 w-auto"
               />
             </button>
             <div className="flex items-center gap-3">

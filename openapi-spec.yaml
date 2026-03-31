@@ -1,0 +1,679 @@
+openapi: 3.0.3
+info:
+  title: InkOps API
+  description: |
+    The InkOps API provides programmatic access to quote management, product search,
+    customer portal features, and payment processing for the InkOps platform.
+
+    ## Authentication
+
+    The API supports two authentication methods:
+
+    1. **JWT Bearer Token**: For authenticated internal users and staff
+    2. **Customer Portal Token**: For customer-facing portal access
+
+    ## Base URL
+
+    All API endpoints are accessed via: `https://your-project.supabase.co`
+
+  version: 1.0.0
+  contact:
+    name: InkOps API Support
+    email: support@inkops.com
+
+servers:
+  - url: https://your-project.supabase.co
+    description: Production server
+
+security:
+  - BearerAuth: []
+  - CustomerToken: []
+
+tags:
+  - name: Quotes
+    description: Quote management operations
+  - name: Products
+    description: Product catalog search
+  - name: Portal
+    description: Customer portal access
+  - name: Payments
+    description: Payment method management
+  - name: Webhooks
+    description: External service webhooks
+
+paths:
+  /functions/v1/quotes-api/draft:
+    post:
+      tags:
+        - Quotes
+      summary: Create Draft Quote
+      description: Creates a minimal draft quote with auto-generated quote number
+      operationId: createDraftQuote
+      security:
+        - BearerAuth: []
+      responses:
+        '201':
+          description: Quote created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/quotes-api:
+    get:
+      tags:
+        - Quotes
+      summary: List Quotes
+      description: Retrieves a paginated list of quotes with optional filtering
+      operationId: listQuotes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by quote status
+          schema:
+            type: string
+            enum: [draft, sent, approved, declined]
+        - name: customer_id
+          in: query
+          description: Filter by customer ID
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Search by quote number, customer name, or email
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          description: Filter quotes created on or after this date
+          schema:
+            type: string
+            format: date-time
+        - name: date_to
+          in: query
+          description: Filter quotes created on or before this date
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Number of results to return
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of results to skip for pagination
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Quotes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quotes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Quote'
+                  count:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/quotes-api/{quote_id}:
+    get:
+      tags:
+        - Quotes
+      summary: Get Quote Details
+      description: Retrieves detailed information about a specific quote
+      operationId: getQuoteDetails
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: quote_id
+          in: path
+          required: true
+          description: Quote UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Quote details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+                  lineItems:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LineItem'
+                  activityLog:
+                    type: array
+                    items:
+                      type: object
+                  approvals:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/product-search:
+    get:
+      tags:
+        - Products
+      summary: Search Products
+      description: |
+        Searches for products by style number across enabled supplier catalogs.
+        Returns cached results when available, otherwise fetches live data.
+      operationId: searchProducts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: style
+          in: query
+          required: true
+          description: Product style number to search for
+          schema:
+            type: string
+          example: PC54
+        - name: companyId
+          in: query
+          required: false
+          description: Company ID (required if not using JWT authentication)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  style:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  count:
+                    type: integer
+                  diagnostics:
+                    type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/portal-data:
+    get:
+      tags:
+        - Portal
+      summary: Get Portal Data
+      description: Retrieves customer-specific data based on session token
+      operationId: getPortalData
+      security:
+        - CustomerToken: []
+      parameters:
+        - name: type
+          in: query
+          description: Data type to retrieve
+          schema:
+            type: string
+            enum: [quotes, invoices, proofs, work_orders]
+            default: quotes
+      responses:
+        '200':
+          description: Portal data retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/portal-payment:
+    post:
+      tags:
+        - Portal
+      summary: Create Payment Link
+      description: Creates a Stripe payment link for invoice payment
+      operationId: createPaymentLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+                - companyId
+                - invoiceId
+                - customerId
+                - amount
+              properties:
+                action:
+                  type: string
+                  enum: [createPaymentLink]
+                companyId:
+                  type: string
+                  format: uuid
+                invoiceId:
+                  type: string
+                  format: uuid
+                customerId:
+                  type: string
+                  format: uuid
+                amount:
+                  type: integer
+                  description: Amount in cents
+                customerEmail:
+                  type: string
+                  format: email
+                customerName:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Payment link created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentLinkId:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/customer-payment-methods:
+    get:
+      tags:
+        - Payments
+      summary: List Payment Methods
+      description: Retrieves all saved payment methods for a customer
+      operationId: listPaymentMethods
+      parameters:
+        - name: customer_id
+          in: query
+          required: true
+          description: Customer ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment methods retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  payment_methods:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Payments
+      summary: Add Payment Method
+      description: Adds a new payment method for a customer
+      operationId: addPaymentMethod
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customer_id
+                - stripe_payment_method_id
+              properties:
+                customer_id:
+                  type: string
+                  format: uuid
+                stripe_payment_method_id:
+                  type: string
+                is_default:
+                  type: boolean
+      responses:
+        '201':
+          description: Payment method added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  payment_method:
+                    $ref: '#/components/schemas/PaymentMethod'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/stripe-webhook:
+    post:
+      tags:
+        - Webhooks
+      summary: Stripe Webhook
+      description: Receives and processes webhook events from Stripe
+      operationId: stripeWebhook
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          description: Stripe webhook signature for verification
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                type:
+                  type: string
+                  enum:
+                    - payment_intent.succeeded
+                    - payment_intent.payment_failed
+                    - charge.refunded
+                    - checkout.session.completed
+                    - invoice.paid
+                data:
+                  type: object
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authenticated users
+
+    CustomerToken:
+      type: apiKey
+      in: header
+      name: X-Customer-Token
+      description: Customer portal session token
+
+  schemas:
+    Quote:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        quote_number:
+          type: string
+        company_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+          nullable: true
+        customer_name:
+          type: string
+        customer_email:
+          type: string
+          format: email
+          nullable: true
+        status:
+          type: string
+          enum: [draft, sent, approved, declined]
+        subtotal:
+          type: number
+          format: double
+        tax_rate:
+          type: number
+          format: double
+        tax_amount:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        quote_id:
+          type: string
+          format: uuid
+        line_number:
+          type: integer
+        description:
+          type: string
+        quantity:
+          type: integer
+        unit_price:
+          type: number
+          format: double
+        total_price:
+          type: number
+          format: double
+        sku:
+          type: string
+          nullable: true
+
+    Product:
+      type: object
+      properties:
+        supplier:
+          type: string
+          enum: [sanmar, ssactivewear]
+        style:
+          type: string
+        brand:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        colors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColorOption'
+        cached:
+          type: boolean
+        last_synced:
+          type: string
+          format: date-time
+
+    ColorOption:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        rear_image_url:
+          type: string
+          format: uri
+        side_image_url:
+          type: string
+          format: uri
+        sizes:
+          type: array
+          items:
+            type: string
+        pricing:
+          type: object
+          properties:
+            wholesale:
+              type: number
+              format: double
+            retail:
+              type: number
+              format: double
+
+    PaymentMethod:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        stripe_payment_method_id:
+          type: string
+        payment_method_type:
+          type: string
+        last_four:
+          type: string
+        brand:
+          type: string
+        exp_month:
+          type: integer
+        exp_year:
+          type: integer
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

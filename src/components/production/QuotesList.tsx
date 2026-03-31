@@ -2,30 +2,36 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
-import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface QuotesListProps {
   onSelectQuote: (quoteId: string) => void;
   onCreateQuote: () => void;
   onEditQuote: (quoteId: string) => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
 interface Quote {
   id: string;
   quote_number: string | null;
+  customer_id: string | null;
   customer_name: string | null;
   customer_company: string | null;
   customer_email: string | null;
+  contact_name: string | null;
   total: number | null;
   status: string;
   created_at: string;
   sent_at: string | null;
   approved_at: string | null;
   valid_until: string | null;
+  followup_count: number | null;
+  last_followup_sent_at: string | null;
+  next_followup_due_at: string | null;
 }
 
-export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }: QuotesListProps) {
+export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, onViewCustomer }: QuotesListProps) {
   const { showNotification } = useNotification();
   const { confirm } = useConfirmation();
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -34,6 +40,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [sendingFollowup, setSendingFollowup] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -61,16 +68,36 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const loadQuotes = async () => {
     setLoading(true);
     try {
-      const query = supabase
+      const { data, error } = await supabase
         .from('quotes')
-        .select('*')
+        .select(`
+          id,
+          quote_number,
+          customer_id,
+          customer_name,
+          customer_company,
+          customer_email,
+          total,
+          status,
+          created_at,
+          sent_at,
+          approved_at,
+          valid_until,
+          followup_count,
+          last_followup_sent_at,
+          next_followup_due_at,
+          customer_contacts(full_name)
+        `)
         .order('created_at', { ascending: false });
-
-      const { data, error } = await query;
 
       if (error) throw error;
 
-      setQuotes(data || []);
+      const formattedData = (data || []).map(quote => ({
+        ...quote,
+        contact_name: (quote.customer_contacts as { full_name: string } | null)?.full_name || null
+      }));
+
+      setQuotes(formattedData);
     } catch (error) {
       console.error('Error loading quotes:', error);
       showNotification('Failed to load quotes', 'error');
@@ -161,6 +188,66 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
     }
   };
 
+  const handleSendFollowup = async (quoteId: string, quoteNumber: string | null) => {
+    const confirmed = await confirm({
+      title: 'Send Follow-Up',
+      message: `Send a follow-up email for quote ${quoteNumber || 'N/A'}?`,
+      confirmLabel: 'Send Follow-Up',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    setSendingFollowup(quoteId);
+    try {
+      // Get current followup count
+      const { data: quoteData, error: fetchError } = await supabase
+        .from('quotes')
+        .select('followup_count')
+        .eq('id', quoteId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const currentCount = quoteData?.followup_count || 0;
+      const newCount = currentCount + 1;
+
+      // Update quote with new followup count and timestamp
+      const { error: updateError } = await supabase
+        .from('quotes')
+        .update({
+          followup_count: newCount,
+          last_followup_sent_at: new Date().toISOString(),
+        })
+        .eq('id', quoteId);
+
+      if (updateError) throw updateError;
+
+      // Queue follow-up in automation queue
+      const { error: queueError } = await supabase
+        .from('automation_queue')
+        .insert({
+          automation_type: 'quote_followup',
+          entity_type: 'quote',
+          entity_id: quoteId,
+          status: 'pending',
+          data: {
+            quote_id: quoteId,
+            followup_number: newCount,
+          },
+        });
+
+      if (queueError) throw queueError;
+
+      showNotification(`Follow-up #${newCount} queued for ${quoteNumber}`, 'success');
+      loadQuotes();
+    } catch (error) {
+      console.error('Error sending follow-up:', error);
+      showNotification('Failed to send follow-up', 'error');
+    } finally {
+      setSendingFollowup(null);
+    }
+  };
+
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'draft':
@@ -185,6 +272,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       (quote.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.quote_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.contact_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesStatus = true;
@@ -393,11 +481,8 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                       <td className="px-6 py-4">
                         <div>
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
-                          {quote.customer_company && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_company}</div>
-                          )}
-                          {quote.customer_email && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_email}</div>
+                          {quote.contact_name && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.contact_name}</div>
                           )}
                         </div>
                       </td>
@@ -429,6 +514,20 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                           >
                             <Eye className="w-4 h-4" />
                           </button>
+                          {(quote.status === 'sent' || quote.status === 'pending') && (
+                            <button
+                              onClick={() => handleSendFollowup(quote.id, quote.quote_number)}
+                              disabled={sendingFollowup === quote.id}
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50"
+                              title={quote.followup_count ? `Send Follow-Up (${quote.followup_count} sent)` : 'Send Follow-Up'}
+                            >
+                              {sendingFollowup === quote.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Mail className="w-4 h-4" />
+                              )}
+                            </button>
+                          )}
                           {(quote.status === 'draft' || quote.status === 'sent' || quote.status === 'rejected') && (
                             <button
                               onClick={() => onEditQuote(quote.id)}

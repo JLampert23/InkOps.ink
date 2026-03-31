@@ -11,15 +11,20 @@ import {
   Download,
   Trash2,
   DollarSign,
+  Pause,
+  Play,
+  AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { WorkOrderService, WorkOrderLineItem, CustomInvoiceStatus } from '../../services/work-order-service';
+import { ProductionWorkflowService, WorkflowTracking } from '../../services/production-workflow-service';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { BoxLabelConfig } from './BoxLabel';
 import { generateWorkOrderPDF, WorkOrderPDFData } from '../../utils/work-order-pdf-export';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
 import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
 import { useNotification } from '../../contexts/NotificationContext';
+import { HoldReasonModal } from './HoldReasonModal';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -151,6 +156,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [customInvoiceStatuses, setCustomInvoiceStatuses] = useState<CustomInvoiceStatus[]>([]);
   const [selectedInvoiceStatus, setSelectedInvoiceStatus] = useState<string | null>(null);
   const [updatingInvoiceStatus, setUpdatingInvoiceStatus] = useState(false);
+  const [workflowTracking, setWorkflowTracking] = useState<WorkflowTracking | null>(null);
+  const [showHoldModal, setShowHoldModal] = useState(false);
+  const [processingHold, setProcessingHold] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -215,6 +223,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         loadCompanySettings(woData.company_id);
         loadCustomInvoiceStatuses(woData.company_id);
       }
+
+      // Load workflow tracking data
+      const { data: trackingData } = await ProductionWorkflowService.getWorkflowTracking(workOrderId);
+      setWorkflowTracking(trackingData);
 
       const { data: woItems } = await supabase
         .from('work_order_line_items')
@@ -380,6 +392,80 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       addNotification('error', 'Failed to update work order status');
     } finally {
       setUpdatingInvoiceStatus(false);
+    }
+  };
+
+  const handlePutOnHold = async (reason: string) => {
+    if (!workOrder) return;
+
+    setProcessingHold(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        addNotification('error', 'You must be logged in to put work orders on hold');
+        return;
+      }
+
+      const { data, error } = await ProductionWorkflowService.holdWorkOrder(
+        workOrder.id,
+        user.id,
+        reason
+      );
+
+      if (error) {
+        console.error('Error putting work order on hold:', error);
+        addNotification('error', 'Failed to put work order on hold');
+        return;
+      }
+
+      addNotification('success', `Work order ${workOrder.work_order_number} put on hold`);
+      await loadData();
+    } catch (error) {
+      console.error('Error putting work order on hold:', error);
+      addNotification('error', 'Failed to put work order on hold');
+    } finally {
+      setProcessingHold(false);
+    }
+  };
+
+  const handleResumeWork = async () => {
+    if (!workOrder) return;
+
+    const confirmed = await confirm({
+      title: 'Resume Work Order',
+      message: `Resume work on ${workOrder.work_order_number}?\n\nThis will remove the hold and allow production to continue.`,
+      confirmLabel: 'Resume Work',
+    });
+
+    if (!confirmed) return;
+
+    setProcessingHold(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        addNotification('error', 'You must be logged in to resume work orders');
+        return;
+      }
+
+      const { data, error } = await ProductionWorkflowService.resumeWorkOrder(
+        workOrder.id,
+        user.id,
+        'Work order resumed from hold'
+      );
+
+      if (error) {
+        console.error('Error resuming work order:', error);
+        addNotification('error', 'Failed to resume work order');
+        return;
+      }
+
+      addNotification('success', `Work order ${workOrder.work_order_number} resumed`);
+      await loadData();
+    } catch (error) {
+      console.error('Error resuming work order:', error);
+      addNotification('error', 'Failed to resume work order');
+    } finally {
+      setProcessingHold(false);
     }
   };
 
@@ -598,6 +684,25 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           {quote && <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{quote.quote_number}</span>}
         </div>
         <div className="flex items-center gap-1.5">
+          {workflowTracking?.is_on_hold ? (
+            <button
+              onClick={handleResumeWork}
+              disabled={processingHold}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {processingHold ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+              Resume Work
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowHoldModal(true)}
+              disabled={processingHold}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors disabled:opacity-50"
+            >
+              {processingHold ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
+              Put on Hold
+            </button>
+          )}
           <button
             onClick={handleDownloadPDF}
             disabled={downloading}
@@ -620,6 +725,29 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           </button>
         </div>
       </div>
+
+      {workflowTracking?.is_on_hold && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-600 rounded-lg shadow-sm p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
+              <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-amber-900 dark:text-amber-300 mb-1">
+                WORK ORDER ON HOLD
+              </h3>
+              <p className="text-sm text-amber-800 dark:text-amber-400 mb-2">
+                <span className="font-semibold">Reason:</span> {workflowTracking.hold_reason}
+              </p>
+              {workflowTracking.hold_started_at && (
+                <p className="text-xs text-amber-700 dark:text-amber-500">
+                  On hold since {format(new Date(workflowTracking.hold_started_at), 'MMM d, yyyy h:mm a')}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {totalWoItems > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
@@ -785,6 +913,13 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       )}
 
       <LabelPreviewModal isOpen={showLabelModal} onClose={() => setShowLabelModal(false)} labels={generateLabels()} config={boxLabelConfig} />
+
+      <HoldReasonModal
+        isOpen={showHoldModal}
+        onClose={() => setShowHoldModal(false)}
+        onConfirm={handlePutOnHold}
+        workOrderNumber={workOrder?.work_order_number || ''}
+      />
     </div>
   );
 }

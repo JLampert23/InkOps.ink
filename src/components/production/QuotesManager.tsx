@@ -6,17 +6,22 @@ import { QuoteBuilder } from './QuoteBuilder';
 interface QuotesManagerProps {
   initialCustomerId?: string;
   initialContactId?: string;
+  initialQuoteId?: string;
   onCustomerIdConsumed?: () => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
-export function QuotesManager({ initialCustomerId, initialContactId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
+export function QuotesManager({ initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed, onViewCustomer }: QuotesManagerProps = {}) {
   const [view, setView] = useState<'list' | 'detail' | 'edit' | 'create'>('list');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | undefined>(initialCustomerId);
   const [preselectedContactId, setPreselectedContactId] = useState<string | undefined>(initialContactId);
 
   useEffect(() => {
-    if (initialCustomerId) {
+    if (initialQuoteId) {
+      setSelectedQuoteId(initialQuoteId);
+      setView('detail');
+    } else if (initialCustomerId) {
       setView('create');
       setPreselectedCustomerId(initialCustomerId);
       setPreselectedContactId(initialContactId);
@@ -24,11 +29,31 @@ export function QuotesManager({ initialCustomerId, initialContactId, onCustomerI
         onCustomerIdConsumed();
       }
     }
-  }, [initialCustomerId, initialContactId, onCustomerIdConsumed]);
+  }, [initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed]);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.quoteView === 'list') {
+        setView('list');
+        setSelectedQuoteId(null);
+      } else if (event.state?.quoteView === 'detail' && event.state?.quoteId) {
+        setView('detail');
+        setSelectedQuoteId(event.state.quoteId);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleSelectQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
     setView('detail');
+    window.history.pushState(
+      { quoteView: 'detail', quoteId },
+      '',
+      `#production/quotes/${quoteId}`
+    );
   };
 
   const handleEditQuote = (quoteId: string) => {
@@ -48,6 +73,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, onCustomerI
     setPreselectedCustomerId(undefined);
     setPreselectedContactId(undefined);
     setView('list');
+    window.history.back();
   };
 
   if (view === 'detail' && selectedQuoteId) {
@@ -56,6 +82,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, onCustomerI
         quoteId={selectedQuoteId}
         onBack={handleBack}
         onEdit={() => handleEditQuote(selectedQuoteId)}
+        onViewCustomer={onViewCustomer}
       />
     );
   }
@@ -89,6 +116,7 @@ export function QuotesManager({ initialCustomerId, initialContactId, onCustomerI
       onSelectQuote={handleSelectQuote}
       onCreateQuote={handleCreateQuote}
       onEditQuote={handleEditQuote}
+      onViewCustomer={onViewCustomer}
     />
   );
 }

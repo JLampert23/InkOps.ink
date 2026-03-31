@@ -16,6 +16,18 @@ export function InvoicingManager() {
     loadInvoices();
   }, [statusFilter]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (showInvoiceModal) {
+        setShowInvoiceModal(false);
+        setSelectedInvoice(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showInvoiceModal]);
+
   const loadInvoices = async () => {
     setLoading(true);
     try {
@@ -204,6 +216,11 @@ export function InvoicingManager() {
                       onClick={() => {
                         setSelectedInvoice(invoice);
                         setShowInvoiceModal(true);
+                        window.history.pushState(
+                          { invoiceView: 'detail', invoiceId: invoice.id },
+                          '',
+                          `#invoicing/${invoice.id}`
+                        );
                       }}
                       className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
                       title="View Details"
@@ -228,7 +245,10 @@ export function InvoicingManager() {
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedInvoice.invoiceNumber}</p>
                 </div>
                 <button
-                  onClick={() => setShowInvoiceModal(false)}
+                  onClick={() => {
+                    setShowInvoiceModal(false);
+                    window.history.back();
+                  }}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <Eye className="w-6 h-6" />

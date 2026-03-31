@@ -19,6 +19,7 @@ interface QuoteDetailProps {
   quoteId: string;
   onBack: () => void;
   onEdit: () => void;
+  onViewCustomer?: (customerId: string) => void;
 }
 
 interface Quote {
@@ -85,6 +86,9 @@ interface Quote {
   company_website: string | null;
   company_email: string | null;
   company_logo_url: string | null;
+  followup_count?: number;
+  last_followup_sent_at?: string | null;
+  next_followup_due_at?: string | null;
 }
 
 interface LineItem {
@@ -144,7 +148,7 @@ interface CompanySettings {
   company_logo_secondary_url: string | null;
 }
 
-export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
+export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }: QuoteDetailProps) {
   const { showNotification } = useNotification();
   const { confirm } = useConfirmation();
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -160,6 +164,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
   const [reopening, setReopening] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [sendingFollowup, setSendingFollowup] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -175,22 +180,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .single();
 
       if (quoteError) throw quoteError;
-
-      // If quote has contact_id, fetch contact details
-      if (quoteData.contact_id) {
-        const { data: contactData } = await supabase
-          .from('customer_contacts')
-          .select('*')
-          .eq('id', quoteData.contact_id)
-          .maybeSingle();
-
-        if (contactData) {
-          // Add contact info to quote data for display
-          quoteData.contact_name = contactData.name;
-          quoteData.contact_email = contactData.email;
-          quoteData.contact_phone = contactData.phone;
-        }
-      }
 
       // If quote has customer_id, fetch customer details if billing info is missing
       if (quoteData.customer_id) {
@@ -232,6 +221,28 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           if (!quoteData.ship_zip && customerData.shipping_zip) {
             quoteData.ship_zip = customerData.shipping_zip;
           }
+        }
+      }
+
+      // If quote has contact_id, fetch contact details and override billing contact info
+      if (quoteData.contact_id) {
+        const { data: contactData } = await supabase
+          .from('customer_contacts')
+          .select('*')
+          .eq('id', quoteData.contact_id)
+          .maybeSingle();
+
+        if (contactData) {
+          // Add contact info to quote data for display
+          quoteData.contact_name = contactData.name;
+          quoteData.contact_email = contactData.email;
+          quoteData.contact_phone = contactData.phone;
+
+          // Override billing contact information with selected contact
+          // Keep company name and address from customer, but use selected contact's personal details
+          quoteData.bill_name = contactData.name;
+          quoteData.bill_email = contactData.email;
+          quoteData.bill_phone = contactData.phone;
         }
       }
 
@@ -336,6 +347,78 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF');
+    }
+  };
+
+  const handleSendFollowup = async () => {
+    if (!quote) return;
+
+    const confirmed = await confirm({
+      title: 'Send Follow-Up Email',
+      message: 'This will send a reminder email about the pending quote. Click Confirm to Send.',
+      confirmLabel: 'Confirm',
+      variant: 'info',
+    });
+
+    if (!confirmed) return;
+
+    setSendingFollowup(true);
+    try {
+      // Queue the follow-up in automation queue
+      const { error: queueError } = await supabase
+        .from('automation_queue')
+        .insert({
+          company_id: quote.company_id,
+          trigger_type: 'quote_followup',
+          trigger_data: {
+            quote_id: quote.id,
+            quote_number: quote.quote_number,
+            customer_id: quote.customer_id,
+            contact_id: quote.contact_id,
+            followup_number: (quote.followup_count || 0) + 1,
+          },
+          status: 'pending',
+          scheduled_for: new Date().toISOString(),
+          attempts: 0,
+          max_attempts: 3,
+        });
+
+      if (queueError) throw queueError;
+
+      // Update the quote with follow-up info
+      const { error: updateError } = await supabase
+        .from('quotes')
+        .update({
+          followup_count: (quote.followup_count || 0) + 1,
+          last_followup_sent_at: new Date().toISOString(),
+        })
+        .eq('id', quote.id);
+
+      if (updateError) throw updateError;
+
+      // Log the manual follow-up
+      await supabase
+        .from('quote_activity_log')
+        .insert({
+          company_id: quote.company_id,
+          quote_id: quote.id,
+          action: 'manual_followup',
+          meta: {
+            followup_number: (quote.followup_count || 0) + 1,
+            recipient_email: quote.customer_email,
+          },
+          performed_at: new Date().toISOString(),
+        });
+
+      showNotification('success', 'Follow-Up Sent', 'The follow-up email has been queued and will be sent shortly.');
+
+      // Reload quote details to show updated count
+      await loadQuoteDetails();
+    } catch (error) {
+      console.error('Error sending follow-up:', error);
+      showNotification('error', 'Error', error instanceof Error ? error.message : 'Failed to send follow-up email');
+    } finally {
+      setSendingFollowup(false);
     }
   };
 
@@ -561,6 +644,26 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <Send className="w-3 h-3" />
             {quote.status === 'draft' ? 'Send to Customer' : 'Resend'}
           </button>
+          {(quote.status === 'sent' || quote.status === 'pending') && (
+            <button
+              onClick={handleSendFollowup}
+              disabled={sendingFollowup}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={`Follow-up count: ${quote.followup_count || 0}`}
+            >
+              {sendingFollowup ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-3 h-3" />
+                  Send Follow-Up {quote.followup_count ? `(${quote.followup_count})` : ''}
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -582,9 +685,32 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
             <div className="text-sm space-y-0.5">
-              {quote.bill_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.bill_company}</p>}
-              {quote.bill_name && <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>}
-              {quote.contact_name && quote.contact_name !== quote.bill_name && (
+              {quote.bill_company && (
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {quote.customer_id && onViewCustomer ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewCustomer(quote.customer_id!);
+                      }}
+                      className="text-blue-600 dark:text-blue-400 hover:underline text-left"
+                    >
+                      {quote.bill_company}
+                    </button>
+                  ) : (
+                    quote.bill_company
+                  )}
+                </p>
+              )}
+              {(quote.bill_first_name || quote.bill_last_name) && (
+                <p className="text-gray-700 dark:text-gray-300">
+                  {quote.bill_first_name} {quote.bill_last_name}
+                </p>
+              )}
+              {!quote.bill_first_name && !quote.bill_last_name && quote.bill_name && (
+                <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>
+              )}
+              {quote.contact_name && quote.contact_name !== quote.bill_name && quote.contact_name !== `${quote.bill_first_name} ${quote.bill_last_name}`.trim() && (
                 <p className="text-gray-600 dark:text-gray-400 text-xs italic">Contact: {quote.contact_name}</p>
               )}
               {quote.bill_address_1 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_1}</p>}
@@ -604,7 +730,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               {(quote.contact_phone || quote.bill_phone || quote.customer_phone) && (
                 <p className="text-gray-700 dark:text-gray-300">{quote.contact_phone || quote.bill_phone || quote.customer_phone}</p>
               )}
-              {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
+              {!quote.bill_company && !quote.bill_name && !quote.bill_first_name && !quote.bill_last_name && !quote.bill_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
               )}
             </div>
@@ -1137,7 +1263,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           quoteId={quoteId}
           quoteNumber={quote.quote_number}
           customerName={quote.customer_name}
-          customerEmail={quote.customer_email || quote.bill_email || ''}
+          customerEmail={quote.contact_email || quote.bill_email || quote.customer_email || ''}
+          customerPhone={quote.contact_phone || ''}
           totalAmount={quote.total || 0}
           onClose={() => setShowSendModal(false)}
           onSuccess={() => {

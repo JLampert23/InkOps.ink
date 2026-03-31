@@ -1,7 +1,8 @@
 /**
  * Communication Template Types
  *
- * Type definitions for customizable email templates with short code support
+ * Type definitions for customizable communication templates with short code support
+ * Supports email, SMS, or both channels
  */
 
 /**
@@ -18,6 +19,11 @@ export type TemplateType =
   | 'custom';
 
 /**
+ * Communication channel options
+ */
+export type CommunicationChannel = 'email' | 'sms' | 'both';
+
+/**
  * Communication Template Database Model
  */
 export interface CommunicationTemplate {
@@ -27,6 +33,8 @@ export interface CommunicationTemplate {
   template_name: string;
   subject_template: string;
   body_template: string;
+  channel: CommunicationChannel;
+  sms_body_template: string;
   auto_attach_quote_link: boolean;
   auto_attach_pdf: boolean;
   auto_attach_mockups: boolean;
@@ -46,6 +54,8 @@ export interface CreateTemplateRequest {
   template_name: string;
   subject_template: string;
   body_template: string;
+  channel?: CommunicationChannel;
+  sms_body_template?: string;
   auto_attach_quote_link?: boolean;
   auto_attach_pdf?: boolean;
   auto_attach_mockups?: boolean;
@@ -60,6 +70,8 @@ export interface UpdateTemplateRequest {
   template_name?: string;
   subject_template?: string;
   body_template?: string;
+  channel?: CommunicationChannel;
+  sms_body_template?: string;
   auto_attach_quote_link?: boolean;
   auto_attach_pdf?: boolean;
   auto_attach_mockups?: boolean;
@@ -87,6 +99,8 @@ export interface TemplateTypeInfo {
   description: string;
   defaultSubject: string;
   defaultBody: string;
+  defaultSmsBody: string;
+  supportsSms: boolean;
   supportedAttachments: {
     quoteLink: boolean;
     pdf: boolean;
@@ -113,6 +127,7 @@ export interface RenderTemplateRequest {
 export interface RenderedTemplate {
   subject: string;
   body: string;
+  smsBody?: string;
   attachments: {
     quote_link?: string;
     pdf?: boolean;
@@ -147,6 +162,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Default template for sending quote approval emails to customers',
     defaultSubject: 'Quote {{quote_number}} for {{customer_company}}',
     defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your quote {{quote_number}} is ready for review.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
+    defaultSmsBody: 'Hi {{customer_first_name}}, your quote {{quote_number}} for {{quote_total}} is ready. Review & approve: {{quote_link}} - {{company_name}}',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: true,
       pdf: true,
@@ -165,6 +182,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Default template for sending invoices to customers',
     defaultSubject: 'Invoice {{invoice_number}} from {{company_name}}',
     defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your invoice {{invoice_number}} is now available.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
+    defaultSmsBody: 'Hi {{customer_first_name}}, invoice {{invoice_number}} for {{invoice_total}} is ready. View: {{invoice_link}} - {{company_name}}',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -182,6 +201,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Template for sending payment reminder emails for overdue invoices',
     defaultSubject: 'Payment Reminder: Invoice {{invoice_number}}',
     defaultBody: '<p>Hi {{customer_first_name}},</p><p>This is a friendly reminder that invoice {{invoice_number}} for {{invoice_balance}} is due.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
+    defaultSmsBody: 'Reminder: Invoice {{invoice_number}} for {{invoice_balance}} is due. Pay now: {{invoice_link}} - {{company_name}}',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -200,6 +221,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Template for confirming payment receipt',
     defaultSubject: 'Payment Received: {{payment_amount}}',
     defaultBody: '<p>Hi {{customer_first_name}},</p><p>We have received your payment of {{payment_amount}} for invoice {{invoice_number}}.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
+    defaultSmsBody: 'Payment received! {{payment_amount}} for invoice {{invoice_number}}. Thank you! - {{company_name}}',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -217,6 +240,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Template for requesting approval on quotes or designs',
     defaultSubject: 'Approval Required: {{quote_number}}',
     defaultBody: '<p>Hi {{customer_first_name}},</p><p>Please review and approve {{quote_number}}.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
+    defaultSmsBody: 'Hi {{customer_first_name}}, please review & approve {{quote_number}}: {{quote_link}} - {{company_name}}',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: true,
       pdf: true,
@@ -234,6 +259,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Template for internal team notifications',
     defaultSubject: 'Internal: {{quote_number}} Status Update',
     defaultBody: '<p>Team,</p><p>Quote {{quote_number}} has been updated.</p>',
+    defaultSmsBody: 'Internal: {{quote_number}} has been updated.',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: true,
       pdf: false,
@@ -248,6 +275,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Template for automated accounts receivable reports',
     defaultSubject: 'Accounts Receivable Report - {{current_date}}',
     defaultBody: '<p>AR Report for {{current_date}}</p>',
+    defaultSmsBody: '',
+    supportsSms: false,
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -264,6 +293,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     description: 'Custom template for specialized communication needs',
     defaultSubject: 'Message from {{company_name}}',
     defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your custom message here.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
+    defaultSmsBody: 'Hi {{customer_first_name}}, message from {{company_name}}.',
+    supportsSms: true,
     supportedAttachments: {
       quoteLink: false,
       pdf: false,

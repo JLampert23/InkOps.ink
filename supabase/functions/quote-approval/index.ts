@@ -465,6 +465,23 @@ Deno.serve(async (req: Request) => {
         .eq("id", approval.company_id)
         .maybeSingle();
 
+      let contact = null;
+      if (approval.quote?.contact_id) {
+        const { data: contactData } = await supabase
+          .from("customer_contacts")
+          .select("full_name, email, phone")
+          .eq("id", approval.quote.contact_id)
+          .maybeSingle();
+        contact = contactData;
+      }
+
+      const quoteWithContact = {
+        ...approval.quote,
+        bill_name: contact?.full_name || approval.quote?.customer_name,
+        bill_email: contact?.email || approval.quote?.customer_email,
+        bill_phone: contact?.phone || approval.quote?.customer_phone,
+      };
+
       let approvalStatus = 'pending';
       if (approval.is_used) {
         const quoteStatus = approval.quote?.status;
@@ -475,7 +492,7 @@ Deno.serve(async (req: Request) => {
 
       return new Response(
         JSON.stringify({
-          quote: approval.quote,
+          quote: quoteWithContact,
           line_items: lineItems || [],
           imprints: imprints || [],
           company_settings: companySettings || {},
@@ -577,15 +594,24 @@ Deno.serve(async (req: Request) => {
         updateFields.converted_at = new Date().toISOString();
       }
 
-      const { error: quoteUpdateError } = await supabase
+      const { data: updatedQuote, error: quoteUpdateError } = await supabase
         .from("quotes")
         .update(updateFields)
-        .eq("id", approval.quote_id);
+        .eq("id", approval.quote_id)
+        .select("id, status")
+        .single();
 
       if (quoteUpdateError) {
         console.error("Quote update failed:", quoteUpdateError);
         throw new Error("Failed to update quote status: " + quoteUpdateError.message);
       }
+
+      if (!updatedQuote || updatedQuote.status !== newStatus) {
+        console.error("Quote status verification failed. Expected:", newStatus, "Got:", updatedQuote?.status);
+        throw new Error("Quote status update could not be verified. Please try again.");
+      }
+
+      console.log(`Quote ${approval.quote_id} status successfully updated to: ${updatedQuote.status}`);
 
       if (approval.single_use) {
         await supabase

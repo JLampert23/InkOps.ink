@@ -117,6 +117,22 @@ async function processQueueItem(supabase: any, queueItem: any) {
       .update({ status: 'processing' })
       .eq('id', queueItem.id);
 
+    // Handle special system automation types
+    if (queueItem.trigger_type === 'quote_followup') {
+      const result = await processQuoteFollowup(supabase, queueItem);
+
+      // Mark as completed
+      await supabase
+        .from('automation_queue')
+        .update({
+          status: 'completed',
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', queueItem.id);
+
+      return result;
+    }
+
     // Get all automations that match this trigger type
     const { data: automations, error: autoError } = await supabase
       .from('automations')
@@ -697,11 +713,20 @@ async function executeRequestApproval(supabase: any, config: any, triggerData: a
     throw new Error(`Failed to create approval: ${approvalError.message}`);
   }
 
+  // Get company settings for subdomain
+  const { data: companySettings } = await supabase
+    .from('company_settings')
+    .select('inkops_subdomain')
+    .eq('id', companyId)
+    .maybeSingle();
+
+  // Generate approval URL - always use inkops subdomain format
+  const subdomain = companySettings?.inkops_subdomain || 'app';
+  const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approval.approval_token}`;
+
   // Send approval request email
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-  const approvalUrl = `${supabaseUrl}/approve/${approval.id}`;
 
   await fetch(`${supabaseUrl}/functions/v1/send-email`, {
     method: 'POST',
@@ -806,6 +831,163 @@ async function executeWaitUntil(supabase: any, config: any, triggerData: any, co
     delay_ms: delayMs,
     reschedule: true
   };
+}
+
+async function processQuoteFollowup(supabase: any, queueItem: any) {
+  try {
+    const { quote_id, quote_number, customer_id, contact_id, followup_number } = queueItem.trigger_data;
+
+    // Get quote details
+    const { data: quote, error: quoteError } = await supabase
+      .from('quotes')
+      .select('*, customers(name, email, primary_contact_name)')
+      .eq('id', quote_id)
+      .maybeSingle();
+
+    if (quoteError || !quote) {
+      throw new Error(`Failed to fetch quote: ${quoteError?.message || 'Quote not found'}`);
+    }
+
+    // Check if quote is still in a state where follow-up should be sent
+    if (!['sent', 'pending'].includes(quote.status)) {
+      return {
+        success: true,
+        skipped: true,
+        reason: `Quote status is ${quote.status}, no follow-up needed`
+      };
+    }
+
+    // Get company settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('*, communication_templates!quote_followup_template_id(*)')
+      .eq('id', queueItem.company_id)
+      .maybeSingle();
+
+    if (settingsError || !settings) {
+      throw new Error(`Failed to fetch company settings: ${settingsError?.message}`);
+    }
+
+    if (!settings.quote_followup_enabled) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'Quote follow-ups are disabled'
+      };
+    }
+
+    // Get customer email
+    const customerEmail = quote.customers?.email || quote.customer_email;
+    if (!customerEmail) {
+      throw new Error('No customer email found for quote follow-up');
+    }
+
+    // Get template
+    const template = settings.communication_templates;
+    if (!template) {
+      throw new Error('No follow-up template configured');
+    }
+
+    // Send follow-up email
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        company_id: queueItem.company_id,
+        to: customerEmail,
+        subject: template.subject_template,
+        html: template.body_template,
+        template: 'quote_followup',
+        auto_attach_quote_link: template.auto_attach_quote_link,
+        auto_attach_pdf: template.auto_attach_pdf,
+        auto_attach_mockups: template.auto_attach_mockups,
+        shortCodeData: {
+          quote: {
+            id: quote.id,
+            number: quote.quote_number,
+            total: quote.total,
+            created_date: quote.created_at,
+            expiration_date: quote.expiration_date,
+          },
+          customer: {
+            name: quote.customers?.name || quote.customer_name || quote.customers?.primary_contact_name,
+            email: customerEmail,
+          },
+          company: {
+            name: settings.company_name,
+          }
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to send follow-up email: ${error}`);
+    }
+
+    // Update quote with follow-up information
+    const newFollowupCount = quote.followup_count + 1;
+    const { error: updateError } = await supabase
+      .from('quotes')
+      .update({
+        followup_count: newFollowupCount,
+        last_followup_sent_at: new Date().toISOString(),
+      })
+      .eq('id', quote_id);
+
+    if (updateError) {
+      console.error('Failed to update quote follow-up count:', updateError);
+    }
+
+    // Log activity
+    await supabase
+      .from('quote_activity_log')
+      .insert({
+        company_id: queueItem.company_id,
+        quote_id: quote_id,
+        action: 'followup_sent',
+        meta: {
+          followup_number: followup_number,
+          recipient_email: customerEmail,
+          template_used: template.template_name,
+        },
+        performed_at: new Date().toISOString(),
+      });
+
+    return {
+      success: true,
+      message: `Follow-up #${followup_number} sent to ${customerEmail}`,
+      followup_number: followup_number,
+    };
+
+  } catch (error) {
+    console.error('Error processing quote follow-up:', error);
+
+    // Log failed follow-up
+    const { quote_id } = queueItem.trigger_data;
+    if (quote_id) {
+      await supabase
+        .from('quote_activity_log')
+        .insert({
+          company_id: queueItem.company_id,
+          quote_id: quote_id,
+          action: 'followup_failed',
+          meta: {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            trigger_data: queueItem.trigger_data,
+          },
+          performed_at: new Date().toISOString(),
+        });
+    }
+
+    throw error;
+  }
 }
 
 function getNestedValue(obj: any, path: string): any {

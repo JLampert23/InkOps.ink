@@ -207,10 +207,12 @@ function AppContent() {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
   const [quoteContactId, setQuoteContactId] = useState<string | undefined>(undefined);
+  const [navigateToQuoteId, setNavigateToQuoteId] = useState<string | undefined>(undefined);
   const previousTabRef = useRef<Tab | null>(null);
   const isNavigatingRef = useRef(false);
   const { signOut, user } = useAuth();
@@ -229,6 +231,10 @@ function AppContent() {
 
     if (ACCOUNTING_TABS.includes(activeTab)) {
       setAccountingExpanded(true);
+    }
+
+    if (activeTab !== 'customers') {
+      setSelectedCustomerId(undefined);
     }
   }, [activeTab]);
 
@@ -363,6 +369,23 @@ function AppContent() {
     setActiveTab('production');
   };
 
+  const handleViewCustomer = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setCustomerSearchTerm('');
+    setActiveTab('customers');
+    setAccountingExpanded(true);
+  };
+
+  const handleViewQuote = (quoteId: string) => {
+    setNavigateToQuoteId(quoteId);
+    setActiveTab('production');
+  };
+
+  const handleDuplicateQuote = (quoteId: string) => {
+    setNavigateToQuoteId(quoteId);
+    setActiveTab('production');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 transition-colors">
       {/* Sidebar */}
@@ -401,7 +424,7 @@ function AppContent() {
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
                     <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                      Production<br />Dashboard
+                      Production
                     </div>
                   </div>
                   {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -651,9 +674,12 @@ function AppContent() {
               </div>
             }>
               <CustomersReport
-                key={customersKey}
+                key={`${customersKey}-${selectedCustomerId || ''}`}
                 initialSearchTerm={customerSearchTerm}
+                initialCustomerId={selectedCustomerId}
                 onCreateQuote={handleCreateQuoteForCustomer}
+                onViewQuote={handleViewQuote}
+                onDuplicateQuote={handleDuplicateQuote}
               />
             </Suspense>
           )}
@@ -701,11 +727,14 @@ function AppContent() {
                   setActiveTab('customers');
                   setAccountingExpanded(true);
                 }}
+                onViewCustomer={handleViewCustomer}
                 initialCustomerId={quoteCustomerId}
                 initialContactId={quoteContactId}
+                initialQuoteId={navigateToQuoteId}
                 onCustomerIdConsumed={() => {
                   setQuoteCustomerId(undefined);
                   setQuoteContactId(undefined);
+                  setNavigateToQuoteId(undefined);
                 }}
               />
             </Suspense>

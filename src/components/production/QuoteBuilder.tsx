@@ -3,6 +3,7 @@ import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Sea
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
@@ -189,6 +190,7 @@ function UnitPriceTooltip({ item, groupImprints, garmentMarkup }: {
 export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initialContactId, onSave, onCancel }: QuoteBuilderProps) {
   const { user, session } = useAuth();
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -269,6 +271,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
   const [billCompany, setBillCompany] = useState('');
   const [billName, setBillName] = useState('');
+  const [billFirstName, setBillFirstName] = useState('');
+  const [billLastName, setBillLastName] = useState('');
   const [billAddress1, setBillAddress1] = useState('');
   const [billAddress2, setBillAddress2] = useState('');
   const [billCity, setBillCity] = useState('');
@@ -513,6 +517,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
       if (customer) {
         let contactName = customer.contact_name || '';
+        let contactFirstName = customer.primary_contact_first_name || '';
+        let contactLastName = customer.primary_contact_last_name || '';
         let contactEmail = customer.email || '';
         let contactPhone = customer.phone || '';
 
@@ -525,6 +531,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
           if (contact) {
             contactName = contact.full_name || '';
+            const nameParts = contactName.split(' ');
+            contactFirstName = nameParts[0] || '';
+            contactLastName = nameParts.slice(1).join(' ') || '';
             contactEmail = contact.email || '';
             contactPhone = contact.phone || contact.mobile || '';
           }
@@ -532,6 +541,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
         setBillCompany(customer.company_name || '');
         setBillName(contactName);
+        setBillFirstName(contactFirstName);
+        setBillLastName(contactLastName);
         setBillAddress1(customer.billing_address_line1 || '');
         setBillAddress2(customer.billing_address_line2 || '');
         setBillCity(customer.billing_city || '');
@@ -661,6 +672,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       setProductionNotes(quote.production_notes || '');
       setBillCompany(quote.bill_company || '');
       setBillName(quote.bill_name || '');
+      setBillFirstName(quote.bill_first_name || '');
+      setBillLastName(quote.bill_last_name || '');
       setBillAddress1(quote.bill_address_1 || '');
       setBillAddress2(quote.bill_address_2 || '');
       setBillCity(quote.bill_city || '');
@@ -2060,6 +2073,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         production_notes: productionNotes || null,
         bill_company: billCompany || null,
         bill_name: billName || null,
+        bill_first_name: billFirstName || null,
+        bill_last_name: billLastName || null,
         bill_address_1: billAddress1 || null,
         bill_address_2: billAddress2 || null,
         bill_city: billCity || null,
@@ -2366,13 +2381,22 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                       placeholder="Company"
                       className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
-                    <input
-                      type="text"
-                      value={billName}
-                      onChange={(e) => setBillName(e.target.value)}
-                      placeholder="Name"
-                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        value={billFirstName}
+                        onChange={(e) => setBillFirstName(e.target.value)}
+                        placeholder="First Name"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                      <input
+                        type="text"
+                        value={billLastName}
+                        onChange={(e) => setBillLastName(e.target.value)}
+                        placeholder="Last Name"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      />
+                    </div>
                     <input
                       type="text"
                       value={billAddress1}
@@ -3051,7 +3075,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                                     <button
                                                       onClick={async (e) => {
                                                         e.stopPropagation();
-                                                        if (confirm('Delete this mockup?')) {
+                                                        const confirmed = await confirm({
+                                                          title: 'Delete Mockup',
+                                                          message: 'Are you sure you want to delete this mockup? This action cannot be undone.',
+                                                          confirmLabel: 'Delete',
+                                                          cancelLabel: 'Cancel',
+                                                          variant: 'danger',
+                                                          icon: <Trash2 className="w-6 h-6" />,
+                                                        });
+
+                                                        if (confirmed) {
                                                           try {
                                                             const updatedMockups = imprint.mockups.filter((_: any, idx: number) => idx !== mockupIdx);
                                                             const { error } = await supabase
@@ -3286,6 +3319,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           quoteNumber={quoteNumber}
           customerName={customers.find(c => c.id === selectedCustomerId)?.company_name || ''}
           customerEmail={customers.find(c => c.id === selectedCustomerId)?.email || ''}
+          customerPhone={customerContacts.find(c => c.id === selectedContactId)?.phone || customers.find(c => c.id === selectedCustomerId)?.phone || ''}
           totalAmount={totals.totalDue}
           onClose={() => setShowSendQuoteModal(false)}
           onSuccess={() => {

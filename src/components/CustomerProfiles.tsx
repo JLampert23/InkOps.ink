@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, Edit2, Trash2, Save, X, Gift, Upload, File, MapPin, Phone, Mail, Globe, Building, Image } from 'lucide-react';
+import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, CreditCard as Edit2, Trash2, Save, X, Gift, Upload, File, MapPin, Phone, Mail, Globe, Building, Image, Receipt } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { formatCurrency, calculateCustomerLifetimeValue, calculateCustomerOutstandingBalance } from '../utils/financial-aggregations';
 import { format, parseISO } from 'date-fns';
@@ -61,6 +61,17 @@ interface CustomerContact {
   mobile: string | null;
   is_primary: boolean | null;
   notes: string | null;
+}
+
+interface Quote {
+  id: string;
+  quote_number: string;
+  customer_id: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+  nickname?: string;
+  delivery_date?: string;
 }
 
 interface FundraisingCredit {
@@ -290,12 +301,14 @@ interface CustomerDetailProps {
 function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetailProps) {
   const [fundraisingCredits, setFundraisingCredits] = useState<FundraisingCredit[]>([]);
   const [contacts, setContacts] = useState<CustomerContact[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [isAddingCredit, setIsAddingCredit] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [editingCreditId, setEditingCreditId] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'quotes'>('invoices');
 
   const [editedCustomer, setEditedCustomer] = useState<DatabaseCustomer | null>(databaseCustomer);
 
@@ -346,7 +359,33 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
     if (customer.id && companyId) {
       loadFundraisingCredits();
       loadContacts();
+      loadQuotes();
     }
+  }, [customer.id, companyId]);
+
+  useEffect(() => {
+    if (!customer.id || !companyId) return;
+
+    // Subscribe to quote changes
+    const quotesSubscription = supabase
+      .channel(`customer-quotes-${customer.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotes',
+          filter: `customer_id=eq.${customer.id}`
+        },
+        () => {
+          loadQuotes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      quotesSubscription.unsubscribe();
+    };
   }, [customer.id, companyId]);
 
   const loadFundraisingCredits = async () => {
@@ -377,6 +416,23 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       console.error('Error fetching contacts:', error);
     } else {
       setContacts(data || []);
+    }
+  };
+
+  const loadQuotes = async () => {
+    if (!companyId) return;
+
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('id, quote_number, customer_id, status, total_amount, created_at, nickname, delivery_date')
+      .eq('customer_id', customer.id)
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching quotes:', error);
+    } else {
+      setQuotes(data || []);
     }
   };
 
@@ -1155,55 +1211,142 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
         </div>
       )}
 
-      {/* Invoice History */}
-      {customer.invoices.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
-          <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Invoice History</h3>
+      {/* Invoices & Quotes Tabs */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
+        {/* Tab Headers */}
+        <div className="border-b border-gray-200 dark:border-slate-700">
+            <div className="flex">
+              <button
+                onClick={() => setActiveTab('invoices')}
+                className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'invoices'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Invoice History ({customer.invoices.length})
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('quotes')}
+                className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'quotes'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Receipt className="w-4 h-4" />
+                  Quotes ({quotes.length})
+                </div>
+              </button>
+            </div>
           </div>
-          <div className="divide-y divide-gray-200 dark:divide-slate-700 max-h-[400px] overflow-y-auto">
-            {customer.invoices.map(invoice => {
-              const totalPaid = invoice.payments?.edges.reduce((sum, edge) => sum + edge.node.amount, 0) || 0;
-              const balance = invoice.total - totalPaid;
 
-              return (
-                <div key={invoice.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={getPrintavoInvoiceUrl(invoice.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {invoice.visualId || invoice.id}
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        {invoice.contact?.fullName && (
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            - {invoice.contact.fullName}
-                          </span>
+          {/* Tab Content */}
+          <div className="divide-y divide-gray-200 dark:divide-slate-700 max-h-[400px] overflow-y-auto">
+            {activeTab === 'invoices' ? (
+              customer.invoices.length > 0 ? (
+                customer.invoices.map(invoice => {
+                  const totalPaid = invoice.payments?.edges.reduce((sum, edge) => sum + edge.node.amount, 0) || 0;
+                  const balance = invoice.total - totalPaid;
+
+                  return (
+                    <div key={invoice.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={getPrintavoInvoiceUrl(invoice.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {invoice.visualId || invoice.id}
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                            {invoice.contact?.fullName && (
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                - {invoice.contact.fullName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {format(parseISO(invoice.createdAt), 'MMM d, yyyy')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Total: {formatCurrency(invoice.total)}</span>
+                        {balance > 0.01 && (
+                          <span className="text-orange-600 dark:text-orange-400">Balance: {formatCurrency(balance)}</span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {format(parseISO(invoice.createdAt), 'MMM d, yyyy')}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                  No invoices found
+                </div>
+              )
+            ) : (
+              quotes.length > 0 ? (
+                quotes.map(quote => {
+                  const statusColors: Record<string, string> = {
+                    draft: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
+                    pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
+                    approved: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+                    rejected: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+                    converted: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  };
+
+                  return (
+                    <div key={quote.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {quote.quote_number}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[quote.status] || statusColors.draft}`}>
+                              {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                            </span>
+                          </div>
+                          {quote.nickname && (
+                            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              {quote.nickname}
+                            </div>
+                          )}
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Created: {format(parseISO(quote.created_at), 'MMM d, yyyy')}
+                            {quote.delivery_date && (
+                              <span className="ml-3">
+                                Due: {format(parseISO(quote.delivery_date), 'MMM d, yyyy')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {formatCurrency(quote.total_amount)}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">Total: {formatCurrency(invoice.total)}</span>
-                    {balance > 0.01 && (
-                      <span className="text-orange-600 dark:text-orange-400">Balance: {formatCurrency(balance)}</span>
-                    )}
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                  No quotes found
                 </div>
-              );
-            })}
+              )
+            )}
           </div>
         </div>
-      )}
 
       {/* Artwork Library Modal */}
       {showArtworkLibrary && (
