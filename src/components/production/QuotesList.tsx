@@ -480,19 +480,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          {quote.customer_id && onViewCustomer ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onViewCustomer(quote.customer_id!);
-                              }}
-                              className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline text-left"
-                            >
-                              {quote.customer_name || 'N/A'}
-                            </button>
-                          ) : (
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
-                          )}
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
                           {quote.contact_name && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{quote.contact_name}</div>
                           )}
