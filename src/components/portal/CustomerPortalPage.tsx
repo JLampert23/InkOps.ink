@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabaseAnon } from '../../lib/supabase-anon-client';
-import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package } from 'lucide-react';
+import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { PortalPaymentsTab } from './PortalPaymentsTab';
 import { PortalPaymentModal } from './PortalPaymentModal';
 import { PortalProofsTab } from './PortalProofsTab';
 import { PortalOrdersTab } from './PortalOrdersTab';
+import { PortalCustomerInfoTab } from './PortalCustomerInfoTab';
 
 interface CustomerPortalPageProps {
   customerId: string;
@@ -59,7 +60,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
   const [branding, setBranding] = useState<CompanyBranding | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments' | 'proofs' | 'orders'>('quotes');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments' | 'proofs' | 'orders' | 'account'>('quotes');
   const [stripeConfig, setStripeConfig] = useState<StripeConfig>({ enabled: false });
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -325,6 +326,17 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
               <Package className="w-4 h-4" />
               Orders
             </button>
+            <button
+              onClick={() => setActiveTab('account')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                activeTab === 'account'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              Account
+            </button>
           </div>
         </div>
       </nav>
@@ -484,6 +496,13 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
         {activeTab === 'orders' && customer && (
           <PortalOrdersTab
+            customerId={customer.id}
+            companyId={customer.company_id}
+          />
+        )}
+
+        {activeTab === 'account' && customer && (
+          <PortalCustomerInfoTab
             customerId={customer.id}
             companyId={customer.company_id}
           />
