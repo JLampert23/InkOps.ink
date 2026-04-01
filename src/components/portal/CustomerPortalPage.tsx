@@ -531,7 +531,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
         />
       )}
 
-      {viewingQuoteId && (
+      {viewingQuoteId && customer && (
         <PortalQuoteViewerModal
           quoteId={viewingQuoteId}
           onClose={() => setViewingQuoteId(null)}
@@ -539,6 +539,8 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
             setViewingQuoteId(null);
             loadCustomerData();
           }}
+          customerId={customer.id}
+          companyId={customer.company_id}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, XCircle, Loader2, Clock, Download, Printer, ChevronLeft } from 'lucide-react';
-import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
+import { supabaseAnon } from '../../lib/supabase-anon-client';
 import { portalAnalyticsService } from '../../services/portal-analytics-service';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 
@@ -8,6 +8,8 @@ interface QuoteViewerProps {
   quoteId: string;
   onClose: () => void;
   onApprovalComplete?: () => void;
+  customerId?: string;
+  companyId?: string;
 }
 
 interface FullQuoteData {
@@ -47,8 +49,8 @@ function calcTotalQty(item: Record<string, any>): number {
   return SIZE_COLS.reduce((sum, col) => sum + (Number(item[col.key]) || 0), 0);
 }
 
-export function PortalQuoteViewerModal({ quoteId, onClose, onApprovalComplete }: QuoteViewerProps) {
-  const { user } = useCustomerPortal();
+export function PortalQuoteViewerModal({ quoteId, onClose, onApprovalComplete, customerId, companyId }: QuoteViewerProps) {
+  const useDirectAccess = !!(customerId && companyId);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState<FullQuoteData | null>(null);
@@ -70,40 +72,88 @@ export function PortalQuoteViewerModal({ quoteId, onClose, onApprovalComplete }:
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('customer_portal_token');
-      if (!token) {
-        throw new Error('No portal session found');
-      }
+      let quoteData: FullQuoteData;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=quote_detail&quote_id=${quoteId}`,
-        {
-          headers: {
-            'X-Customer-Token': token,
-            'Content-Type': 'application/json',
-          },
+      if (useDirectAccess) {
+        const { data: quote, error: quoteError } = await supabaseAnon
+          .from('quotes')
+          .select('*')
+          .eq('id', quoteId)
+          .eq('customer_id', customerId)
+          .eq('company_id', companyId)
+          .maybeSingle();
+
+        if (quoteError) throw quoteError;
+        if (!quote) throw new Error('Quote not found');
+
+        const { data: lineItems, error: lineItemsError } = await supabaseAnon
+          .from('quote_line_items')
+          .select('*')
+          .eq('quote_id', quoteId)
+          .order('sort_order', { ascending: true });
+
+        if (lineItemsError) throw lineItemsError;
+
+        const { data: imprints, error: imprintsError } = await supabaseAnon
+          .from('quote_imprints')
+          .select('*')
+          .eq('quote_id', quoteId)
+          .order('created_at', { ascending: true });
+
+        if (imprintsError) throw imprintsError;
+
+        const { data: companySettings, error: companyError } = await supabaseAnon
+          .from('company_settings')
+          .select('company_name, logo_url, company_logo_primary_url, company_logo_secondary_url, company_address, company_city, company_state, company_zip, company_phone, company_website, company_email, quote_terms')
+          .eq('id', companyId)
+          .maybeSingle();
+
+        if (companyError) throw companyError;
+
+        quoteData = {
+          quote: { ...quote, quote_terms: companySettings?.quote_terms },
+          line_items: lineItems || [],
+          imprints: imprints || [],
+          company_settings: companySettings || {}
+        };
+      } else {
+        const token = localStorage.getItem('customer_portal_token');
+        if (!token) {
+          throw new Error('No portal session found');
         }
-      );
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => null);
-        throw new Error(errData?.error || 'Failed to load quote details');
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=quote_detail&quote_id=${quoteId}`,
+          {
+            headers: {
+              'X-Customer-Token': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.error || 'Failed to load quote details');
+        }
+
+        const result = await response.json();
+        quoteData = result.data;
       }
 
-      const result = await response.json();
-      setData(result.data);
+      setData(quoteData);
 
-      if (result.data?.quote?.bill_name || result.data?.quote?.customer_name) {
-        setApproverName(result.data.quote.bill_name || result.data.quote.customer_name);
+      if (quoteData?.quote?.bill_name || quoteData?.quote?.customer_name) {
+        setApproverName(quoteData.quote.bill_name || quoteData.quote.customer_name);
       }
-      if (result.data?.quote?.bill_email || result.data?.quote?.customer_email) {
-        setApproverEmail(result.data.quote.bill_email || result.data.quote.customer_email);
+      if (quoteData?.quote?.bill_email || quoteData?.quote?.customer_email) {
+        setApproverEmail(quoteData.quote.bill_email || quoteData.quote.customer_email);
       }
 
-      if (user?.company_id && user?.customer_id) {
+      if (customerId && companyId) {
         await portalAnalyticsService.trackEvent({
-          companyId: user.company_id,
-          customerId: user.customer_id,
+          companyId: companyId,
+          customerId: customerId,
           eventType: 'quote_viewed',
           resourceType: 'quote',
           resourceId: quoteId
@@ -132,41 +182,60 @@ export function PortalQuoteViewerModal({ quoteId, onClose, onApprovalComplete }:
     setSubmitting(true);
     setError(null);
     try {
-      const token = localStorage.getItem('customer_portal_token');
-      if (!token) {
-        throw new Error('Session expired. Please log in again.');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data`,
-        {
-          method: 'POST',
-          headers: {
-            'X-Customer-Token': token,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'approve_quote',
-            quote_id: quoteId,
-            approved,
+      if (useDirectAccess) {
+        const newStatus = approved ? 'approved' : 'rejected';
+        const { error: updateError } = await supabaseAnon
+          .from('quotes')
+          .update({
+            status: newStatus,
             approver_name: approverName.trim(),
             approver_email: approverEmail.trim(),
-            notes: approverNotes.trim() || null,
-          }),
-        }
-      );
+            approval_notes: approverNotes.trim() || null,
+            approved_at: approved ? new Date().toISOString() : null,
+            rejected_at: approved ? null : new Date().toISOString(),
+          })
+          .eq('id', quoteId)
+          .eq('customer_id', customerId)
+          .eq('company_id', companyId);
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => null);
-        throw new Error(errData?.error || 'Failed to submit response');
+        if (updateError) throw updateError;
+      } else {
+        const token = localStorage.getItem('customer_portal_token');
+        if (!token) {
+          throw new Error('Session expired. Please log in again.');
+        }
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Customer-Token': token,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'approve_quote',
+              quote_id: quoteId,
+              approved,
+              approver_name: approverName.trim(),
+              approver_email: approverEmail.trim(),
+              notes: approverNotes.trim() || null,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.error || 'Failed to submit response');
+        }
       }
 
       setSubmitted(approved ? 'approved' : 'rejected');
 
-      if (user?.company_id && user?.customer_id) {
+      if (customerId && companyId) {
         await portalAnalyticsService.trackEvent({
-          companyId: user.company_id,
-          customerId: user.customer_id,
+          companyId: companyId,
+          customerId: customerId,
           eventType: approved ? 'quote_approved' : 'quote_rejected',
           resourceType: 'quote',
           resourceId: quoteId
