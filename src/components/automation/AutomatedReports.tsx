@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, RefreshCw, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+import { Plus, RefreshCw, AlertCircle, Clock, CheckCircle, History } from 'lucide-react';
 import { AutomationService, AutomationRule } from '../../services/automation-service';
 import AutomationRuleEditor from './AutomationRuleEditor';
 import AutomationRuleList from './AutomationRuleList';
+import ExecutionHistoryViewer from './ExecutionHistoryViewer';
 
 export default function AutomatedReports() {
   const [rules, setRules] = useState<AutomationRule[]>([]);
@@ -12,6 +13,8 @@ export default function AutomatedReports() {
   const [editingRuleId, setEditingRuleId] = useState<string | undefined>(undefined);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyRuleId, setHistoryRuleId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     loadRules();
@@ -86,6 +89,16 @@ export default function AutomatedReports() {
     await loadRules();
   };
 
+  const handleViewHistory = (ruleId?: string) => {
+    setHistoryRuleId(ruleId);
+    setShowHistory(true);
+  };
+
+  const handleCloseHistory = () => {
+    setShowHistory(false);
+    setHistoryRuleId(undefined);
+  };
+
   const activeRulesCount = rules.filter(r => r.is_enabled).length;
 
   return (
@@ -135,6 +148,13 @@ export default function AutomatedReports() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => handleViewHistory()}
+              className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
+            >
+              <History className="w-4 h-4" />
+              View History
+            </button>
+            <button
               onClick={loadRules}
               disabled={loading}
               className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors flex items-center gap-2"
@@ -164,6 +184,7 @@ export default function AutomatedReports() {
             onDelete={handleDelete}
             onToggle={handleToggle}
             onTest={handleTest}
+            onViewHistory={handleViewHistory}
           />
         )}
       </div>
@@ -237,6 +258,13 @@ export default function AutomatedReports() {
           ruleId={editingRuleId}
           onClose={handleCloseEditor}
           onSave={handleSaveEditor}
+        />
+      )}
+
+      {showHistory && (
+        <ExecutionHistoryViewer
+          ruleId={historyRuleId}
+          onClose={handleCloseHistory}
         />
       )}
     </div>
