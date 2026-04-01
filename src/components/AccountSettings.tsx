@@ -192,7 +192,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [squareApplicationId, setSquareApplicationId] = useState('');
   const [squareLocationId, setSquareLocationId] = useState('');
   const [squareEnvironment, setSquareEnvironment] = useState('production');
+  const [squarePaymentsEnabled, setSquarePaymentsEnabled] = useState(false);
   const [savingSquare, setSavingSquare] = useState(false);
+  const [savingSquarePayments, setSavingSquarePayments] = useState(false);
   const [testingSquare, setTestingSquare] = useState(false);
   const [squareTestResult, setSquareTestResult] = useState<any>(null);
 
@@ -514,6 +516,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSquareAccessToken(data.square_access_token ? '••••••••••••••••' : '');
         setSquareApplicationId(data.square_application_id || '');
         setSquareLocationId(data.square_location_id || '');
+        setSquarePaymentsEnabled(data.square_payments_enabled || false);
         setEmailFromAddress(data.email_from_address || '');
         setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
         setCustomerUrl(data.customer_url || '');
@@ -1072,6 +1075,44 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Square settings. Please try again.');
     } finally {
       setSavingSquare(false);
+    }
+  };
+
+  const toggleSquarePayments = async (enabled: boolean) => {
+    if (!companySettings?.id) {
+      showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+      return;
+    }
+
+    if (enabled && (!companySettings?.square_access_token || !companySettings?.square_location_id)) {
+      showNotification('warning', 'Configuration Required', 'Please configure Square credentials and Location ID before enabling payments.');
+      return;
+    }
+
+    try {
+      setSavingSquarePayments(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({ square_payments_enabled: enabled })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      setSquarePaymentsEnabled(enabled);
+      showNotification(
+        'success',
+        enabled ? 'Square Payments Enabled' : 'Square Payments Disabled',
+        enabled
+          ? 'Customers can now pay invoices using Square in the customer portal.'
+          : 'Square payments have been disabled. Customers will use Stripe instead.'
+      );
+      await loadSettings();
+    } catch (err) {
+      console.error('Error toggling Square payments:', err);
+      showNotification('error', 'Error', 'Failed to update Square payment settings.');
+    } finally {
+      setSavingSquarePayments(false);
     }
   };
 
@@ -4687,6 +4728,49 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </div>
                 )}
               </div>
+
+              {companySettings?.square_access_token && companySettings?.square_location_id && (
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-600">
+                  <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-4">Square Payment Processing</h3>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <span className="font-medium text-gray-900 dark:text-white">Enable Square Payments in Customer Portal</span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Allow customers to pay invoices using Square in addition to Stripe. Both payment options will be available.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4">
+                        {savingSquarePayments && <Loader2 className="w-4 h-4 animate-spin text-blue-600" />}
+                        <button
+                          onClick={() => toggleSquarePayments(!squarePaymentsEnabled)}
+                          disabled={savingSquarePayments}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                            squarePaymentsEnabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              squarePaymentsEnabled ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    {squarePaymentsEnabled && (
+                      <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                        <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Square payments are active. Customers can choose between Square and Stripe when paying invoices.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

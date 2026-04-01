@@ -11,7 +11,8 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 interface PaymentRequest {
-  action: "createPaymentLink";
+  action: "createPaymentLink" | "getPaymentOptions";
+  provider?: "stripe" | "square";
   companyId: string;
   invoiceId: string;
   customerId: string;
@@ -21,7 +22,7 @@ interface PaymentRequest {
   description?: string;
 }
 
-async function getDecryptedStripeKey(encryptedKey: string): Promise<string> {
+async function decryptKey(encryptedKey: string): Promise<string> {
   const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
     method: "POST",
     headers: {
@@ -35,7 +36,7 @@ async function getDecryptedStripeKey(encryptedKey: string): Promise<string> {
   });
 
   if (!decryptResponse.ok) {
-    throw new Error("Failed to decrypt Stripe key");
+    throw new Error("Failed to decrypt key");
   }
 
   const decryptResult = await decryptResponse.json();
@@ -81,6 +82,41 @@ async function callStripeAPI(
   return await fetch(url, options);
 }
 
+async function callSquareAPI(
+  endpoint: string,
+  method: string,
+  accessToken: string,
+  environment: string,
+  body?: Record<string, unknown>
+): Promise<Response> {
+  const baseUrl = environment === "sandbox"
+    ? "https://connect.squareupsandbox.com"
+    : "https://connect.squareup.com";
+
+  const url = `${baseUrl}${endpoint}`;
+
+  const headers: HeadersInit = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "Square-Version": "2024-12-18",
+  };
+
+  const options: RequestInit = {
+    method,
+    headers,
+  };
+
+  if (body && (method === "POST" || method === "PUT")) {
+    options.body = JSON.stringify(body);
+  }
+
+  return await fetch(url, options);
+}
+
+function generateIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -93,7 +129,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const requestData: PaymentRequest = await req.json();
 
-    const { action, companyId, invoiceId, customerId, amount, customerEmail, customerName, description } = requestData;
+    const { action, provider, companyId, invoiceId, customerId, amount, customerEmail, customerName, description } = requestData;
 
     if (!companyId || !invoiceId || !customerId) {
       return new Response(
@@ -125,23 +161,164 @@ Deno.serve(async (req: Request) => {
 
     const { data: companySettings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("stripe_secret_key, stripe_public_key")
+      .select("stripe_secret_key, stripe_public_key, square_access_token, square_location_id, square_environment, square_payments_enabled")
       .eq("id", companyId)
       .maybeSingle();
 
-    if (settingsError || !companySettings?.stripe_secret_key) {
+    if (settingsError) {
       return new Response(
-        JSON.stringify({ error: "Stripe is not configured for this company" }),
+        JSON.stringify({ error: "Failed to load company settings" }),
         {
-          status: 400,
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
-    const stripeSecretKey = await getDecryptedStripeKey(companySettings.stripe_secret_key);
+    if (action === "getPaymentOptions") {
+      const stripeEnabled = !!(companySettings?.stripe_secret_key && companySettings?.stripe_public_key);
+      const squareEnabled = !!(companySettings?.square_payments_enabled && companySettings?.square_access_token && companySettings?.square_location_id);
+
+      return new Response(
+        JSON.stringify({
+          stripe: stripeEnabled,
+          square: squareEnabled,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     if (action === "createPaymentLink") {
+      const selectedProvider = provider || "stripe";
+
+      if (selectedProvider === "square") {
+        if (!companySettings?.square_payments_enabled || !companySettings?.square_access_token || !companySettings?.square_location_id) {
+          return new Response(
+            JSON.stringify({ error: "Square payments are not configured for this company" }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const squareAccessToken = await decryptKey(companySettings.square_access_token);
+        const locationId = companySettings.square_location_id;
+        const environment = companySettings.square_environment || "production";
+
+        const redirectUrl = `${req.headers.get("origin") || supabaseUrl}/portal/customer/${customerId}?payment=success&provider=square`;
+
+        const orderBody = {
+          idempotency_key: generateIdempotencyKey(),
+          order: {
+            location_id: locationId,
+            line_items: [
+              {
+                name: description || `Invoice ${invoice.visual_id || invoice.invoice_number}`,
+                quantity: "1",
+                base_price_money: {
+                  amount: amount,
+                  currency: "USD",
+                },
+              },
+            ],
+            metadata: {
+              invoice_id: invoiceId,
+              customer_id: customerId,
+              company_id: companyId,
+              source: "customer_portal",
+            },
+          },
+        };
+
+        const orderResponse = await callSquareAPI("/v2/orders", "POST", squareAccessToken, environment, orderBody);
+
+        if (!orderResponse.ok) {
+          const error = await orderResponse.json();
+          console.error("Square order creation error:", error);
+          throw new Error(error.errors?.[0]?.detail || "Failed to create Square order");
+        }
+
+        const orderResult = await orderResponse.json();
+        const orderId = orderResult.order?.id;
+
+        if (!orderId) {
+          throw new Error("Failed to get order ID from Square");
+        }
+
+        const checkoutBody = {
+          idempotency_key: generateIdempotencyKey(),
+          order_id: orderId,
+          checkout_options: {
+            redirect_url: redirectUrl,
+            ask_for_shipping_address: false,
+          },
+          pre_populated_data: customerEmail ? {
+            buyer_email: customerEmail,
+          } : undefined,
+        };
+
+        const checkoutResponse = await callSquareAPI("/v2/online-checkout/payment-links", "POST", squareAccessToken, environment, checkoutBody);
+
+        if (!checkoutResponse.ok) {
+          const error = await checkoutResponse.json();
+          console.error("Square checkout creation error:", error);
+          throw new Error(error.errors?.[0]?.detail || "Failed to create Square checkout link");
+        }
+
+        const checkoutResult = await checkoutResponse.json();
+        const paymentLink = checkoutResult.payment_link;
+
+        if (!paymentLink?.url) {
+          throw new Error("Failed to get checkout URL from Square");
+        }
+
+        await supabase.from("square_payment_links").insert({
+          company_id: companyId,
+          invoice_id: invoiceId,
+          square_checkout_id: paymentLink.id,
+          square_checkout_url: paymentLink.url,
+          square_order_id: orderId,
+          amount: amount / 100,
+          currency: "USD",
+          status: "active",
+          customer_email: customerEmail || null,
+          customer_name: customerName || null,
+          metadata: {
+            invoice_id: invoiceId,
+            customer_id: customerId,
+            visual_id: invoice.visual_id,
+          },
+        });
+
+        return new Response(
+          JSON.stringify({
+            paymentLinkId: paymentLink.id,
+            url: paymentLink.url,
+            provider: "square",
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (!companySettings?.stripe_secret_key) {
+        return new Response(
+          JSON.stringify({ error: "Stripe is not configured for this company" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const stripeSecretKey = await decryptKey(companySettings.stripe_secret_key);
+
       const priceResponse = await callStripeAPI("/prices", "POST", stripeSecretKey, {
         unit_amount: amount,
         currency: "usd",
@@ -165,7 +342,7 @@ Deno.serve(async (req: Request) => {
         after_completion: {
           type: "redirect",
           redirect: {
-            url: `${req.headers.get("origin") || supabaseUrl}/portal/customer/${customerId}?payment=success`,
+            url: `${req.headers.get("origin") || supabaseUrl}/portal/customer/${customerId}?payment=success&provider=stripe`,
           },
         },
       };
@@ -181,12 +358,13 @@ Deno.serve(async (req: Request) => {
         throw new Error(error.error?.message || "Failed to create payment link");
       }
 
-      const paymentLink = await linkResponse.json();
+      const stripePaymentLink = await linkResponse.json();
 
       return new Response(
         JSON.stringify({
-          paymentLinkId: paymentLink.id,
-          url: paymentLink.url,
+          paymentLinkId: stripePaymentLink.id,
+          url: stripePaymentLink.url,
+          provider: "stripe",
         }),
         {
           status: 200,
