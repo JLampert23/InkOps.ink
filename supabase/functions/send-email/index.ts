@@ -222,10 +222,16 @@ Deno.serve(async (req: Request) => {
     };
 
     if (attachments && attachments.length > 0) {
-      emailPayload.attachments = attachments.map(att => ({
-        filename: att.filename,
-        content: att.content,
-      }));
+      emailPayload.attachments = attachments.map(att => {
+        const attachment: { filename: string; content: string; content_type?: string } = {
+          filename: att.filename,
+          content: att.content,
+        };
+        if (att.type) {
+          attachment.content_type = att.type;
+        }
+        return attachment;
+      });
     }
 
     console.log('Sending email with payload:', {
