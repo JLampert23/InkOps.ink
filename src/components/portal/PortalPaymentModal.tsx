@@ -10,11 +10,6 @@ interface Invoice {
   balance_remaining: number;
 }
 
-interface PaymentOptions {
-  stripe: boolean;
-  square: boolean;
-}
-
 interface PortalPaymentModalProps {
   invoice: Invoice;
   companyId: string;
@@ -37,53 +32,31 @@ export function PortalPaymentModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-  const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
-  const [checkingOptions, setCheckingOptions] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState<'stripe' | 'square' | null>(null);
+  const [stripeEnabled, setStripeEnabled] = useState<boolean | null>(null);
+  const [checkingStripe, setCheckingStripe] = useState(true);
 
   useEffect(() => {
-    checkPaymentOptions();
+    checkStripeEnabled();
   }, [companyId]);
 
-  const checkPaymentOptions = async () => {
+  const checkStripeEnabled = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-payment`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            action: 'getPaymentOptions',
-            companyId,
-            invoiceId: invoice.id,
-            customerId,
-          }),
-        }
-      );
+      const { data } = await supabaseAnon
+        .from('company_settings')
+        .select('stripe_public_key, stripe_secret_key')
+        .eq('id', companyId)
+        .maybeSingle();
 
-      if (response.ok) {
-        const options = await response.json();
-        setPaymentOptions(options);
-        if (options.stripe && !options.square) {
-          setSelectedProvider('stripe');
-        } else if (options.square && !options.stripe) {
-          setSelectedProvider('square');
-        }
-      } else {
-        setPaymentOptions({ stripe: false, square: false });
-      }
+      setStripeEnabled(!!data?.stripe_public_key && !!data?.stripe_secret_key);
     } catch (err) {
-      console.error('Error checking payment options:', err);
-      setPaymentOptions({ stripe: false, square: false });
+      console.error('Error checking Stripe configuration:', err);
+      setStripeEnabled(false);
     } finally {
-      setCheckingOptions(false);
+      setCheckingStripe(false);
     }
   };
 
-  const handleCreatePaymentLink = async (provider: 'stripe' | 'square') => {
+  const handleCreatePaymentLink = async () => {
     setLoading(true);
     setError(null);
 
@@ -101,7 +74,6 @@ export function PortalPaymentModal({
           },
           body: JSON.stringify({
             action: 'createPaymentLink',
-            provider,
             companyId,
             invoiceId: invoice.id,
             customerId,
@@ -136,7 +108,7 @@ export function PortalPaymentModal({
 
   const balance = parseFloat(invoice.balance_remaining?.toString() || '0');
 
-  if (checkingOptions) {
+  if (checkingStripe) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
@@ -148,9 +120,7 @@ export function PortalPaymentModal({
     );
   }
 
-  const hasPaymentOptions = paymentOptions?.stripe || paymentOptions?.square;
-
-  if (!hasPaymentOptions) {
+  if (!stripeEnabled) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -189,8 +159,6 @@ export function PortalPaymentModal({
       </div>
     );
   }
-
-  const bothEnabled = paymentOptions?.stripe && paymentOptions?.square;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -255,64 +223,12 @@ export function PortalPaymentModal({
                 </div>
               )}
 
-              {bothEnabled && !selectedProvider && (
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Choose payment method:</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setSelectedProvider('stripe')}
-                      className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                    >
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">Stripe</span>
-                    </button>
-                    <button
-                      onClick={() => setSelectedProvider('square')}
-                      className="flex flex-col items-center gap-2 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
-                    >
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">Square</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {(selectedProvider || !bothEnabled) && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg mb-4 ${
-                  (selectedProvider === 'square' || (!bothEnabled && paymentOptions?.square))
-                    ? 'bg-green-50 border border-green-200'
-                    : 'bg-blue-50 border border-blue-200'
-                }`}>
-                  <CreditCard className={`w-5 h-5 ${
-                    (selectedProvider === 'square' || (!bothEnabled && paymentOptions?.square))
-                      ? 'text-green-600'
-                      : 'text-blue-600'
-                  }`} />
-                  <p className={`text-sm ${
-                    (selectedProvider === 'square' || (!bothEnabled && paymentOptions?.square))
-                      ? 'text-green-800'
-                      : 'text-blue-800'
-                  }`}>
-                    Secure payment powered by {
-                      (selectedProvider === 'square' || (!bothEnabled && paymentOptions?.square))
-                        ? 'Square'
-                        : 'Stripe'
-                    }
-                  </p>
-                  {bothEnabled && selectedProvider && (
-                    <button
-                      onClick={() => setSelectedProvider(null)}
-                      className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline"
-                    >
-                      Change
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <CreditCard className="w-5 h-5 text-blue-600" />
+                <p className="text-sm text-blue-800">
+                  Secure payment powered by Stripe
+                </p>
+              </div>
             </>
           )}
         </div>
@@ -324,17 +240,11 @@ export function PortalPaymentModal({
           >
             {paymentUrl ? 'Close' : 'Cancel'}
           </button>
-          {!paymentUrl && (selectedProvider || !bothEnabled) && (
+          {!paymentUrl && (
             <button
-              onClick={() => handleCreatePaymentLink(
-                selectedProvider || (paymentOptions?.stripe ? 'stripe' : 'square')
-              )}
+              onClick={handleCreatePaymentLink}
               disabled={loading || balance <= 0}
-              className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
-                (selectedProvider === 'square' || (!bothEnabled && paymentOptions?.square))
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? (
                 <>
