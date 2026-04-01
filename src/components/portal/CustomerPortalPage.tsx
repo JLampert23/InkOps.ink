@@ -123,6 +123,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
         .select('id, quote_number, created_at, status, subtotal, tax_amount, nickname')
         .eq('customer_id', customerId)
         .eq('company_id', customerData.company_id)
+        .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;

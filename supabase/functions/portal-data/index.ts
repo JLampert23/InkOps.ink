@@ -107,6 +107,7 @@ Deno.serve(async (req: Request) => {
           .eq('id', quoteId)
           .eq('company_id', customer.company_id)
           .ilike('customer_email', customer.email)
+          .neq('status', 'draft')
           .maybeSingle();
 
         if (quoteError) throw quoteError;
@@ -184,6 +185,7 @@ Deno.serve(async (req: Request) => {
           `)
           .eq('company_id', customer.company_id)
           .ilike('customer_email', customer.email)
+          .neq('status', 'draft')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
