@@ -62,7 +62,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings, onNavig
         .select('*')
         .in('status_stage', ['billing_queue', 'accounts_receivable'])
         .gt('amount_outstanding', 0)
-        .order('due_date', { ascending: true });
+        .order('due_date', { ascending: true, nullsFirst: false });
 
       if (selectedCustomer !== 'all') {
         query = query.eq('customer_name', selectedCustomer);
