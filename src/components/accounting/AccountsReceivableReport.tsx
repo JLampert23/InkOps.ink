@@ -61,8 +61,8 @@ export default function AccountsReceivableReport({ onNavigateToSettings, onNavig
         .from('printavo_invoices')
         .select('*')
         .in('status_stage', ['billing_queue', 'accounts_receivable'])
-        .gt('amount_outstanding', 0)
-        .order('due_date', { ascending: true, nullsFirst: false });
+        .gt('amount_outstanding', '0')
+        .order('invoice_date', { ascending: false });
 
       if (selectedCustomer !== 'all') {
         query = query.eq('customer_name', selectedCustomer);
@@ -70,7 +70,12 @@ export default function AccountsReceivableReport({ onNavigateToSettings, onNavig
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('AR Query Error:', error);
+        throw error;
+      }
+
+      console.log('AR Query returned invoices:', data?.length || 0, data);
 
       const processedInvoices: Invoice[] = (data || []).map((inv: any) => {
         const total = parseFloat(inv.total || 0);
