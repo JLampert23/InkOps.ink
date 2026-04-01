@@ -76,7 +76,9 @@ export default function AccountsReceivableReport({ onNavigateToSettings, onNavig
         const total = parseFloat(inv.total || 0);
         const amountPaid = parseFloat(inv.amount_paid || 0);
         const balanceRemaining = parseFloat(inv.amount_outstanding || 0);
-        const dueDate = new Date(inv.due_date);
+
+        // Use due_date if available, otherwise fall back to invoice_date (creation date)
+        const dueDate = inv.due_date ? new Date(inv.due_date) : new Date(inv.invoice_date);
         const today = new Date();
         const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -90,7 +92,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings, onNavig
           invoice_number: inv.invoice_number,
           customer_name: inv.customer_name,
           invoice_date: inv.invoice_date,
-          due_date: inv.due_date,
+          due_date: inv.due_date || inv.invoice_date, // Use invoice_date as fallback for display
           total,
           amount_paid: amountPaid,
           balance_remaining: balanceRemaining,
