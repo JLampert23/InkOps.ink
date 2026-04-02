@@ -26,8 +26,14 @@ export function PortalLogin() {
 
   const handleTokenLogin = async (token: string) => {
     setSubmitting(true);
-    const success = await loginWithToken(token);
-    if (success) {
+    const result = await loginWithToken(token);
+
+    if (typeof result === 'object' && result.requiresSetup) {
+      window.location.href = `/portal/setup-password?token=${result.setupToken}&email=${encodeURIComponent(result.email)}`;
+      return;
+    }
+
+    if (result === true) {
       window.location.href = '/portal/invoices';
     } else {
       setMessage('Invalid or expired token. Please contact support.');

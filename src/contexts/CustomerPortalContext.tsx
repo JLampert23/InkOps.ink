@@ -22,7 +22,7 @@ interface CustomerPortalContextType {
   user: CustomerPortalUser | null;
   branding: CompanyBranding | null;
   loading: boolean;
-  loginWithToken: (token: string) => Promise<boolean>;
+  loginWithToken: (token: string) => Promise<boolean | { requiresSetup: true; setupToken: string; email: string }>;
   loginWithEmail: (email: string) => Promise<boolean>;
   loginWithPassword: (email: string, password: string) => Promise<{ success: boolean; requiresSetup?: boolean; error?: string }>;
   requestPasswordReset: (email: string) => Promise<boolean>;
@@ -58,7 +58,7 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginWithToken = useCallback(async (token: string): Promise<boolean> => {
+  const loginWithToken = useCallback(async (token: string): Promise<boolean | { requiresSetup: true; setupToken: string; email: string }> => {
     try {
       setLoading(true);
 
@@ -75,6 +75,14 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
       });
 
       const result = await response.json();
+
+      if (response.ok && result.success && result.requiresPasswordSetup) {
+        return {
+          requiresSetup: true,
+          setupToken: result.setupToken || token,
+          email: result.customer?.email || ''
+        };
+      }
 
       if (!response.ok || !result.success) {
         const { data: quoteApproval } = await supabase
@@ -291,6 +299,7 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('customer_portal_user');
     localStorage.removeItem('customer_portal_branding');
     localStorage.removeItem('customer_portal_token');
+    window.location.href = '/portal/login';
   }, []);
 
   const value = useMemo(() => ({

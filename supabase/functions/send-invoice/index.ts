@@ -92,15 +92,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const formatCurrency = (value: number | null | undefined): string => {
+      return (value ?? 0).toFixed(2);
+    };
+
     // Build line items table for email
     const lineItemsHtml = lineItems
       ?.map(
         (item: any) => `
         <tr>
-          <td style="padding: 8px; border: 1px solid #e5e7eb;">${item.description}</td>
-          <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-          <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: right;">$${item.unit_price.toFixed(2)}</td>
-          <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: right;">$${item.total.toFixed(2)}</td>
+          <td style="padding: 8px; border: 1px solid #e5e7eb;">${item.description || ''}</td>
+          <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center;">${item.quantity ?? 0}</td>
+          <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: right;">$${formatCurrency(item.unit_price)}</td>
+          <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: right;">$${formatCurrency(item.total)}</td>
         </tr>
       `
       )
@@ -148,12 +152,12 @@ Deno.serve(async (req: Request) => {
         }
 
         <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 20px 0; text-align: right;">
-          <p style="margin: 5px 0;"><strong>Subtotal:</strong> $${invoice.subtotal.toFixed(2)}</p>
-          <p style="margin: 5px 0;"><strong>Tax:</strong> $${invoice.tax.toFixed(2)}</p>
-          <p style="margin: 5px 0; font-size: 18px; color: #1f2937;"><strong>Total:</strong> <strong>$${invoice.total.toFixed(2)}</strong></p>
-          ${invoice.amount_paid > 0
-            ? `<p style="margin: 5px 0;"><strong>Amount Paid:</strong> $${invoice.amount_paid.toFixed(2)}</p>
-               <p style="margin: 5px 0; font-size: 18px; color: #ef4444;"><strong>Balance Due:</strong> <strong>$${invoice.amount_outstanding.toFixed(2)}</strong></p>`
+          <p style="margin: 5px 0;"><strong>Subtotal:</strong> $${formatCurrency(invoice.subtotal)}</p>
+          <p style="margin: 5px 0;"><strong>Tax:</strong> $${formatCurrency(invoice.tax)}</p>
+          <p style="margin: 5px 0; font-size: 18px; color: #1f2937;"><strong>Total:</strong> <strong>$${formatCurrency(invoice.total)}</strong></p>
+          ${(invoice.amount_paid ?? 0) > 0
+            ? `<p style="margin: 5px 0;"><strong>Amount Paid:</strong> $${formatCurrency(invoice.amount_paid)}</p>
+               <p style="margin: 5px 0; font-size: 18px; color: #ef4444;"><strong>Balance Due:</strong> <strong>$${formatCurrency(invoice.amount_outstanding)}</strong></p>`
             : ""
           }
         </div>

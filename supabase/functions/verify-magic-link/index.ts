@@ -63,11 +63,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const requiresPasswordSetup = !data.customer.has_password;
+
     return new Response(
       JSON.stringify({
         success: true,
         customer: data.customer,
-        branding: data.branding
+        branding: data.branding,
+        requiresPasswordSetup,
+        setupToken: requiresPasswordSetup ? token : undefined
       }),
       {
         status: 200,
