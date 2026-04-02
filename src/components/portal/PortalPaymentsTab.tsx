@@ -14,7 +14,6 @@ interface Payment {
   notes: string | null;
   receipt_url: string | null;
   invoice?: {
-    visual_id: string;
     invoice_number: string;
   } | null;
 }
@@ -62,7 +61,7 @@ export function PortalPaymentsTab({ customerId, companyId }: PortalPaymentsTabPr
           if (payment.invoice_id) {
             const { data: invoiceData } = await supabaseAnon
               .from('printavo_invoices')
-              .select('visual_id, invoice_number')
+              .select('invoice_number')
               .eq('id', payment.invoice_id)
               .maybeSingle();
 
@@ -199,7 +198,7 @@ export function PortalPaymentsTab({ customerId, companyId }: PortalPaymentsTabPr
                     {payment.invoice ? (
                       <span className="inline-flex items-center gap-1 text-sm text-gray-900">
                         <Receipt className="w-4 h-4 text-gray-400" />
-                        {payment.invoice.visual_id || payment.invoice.invoice_number}
+                        {payment.invoice.invoice_number}
                       </span>
                     ) : (
                       <span className="text-sm text-gray-400">-</span>
