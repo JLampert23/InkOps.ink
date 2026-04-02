@@ -108,8 +108,10 @@ Deno.serve(async (req: Request) => {
 
     const setupToken = data.token;
 
-    // Determine portal URL
-    const portalUrl = companySettings.customer_url ||
+    // Determine portal URL - only use customer_url if it actually contains /portal
+    const customUrl = companySettings.customer_url;
+    const isValidPortalUrl = customUrl && customUrl.includes('/portal');
+    const portalUrl = isValidPortalUrl ? customUrl :
                       (companySettings.inkops_subdomain ? `https://${companySettings.inkops_subdomain}.inkops.ink/portal` : '') ||
                       `${supabaseUrl.replace('/v1', '')}/portal`;
 

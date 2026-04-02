@@ -336,11 +336,17 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
 
+      if (!session?.access_token) {
+        showNotification('You must be logged in to send welcome emails', 'error');
+        setSendingWelcome(false);
+        return;
+      }
+
       const response = await fetch(`${supabaseUrl}/functions/v1/send-customer-portal-welcome`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           customerId,
@@ -418,7 +424,9 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
         .eq('id', profile.company_id)
         .maybeSingle();
 
-      const portalUrl = settings?.customer_url ||
+      const customUrl = settings?.customer_url;
+      const isValidPortalUrl = customUrl && customUrl.includes('/portal');
+      const portalUrl = isValidPortalUrl ? customUrl :
                         (settings?.inkops_subdomain ? `https://${settings.inkops_subdomain}.inkops.ink/portal` : '') ||
                         `${window.location.origin}/portal/login`;
 
