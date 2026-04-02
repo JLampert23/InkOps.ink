@@ -190,6 +190,11 @@ Deno.serve(async (req: Request) => {
       startsWithRe: RESEND_API_KEY?.startsWith('re_'),
       firstFourChars: RESEND_API_KEY?.substring(0, 4),
     });
+
+    if (!RESEND_API_KEY?.startsWith('re_')) {
+      console.error('Decrypted API key does not have expected format. Key may have been encrypted with a different ENCRYPTION_KEY.');
+      throw new Error('Resend API key decryption failed. Please re-enter your Resend API key in Account Settings to re-encrypt it.');
+    }
     const fromEmail = companySettings.email_from_address;
     const rawFromName = companySettings.company_name || '';
     const fromName = rawFromName.replace(/[^\x00-\x7F]/g, '').trim();
