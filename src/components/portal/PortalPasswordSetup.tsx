@@ -135,6 +135,7 @@ export function PortalPasswordSetup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={submitting || success}
+                autoComplete="new-password"
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="Enter new password"
                 required
@@ -184,6 +185,7 @@ export function PortalPasswordSetup() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={submitting || success}
+                autoComplete="new-password"
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="Confirm new password"
                 required
