@@ -166,8 +166,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { result: decryptedApiKey } = await decryptResponse.json();
-    console.log('Resend API key decrypted successfully');
+    const decryptResult = await decryptResponse.json();
+    console.log('Decryption result:', {
+      success: decryptResult.success,
+      hasResult: !!decryptResult.result,
+      resultType: typeof decryptResult.result,
+      error: decryptResult.error,
+    });
+
+    if (!decryptResult.success || !decryptResult.result) {
+      throw new Error(`Decryption failed: ${decryptResult.error || 'No result returned'}`);
+    }
+
+    const decryptedApiKey = decryptResult.result;
 
     // Trim whitespace and ensure ASCII-only (no invalid ByteString characters)
     const rawApiKey = decryptedApiKey?.trim() || decryptedApiKey || '';
@@ -177,6 +188,7 @@ Deno.serve(async (req: Request) => {
       hasKey: !!RESEND_API_KEY,
       keyLength: RESEND_API_KEY?.length,
       startsWithRe: RESEND_API_KEY?.startsWith('re_'),
+      firstFourChars: RESEND_API_KEY?.substring(0, 4),
     });
     const fromEmail = companySettings.email_from_address;
     const rawFromName = companySettings.company_name || '';
