@@ -1,4 +1,4 @@
-import { Edit2, Trash2, Clock, Mail, FileText, Calendar, Power, Send } from 'lucide-react';
+import { CreditCard as Edit2, Trash2, Clock, Mail, FileText, Calendar, Power, Send, History } from 'lucide-react';
 import { AutomationRule } from '../../services/automation-service';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -9,9 +9,10 @@ interface AutomationRuleListProps {
   onDelete: (ruleId: string) => void;
   onToggle: (ruleId: string, enabled: boolean) => void;
   onTest: (ruleId: string) => Promise<void>;
+  onViewHistory: (ruleId: string) => void;
 }
 
-export default function AutomationRuleList({ rules, onEdit, onDelete, onToggle, onTest }: AutomationRuleListProps) {
+export default function AutomationRuleList({ rules, onEdit, onDelete, onToggle, onTest, onViewHistory }: AutomationRuleListProps) {
   const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
 
   const handleTest = async (ruleId: string) => {
@@ -89,10 +90,17 @@ export default function AutomationRuleList({ rules, onEdit, onDelete, onToggle, 
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => onViewHistory(rule.id)}
+                  className="p-2 bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                  title="View execution history"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => handleTest(rule.id)}
                   disabled={testingRuleId === rule.id}
                   className="p-2 bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Test automation now"
+                  title="Send now"
                 >
                   {testingRuleId === rule.id ? (
                     <div className="w-4 h-4 border-2 border-orange-600 dark:border-orange-400 border-t-transparent rounded-full animate-spin" />

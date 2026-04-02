@@ -57,15 +57,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', rule.user_id)
+      .maybeSingle();
+
+    if (!userProfile?.company_id) {
+      throw new Error('User profile or company not found');
+    }
+
+    const companyId = userProfile.company_id;
+
     let openInvoices: any[] = [];
 
     if (rule.report_type === 'accounts-receivable') {
       const { data, error: invoicesError } = await supabase
         .from('printavo_invoices')
         .select('*')
-        .eq('status_stage', 'accounts_receivable')
+        .eq('company_id', companyId)
+        .in('status_stage', ['billing_queue', 'accounts_receivable'])
         .gt('amount_outstanding', 0)
-        .order('due_date', { ascending: true });
+        .order('due_date', { ascending: true, nullsFirst: false });
 
       if (invoicesError) {
         throw new Error(`Failed to fetch AR invoice data: ${invoicesError.message}`);
@@ -111,8 +124,8 @@ Deno.serve(async (req: Request) => {
 
         if (rule.report_type === 'accounts-receivable') {
           invoiceDate = inv.invoice_date;
-          dueDate = inv.due_date;
-          const dueDateObj = new Date(inv.due_date);
+          dueDate = inv.due_date || inv.invoice_date;
+          const dueDateObj = inv.due_date ? new Date(inv.due_date) : new Date(inv.invoice_date);
           const today = new Date();
           const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24)));
           daysPastDue = daysOverdue;
@@ -188,6 +201,7 @@ Deno.serve(async (req: Request) => {
     const { data: settings } = await supabase
       .from('company_settings')
       .select('email_from_address')
+      .eq('id', companyId)
       .maybeSingle();
 
     const html = `
@@ -231,6 +245,7 @@ Deno.serve(async (req: Request) => {
     const { data: resendSettings } = await supabase
       .from('company_settings')
       .select('resend_api_key')
+      .eq('id', companyId)
       .maybeSingle();
 
     if (!resendSettings?.resend_api_key) {

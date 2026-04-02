@@ -62,8 +62,8 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('printavo_invoices')
       .select('*')
-      .eq('status_stage', 'accounts_receivable')
-      .gt('amount_outstanding', 0)
+      .in('status_stage', ['billing_queue', 'accounts_receivable'])
+      .gt('amount_outstanding', '0')
       .order('due_date', { ascending: true });
 
     const filters = automation.filters || {};
@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
       const total = parseFloat(inv.total || 0);
       const amountPaid = parseFloat(inv.amount_paid || 0);
       const balanceRemaining = parseFloat(inv.amount_outstanding || 0);
-      const dueDate = new Date(inv.due_date);
+      const dueDate = inv.due_date ? new Date(inv.due_date) : new Date(inv.invoice_date);
       const today = new Date();
       const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
         invoice_number: inv.invoice_number,
         customer_name: inv.customer_name,
         invoice_date: inv.invoice_date,
-        due_date: inv.due_date,
+        due_date: inv.due_date || inv.invoice_date,
         total,
         amount_paid: amountPaid,
         balance_remaining: balanceRemaining,
