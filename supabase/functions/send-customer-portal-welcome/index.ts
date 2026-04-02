@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
     // Verify the customer exists and get company info
     const { data: customer, error: customerError } = await supabase
       .from("customers")
-      .select("id, company_id, customer_name, customer_email")
+      .select("id, company_id, company_name, contact_name, email")
       .eq("id", customerId)
       .maybeSingle();
 
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
 
     const setupLink = `${portalUrl}/login?token=${setupToken}&email=${encodeURIComponent(email)}`;
 
-    const displayName = customerName || customer.customer_name || 'Valued Customer';
+    const displayName = customerName || customer.contact_name || 'Valued Customer';
 
     // Build email HTML
     const emailBody = `
