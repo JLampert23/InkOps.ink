@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
 
     // Determine portal URL
     const portalUrl = companySettings.customer_url ||
-                      (companySettings.inkops_subdomain ? `https://${companySettings.inkops_subdomain}.inkops.io/portal` : '') ||
+                      (companySettings.inkops_subdomain ? `https://${companySettings.inkops_subdomain}.inkops.ink/portal` : '') ||
                       `${supabaseUrl.replace('/v1', '')}/portal`;
 
     const setupLink = `${portalUrl}/login?token=${setupToken}&email=${encodeURIComponent(email)}`;
