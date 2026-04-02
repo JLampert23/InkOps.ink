@@ -203,8 +203,16 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to decrypt email API key: ${errorData.error || 'Unknown error'}`);
     }
 
-    const { result: resendApiKey } = await decryptResponse.json();
-    const fromEmail = companySettings.email_from_address || 'noreply@inkops.com';
+    const { result: decryptedApiKey } = await decryptResponse.json();
+
+    // Ensure API key is ASCII-only (no invalid ByteString characters)
+    const resendApiKey = (decryptedApiKey?.trim() || '').replace(/[^\x00-\x7F]/g, '');
+
+    let fromEmail = companySettings.email_from_address || 'noreply@inkops.com';
+    fromEmail = fromEmail.replace(/[^\x00-\x7F]/g, '').trim();
+
+    const companyNameAscii = (companySettings.company_name || 'Company').replace(/[^\x00-\x7F]/g, '').trim();
+    const subjectLine = `Welcome to ${companyNameAscii} Customer Portal`;
 
     // Send email via Resend
     const emailResponse = await fetch("https://api.resend.com/emails", {
@@ -216,7 +224,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         from: fromEmail,
         to: [email],
-        subject: `Welcome to ${companySettings.company_name} Customer Portal`,
+        subject: subjectLine,
         html: emailBody,
       }),
     });

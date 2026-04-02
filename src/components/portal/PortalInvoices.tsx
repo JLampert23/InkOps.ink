@@ -11,12 +11,22 @@ interface Invoice {
   invoice_number: string;
   invoice_date: string;
   due_date: string | null;
-  total: number;
-  balance: number;
+  total: number | null;
+  balance: number | null;
+  balance_remaining: number | null;
+  amount_outstanding: number | null;
   status_stage: string;
   customer_name: string;
   customer_email: string;
 }
+
+const getInvoiceBalance = (invoice: Invoice): number => {
+  return invoice.balance ?? invoice.balance_remaining ?? invoice.amount_outstanding ?? 0;
+};
+
+const getInvoiceTotal = (invoice: Invoice): number => {
+  return invoice.total ?? 0;
+};
 
 export function PortalInvoices() {
   const { user } = useCustomerPortal();
@@ -139,13 +149,13 @@ export function PortalInvoices() {
               <div>
                 <p className="text-sm text-gray-600">Total Amount</p>
                 <p className="text-base font-medium text-gray-900">
-                  ${selectedInvoice.total.toFixed(2)}
+                  ${getInvoiceTotal(selectedInvoice).toFixed(2)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Balance Due</p>
                 <p className="text-base font-medium text-gray-900">
-                  ${selectedInvoice.balance.toFixed(2)}
+                  ${getInvoiceBalance(selectedInvoice).toFixed(2)}
                 </p>
               </div>
               <div>
@@ -156,7 +166,7 @@ export function PortalInvoices() {
               </div>
             </div>
 
-            {selectedInvoice.balance > 0 && selectedInvoice.status_stage !== 'paid' && (
+            {getInvoiceBalance(selectedInvoice) > 0 && selectedInvoice.status_stage !== 'paid' && (
               <div className="flex gap-3">
                 <button
                   onClick={() => handlePayInvoice(selectedInvoice)}
@@ -242,12 +252,12 @@ export function PortalInvoices() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        ${invoice.total.toFixed(2)}
+                        ${getInvoiceTotal(invoice).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        ${invoice.balance.toFixed(2)}
+                        ${getInvoiceBalance(invoice).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -264,7 +274,7 @@ export function PortalInvoices() {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {invoice.balance > 0 && invoice.status_stage !== 'paid' && (
+                        {getInvoiceBalance(invoice) > 0 && invoice.status_stage !== 'paid' && (
                           <button
                             onClick={() => handlePayInvoice(invoice)}
                             className="text-green-600 hover:text-green-700 p-1"
@@ -287,7 +297,7 @@ export function PortalInvoices() {
         <PaymentModal
           invoiceId={paymentInvoice.id}
           invoiceNumber={paymentInvoice.invoice_number}
-          amount={paymentInvoice.balance}
+          amount={getInvoiceBalance(paymentInvoice)}
           companyId={user.company_id}
           onClose={() => setPaymentInvoice(null)}
           onSuccess={() => {

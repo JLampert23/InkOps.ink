@@ -17,15 +17,36 @@ import { PortalLogin } from './components/portal/PortalLogin';
 import { PortalPasswordSetup } from './components/portal/PortalPasswordSetup';
 import { PortalForgotPassword } from './components/portal/PortalForgotPassword';
 import { PortalResetPassword } from './components/portal/PortalResetPassword';
-import { PortalInvoices } from './components/portal/PortalInvoices';
-import { PortalQuotes } from './components/portal/PortalQuotes';
-import { PortalProofs } from './components/portal/PortalProofs';
-import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
-import { PortalDashboard } from './components/portal/PortalDashboard';
-import { PortalPaymentMethods } from './components/portal/PortalPaymentMethods';
 import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
 import { NotificationBell } from './components/NotificationBell';
 import { hideInitialLoader } from './utils/loader';
+
+function PortalRedirect() {
+  useEffect(() => {
+    const storedUser = localStorage.getItem('customer_portal_user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed.customer_id) {
+          window.location.href = `/portal/customer/${parsed.customer_id}`;
+          return;
+        }
+      } catch (e) {
+        console.error('Error parsing stored user:', e);
+      }
+    }
+    window.location.href = '/portal/login';
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+        <p className="text-gray-600">Redirecting...</p>
+      </div>
+    </div>
+  );
+}
 
 function getSubdomainFromHost(): string | null {
   const hostname = window.location.hostname;
@@ -854,18 +875,13 @@ function App() {
                 <PortalForgotPassword />
               ) : path === '/portal/reset-password' ? (
                 <PortalResetPassword />
-              ) : path.startsWith('/portal/dashboard') ? (
-                <PortalDashboard />
-              ) : path.startsWith('/portal/invoices') ? (
-                <PortalInvoices />
-              ) : path.startsWith('/portal/quotes') ? (
-                <PortalQuotes />
-              ) : path.startsWith('/portal/proofs') ? (
-                <PortalProofs />
-              ) : path.startsWith('/portal/orders') ? (
-                <PortalOrderHistory />
-              ) : path.startsWith('/portal/payment-methods') ? (
-                <PortalPaymentMethods />
+              ) : path.startsWith('/portal/dashboard') ||
+                path.startsWith('/portal/invoices') ||
+                path.startsWith('/portal/quotes') ||
+                path.startsWith('/portal/proofs') ||
+                path.startsWith('/portal/orders') ||
+                path.startsWith('/portal/payment-methods') ? (
+                <PortalRedirect />
               ) : (
                 <PortalLogin />
               )}

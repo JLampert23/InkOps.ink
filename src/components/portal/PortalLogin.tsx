@@ -19,8 +19,8 @@ export function PortalLogin() {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      window.location.href = '/portal/invoices';
+    if (user && user.customer_id) {
+      window.location.href = `/portal/customer/${user.customer_id}`;
     }
   }, [user]);
 
@@ -34,7 +34,15 @@ export function PortalLogin() {
     }
 
     if (result === true) {
-      window.location.href = '/portal/invoices';
+      const storedUser = localStorage.getItem('customer_portal_user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (parsed.customer_id) {
+          window.location.href = `/portal/customer/${parsed.customer_id}`;
+          return;
+        }
+      }
+      window.location.href = '/portal/login';
     } else {
       setMessage('Invalid or expired token. Please contact support.');
       setSubmitting(false);
@@ -50,7 +58,15 @@ export function PortalLogin() {
 
     const result = await loginWithPassword(email, password);
     if (result.success) {
-      window.location.href = '/portal/dashboard';
+      const storedUser = localStorage.getItem('customer_portal_user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (parsed.customer_id) {
+          window.location.href = `/portal/customer/${parsed.customer_id}`;
+          return;
+        }
+      }
+      window.location.href = '/portal/login';
     } else if (result.requiresSetup) {
       setMessage('Please check your email for a password setup link.');
     } else {
@@ -160,6 +176,7 @@ export function PortalLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={submitting}
+                  autoComplete="current-password"
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Enter your password"
                   required

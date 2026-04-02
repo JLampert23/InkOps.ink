@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabaseAnon } from '../../lib/supabase-anon-client';
-import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package, User, Eye } from 'lucide-react';
+import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package, User, Eye, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { PortalPaymentsTab } from './PortalPaymentsTab';
 import { PortalPaymentModal } from './PortalPaymentModal';
@@ -71,6 +71,13 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
     loadCustomerData();
     checkPaymentSuccess();
   }, [customerId]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('customer_portal_user');
+    localStorage.removeItem('customer_portal_branding');
+    localStorage.removeItem('customer_portal_token');
+    window.location.href = '/portal/login';
+  };
 
   const checkPaymentSuccess = () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -261,11 +268,21 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                 <h1 className="text-xl font-bold text-gray-900">{branding.company_name}</h1>
               )}
             </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{customer?.company_name}</p>
-              {customer?.contact_name && (
-                <p className="text-xs text-gray-500">{customer.contact_name}</p>
-              )}
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{customer?.company_name}</p>
+                {customer?.contact_name && (
+                  <p className="text-xs text-gray-500">{customer.contact_name}</p>
+                )}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
             </div>
           </div>
         </div>

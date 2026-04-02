@@ -166,19 +166,38 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { result: decryptedApiKey } = await decryptResponse.json();
-    console.log('Resend API key decrypted successfully');
+    const decryptResult = await decryptResponse.json();
+    console.log('Decryption result:', {
+      success: decryptResult.success,
+      hasResult: !!decryptResult.result,
+      resultType: typeof decryptResult.result,
+      error: decryptResult.error,
+    });
 
-    // Trim any whitespace from the API key
-    const RESEND_API_KEY = decryptedApiKey?.trim() || decryptedApiKey;
+    if (!decryptResult.success || !decryptResult.result) {
+      throw new Error(`Decryption failed: ${decryptResult.error || 'No result returned'}`);
+    }
+
+    const decryptedApiKey = decryptResult.result;
+
+    // Trim whitespace and ensure ASCII-only (no invalid ByteString characters)
+    const rawApiKey = decryptedApiKey?.trim() || decryptedApiKey || '';
+    const RESEND_API_KEY = rawApiKey.replace(/[^\x00-\x7F]/g, '');
 
     console.log('Resend API key check:', {
       hasKey: !!RESEND_API_KEY,
       keyLength: RESEND_API_KEY?.length,
       startsWithRe: RESEND_API_KEY?.startsWith('re_'),
+      firstFourChars: RESEND_API_KEY?.substring(0, 4),
     });
+
+    if (!RESEND_API_KEY?.startsWith('re_')) {
+      console.error('Decrypted API key does not have expected format. Key may have been encrypted with a different ENCRYPTION_KEY.');
+      throw new Error('Resend API key decryption failed. Please re-enter your Resend API key in Account Settings to re-encrypt it.');
+    }
     const fromEmail = companySettings.email_from_address;
-    const fromName = companySettings.company_name || '';
+    const rawFromName = companySettings.company_name || '';
+    const fromName = rawFromName.replace(/[^\x00-\x7F]/g, '').trim();
 
     const emailRequest: EmailRequest = await req.json();
     const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
