@@ -455,14 +455,28 @@ export default function MockupGenerator({
         .from('user_profiles')
         .select('company_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError) {
         console.error('MockupGenerator: Error getting profile:', profileError);
-        throw new Error('Profile error: ' + profileError.message);
       }
-      if (!profile) throw new Error('Profile not found');
-      setCompanyId(profile.company_id);
+
+      let resolvedCompanyId = profile?.company_id;
+
+      if (!resolvedCompanyId && quoteId) {
+        const { data: quoteData } = await supabase
+          .from('quotes')
+          .select('company_id')
+          .eq('id', quoteId)
+          .maybeSingle();
+        resolvedCompanyId = quoteData?.company_id;
+      }
+
+      if (!resolvedCompanyId) {
+        throw new Error('Unable to determine company context');
+      }
+
+      setCompanyId(resolvedCompanyId);
 
       // Track typeOfWork locally during loading since state updates are async
       let loadedTypeOfWork = '';
