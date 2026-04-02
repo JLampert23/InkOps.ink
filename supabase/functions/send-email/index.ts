@@ -178,7 +178,8 @@ Deno.serve(async (req: Request) => {
       startsWithRe: RESEND_API_KEY?.startsWith('re_'),
     });
     const fromEmail = companySettings.email_from_address;
-    const fromName = companySettings.company_name || '';
+    const rawFromName = companySettings.company_name || '';
+    const fromName = rawFromName.replace(/[^\x00-\x7F]/g, '').trim();
 
     const emailRequest: EmailRequest = await req.json();
     const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
