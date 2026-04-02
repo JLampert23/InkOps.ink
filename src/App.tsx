@@ -14,6 +14,9 @@ import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
 import { CustomerPortalProvider } from './contexts/CustomerPortalContext';
 import { PortalLogin } from './components/portal/PortalLogin';
+import { PortalPasswordSetup } from './components/portal/PortalPasswordSetup';
+import { PortalForgotPassword } from './components/portal/PortalForgotPassword';
+import { PortalResetPassword } from './components/portal/PortalResetPassword';
 import { PortalInvoices } from './components/portal/PortalInvoices';
 import { PortalQuotes } from './components/portal/PortalQuotes';
 import { PortalProofs } from './components/portal/PortalProofs';
@@ -845,6 +848,12 @@ function App() {
                 <DomainAwareCustomerPortal customerId={customerMatch[1]} />
               ) : path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
                 <PortalLogin />
+              ) : path === '/portal/setup-password' ? (
+                <PortalPasswordSetup />
+              ) : path === '/portal/forgot-password' ? (
+                <PortalForgotPassword />
+              ) : path === '/portal/reset-password' ? (
+                <PortalResetPassword />
               ) : path.startsWith('/portal/dashboard') ? (
                 <PortalDashboard />
               ) : path.startsWith('/portal/invoices') ? (
