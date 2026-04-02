@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, Trash2, Copy, Upload, Building2, User, Mail, Phone, MapPin, CreditCard, FileText, DollarSign } from 'lucide-react';
+import { X, Plus, Trash2, Copy, Upload, Building2, User, Mail, Phone, MapPin, CreditCard, FileText, DollarSign, Globe } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -76,6 +76,9 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
   // Notes
   const [notes, setNotes] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+
+  // Portal Access
+  const [portalAccessEnabled, setPortalAccessEnabled] = useState(false);
 
   const copyBillingToShipping = () => {
     setShippingAddress1(billingAddress1);
@@ -192,6 +195,7 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
           payment_terms: finalPaymentTerms,
           notes: notes,
           internal_notes: internalNotes,
+          portal_access_enabled: portalAccessEnabled,
           status: 'active',
           created_by: user.id
         })
@@ -902,6 +906,34 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="Enter custom payment terms"
                     />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SECTION: PORTAL ACCESS */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-slate-700">
+                <Globe className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Portal Access</h3>
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={portalAccessEnabled}
+                    onChange={(e) => setPortalAccessEnabled(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable portal access for this customer</span>
+                </label>
+
+                {portalAccessEnabled && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                      Customer will be able to log in to view their invoices, quotes, proofs, and order history. You can send them a welcome email after creation to set up their password.
+                    </p>
                   </div>
                 )}
               </div>
