@@ -1148,13 +1148,13 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
       const { data } = await supabase
         .from('payments')
-        .select('invoice_id, printavo_invoices!inner(visual_id)')
+        .select('invoice_id, printavo_invoices!inner(invoice_number)')
         .eq('fundraising_credit_id', credit.id)
         .eq('company_id', companyId)
         .maybeSingle();
 
       if (data && data.printavo_invoices) {
-        setInvoiceNumber(data.printavo_invoices.visual_id);
+        setInvoiceNumber(data.printavo_invoices.invoice_number);
       }
     }
 
