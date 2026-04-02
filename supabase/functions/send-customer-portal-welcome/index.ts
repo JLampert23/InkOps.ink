@@ -203,7 +203,10 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to decrypt email API key: ${errorData.error || 'Unknown error'}`);
     }
 
-    const { result: resendApiKey } = await decryptResponse.json();
+    const { result: decryptedApiKey } = await decryptResponse.json();
+
+    // Ensure API key is ASCII-only (no invalid ByteString characters)
+    const resendApiKey = (decryptedApiKey?.trim() || '').replace(/[^\x00-\x7F]/g, '');
 
     let fromEmail = companySettings.email_from_address || 'noreply@inkops.com';
     fromEmail = fromEmail.replace(/[^\x00-\x7F]/g, '').trim();

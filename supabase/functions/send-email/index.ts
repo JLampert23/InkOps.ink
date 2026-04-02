@@ -169,8 +169,9 @@ Deno.serve(async (req: Request) => {
     const { result: decryptedApiKey } = await decryptResponse.json();
     console.log('Resend API key decrypted successfully');
 
-    // Trim any whitespace from the API key
-    const RESEND_API_KEY = decryptedApiKey?.trim() || decryptedApiKey;
+    // Trim whitespace and ensure ASCII-only (no invalid ByteString characters)
+    const rawApiKey = decryptedApiKey?.trim() || decryptedApiKey || '';
+    const RESEND_API_KEY = rawApiKey.replace(/[^\x00-\x7F]/g, '');
 
     console.log('Resend API key check:', {
       hasKey: !!RESEND_API_KEY,
