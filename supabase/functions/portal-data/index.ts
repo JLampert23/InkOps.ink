@@ -196,13 +196,28 @@ Deno.serve(async (req: Request) => {
       case 'invoices': {
         const { data: invoices, error } = await supabase
           .from('printavo_invoices')
-          .select('*')
+          .select(`
+            id,
+            invoice_number,
+            invoice_date,
+            due_date,
+            total,
+            balance_remaining,
+            amount_outstanding,
+            status_stage,
+            customer_name,
+            customer_email
+          `)
           .eq('company_id', customer.company_id)
           .ilike('customer_email', customer.email)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        data = invoices;
+        data = (invoices || []).map((inv: any) => ({
+          ...inv,
+          balance: inv.balance_remaining ?? inv.amount_outstanding ?? 0,
+          total: inv.total ?? 0,
+        }));
         break;
       }
 
