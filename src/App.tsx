@@ -27,12 +27,27 @@ import { hideInitialLoader } from './utils/loader';
 function getSubdomainFromHost(): string | null {
   const hostname = window.location.hostname;
   const parts = hostname.split('.');
+
+  // Check for inkops.io domain
+  if (parts.length >= 3 && parts[parts.length - 2] === 'inkops' && parts[parts.length - 1] === 'io') {
+    return parts.slice(0, -2).join('.');
+  }
+
+  // Check for inkops.ink domain (legacy support)
   if (parts.length >= 3 && parts[parts.length - 2] === 'inkops' && parts[parts.length - 1] === 'ink') {
     return parts.slice(0, -2).join('.');
   }
-  if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
-    return parts.length > 1 ? parts[0] : null;
+
+  // For localhost development
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return null; // No subdomain validation on localhost
   }
+
+  // For localhost with subdomain (e.g., mycompany.localhost)
+  if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
+    return parts[0];
+  }
+
   return null;
 }
 
@@ -68,10 +83,13 @@ function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
         }
 
         if (!companyData) {
+          console.error('Subdomain not found:', { subdomain, hostname: window.location.hostname });
           setError('Invalid domain');
           setLoading(false);
           return;
         }
+
+        console.log('Company found for subdomain:', { subdomain, companyId: companyData.id });
 
         const { data: customerData, error: customerError } = await supabaseAnon
           .from('customers')
@@ -87,12 +105,18 @@ function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
         }
 
         if (!customerData) {
+          console.error('Customer not found:', { customerId, companyData });
           setError('Customer not found');
           setLoading(false);
           return;
         }
 
         if (customerData.company_id !== companyData.id) {
+          console.error('Company mismatch:', {
+            customerCompanyId: customerData.company_id,
+            expectedCompanyId: companyData.id,
+            subdomain,
+          });
           setError('Access denied - customer does not belong to this company');
           setLoading(false);
           return;
