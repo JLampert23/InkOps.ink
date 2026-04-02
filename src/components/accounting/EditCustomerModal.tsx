@@ -419,7 +419,7 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
         .maybeSingle();
 
       const portalUrl = settings?.customer_url ||
-                        (settings?.inkops_subdomain ? `https://${settings.inkops_subdomain}.inkops.com/portal` : '') ||
+                        (settings?.inkops_subdomain ? `https://${settings.inkops_subdomain}.inkops.ink/portal` : '') ||
                         `${window.location.origin}/portal/login`;
 
       await navigator.clipboard.writeText(portalUrl);
