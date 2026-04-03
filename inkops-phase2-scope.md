@@ -64,9 +64,10 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 **⚠️ Additional requirement:** Client said subscriptions must charge tax (Stripe Tax).
 
+**Payment Method chosen by client:** 🛡️ Stripe Checkout (Redirect)
+
 **Still waiting on:**
 - [ ] **Stripe Price IDs** for both tiers (from the InkOps Stripe account)
-- [ ] **Confirmation** on checkout flow (Stripe Checkout redirect vs embedded)
 
 ---
 
