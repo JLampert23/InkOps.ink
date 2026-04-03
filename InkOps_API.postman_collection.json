@@ -1,0 +1,480 @@
+{
+  "info": {
+    "name": "InkOps API v1",
+    "description": "Complete API collection for InkOps platform including quotes, products, portal, and payments.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "inkops-api-v1"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://your-project.supabase.co",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "company_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Quotes Management",
+      "item": [
+        {
+          "name": "Create Draft Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/quotes-api/draft",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "quotes-api", "draft"]
+            },
+            "description": "Creates a minimal draft quote with auto-generated quote number."
+          },
+          "response": []
+        },
+        {
+          "name": "List Quotes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/quotes-api?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "quotes-api"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "sent",
+                  "disabled": true
+                },
+                {
+                  "key": "customer_id",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "date_from",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "date_to",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Retrieves a paginated list of quotes with optional filtering."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Quote Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/quotes-api/:quote_id",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "quotes-api", ":quote_id"],
+              "variable": [
+                {
+                  "key": "quote_id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Retrieves detailed information about a specific quote including line items, activity log, and approvals."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Acme Corporation\",\n  \"customer_email\": \"contact@acme.com\",\n  \"customer_phone\": \"+1-555-0123\",\n  \"tax_rate\": 0.08,\n  \"line_items\": [\n    {\n      \"description\": \"Custom T-Shirt - Black - Size L\",\n      \"quantity\": 50,\n      \"unit_price\": 10.00,\n      \"sku\": \"PC54-BLK-L\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/quotes-api",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "quotes-api"]
+            },
+            "description": "Creates a new quote with line items."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Quote",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Acme Corporation Updated\",\n  \"status\": \"sent\",\n  \"notes\": \"Updated quote with revised pricing\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/quotes-api/:quote_id",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "quotes-api", ":quote_id"],
+              "variable": [
+                {
+                  "key": "quote_id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Updates an existing quote."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Quote",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/quotes-api/:quote_id",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "quotes-api", ":quote_id"],
+              "variable": [
+                {
+                  "key": "quote_id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Deletes a quote (admin only)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Product Search",
+      "item": [
+        {
+          "name": "Search Products by Style",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/product-search?style=PC54",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "product-search"],
+              "query": [
+                {
+                  "key": "style",
+                  "value": "PC54",
+                  "description": "Product style number (required)"
+                },
+                {
+                  "key": "companyId",
+                  "value": "{{company_id}}",
+                  "disabled": true,
+                  "description": "Company ID (optional if using JWT)"
+                }
+              ]
+            },
+            "description": "Searches for products by style number across enabled supplier catalogs."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Customer Portal",
+      "item": [
+        {
+          "name": "Get Portal Quotes",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Customer-Token",
+                "value": "{{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/portal-data?type=quotes",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "portal-data"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "quotes"
+                }
+              ]
+            },
+            "description": "Retrieves customer quotes using portal session token."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Portal Invoices",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Customer-Token",
+                "value": "{{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/portal-data?type=invoices",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "portal-data"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "invoices"
+                }
+              ]
+            },
+            "description": "Retrieves customer invoices using portal session token."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Portal Proofs",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Customer-Token",
+                "value": "{{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/portal-data?type=proofs",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "portal-data"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "proofs"
+                }
+              ]
+            },
+            "description": "Retrieves customer proofs using portal session token."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Portal Work Orders",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Customer-Token",
+                "value": "{{customer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/portal-data?type=work_orders",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "portal-data"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "work_orders"
+                }
+              ]
+            },
+            "description": "Retrieves customer work orders using portal session token."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Payment Link",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"createPaymentLink\",\n  \"companyId\": \"{{company_id}}\",\n  \"invoiceId\": \"\",\n  \"customerId\": \"\",\n  \"amount\": 54000,\n  \"customerEmail\": \"contact@acme.com\",\n  \"customerName\": \"Acme Corporation\",\n  \"description\": \"Invoice #INV-001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/portal-payment",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "portal-payment"]
+            },
+            "description": "Creates a Stripe payment link for invoice payment."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment Methods",
+      "item": [
+        {
+          "name": "List Payment Methods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/functions/v1/customer-payment-methods?customer_id=",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "customer-payment-methods"],
+              "query": [
+                {
+                  "key": "customer_id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Retrieves all saved payment methods for a customer."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_id\": \"\",\n  \"stripe_payment_method_id\": \"pm_1234567890\",\n  \"is_default\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/customer-payment-methods",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "customer-payment-methods"]
+            },
+            "description": "Adds a new payment method for a customer."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Default Payment Method",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_method_id\": \"\",\n  \"customer_id\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/customer-payment-methods",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "customer-payment-methods"]
+            },
+            "description": "Sets a payment method as the default for a customer."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Payment Method",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_method_id\": \"\",\n  \"customer_id\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/functions/v1/customer-payment-methods",
+              "host": ["{{base_url}}"],
+              "path": ["functions", "v1", "customer-payment-methods"]
+            },
+            "description": "Deletes a payment method for a customer."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

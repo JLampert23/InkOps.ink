@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, FileText, Truck, LayoutDashboard } from 'lucide-react';
 import { PurchaseOrdersList } from './PurchaseOrdersList';
 import { CreatePurchaseOrder } from './CreatePurchaseOrder';
@@ -29,11 +29,17 @@ export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersM
   const handleViewDetail = (poId: string) => {
     setSelectedPoId(poId);
     setCurrentView('detail');
+    window.history.pushState(
+      { poView: 'detail', poId },
+      '',
+      `#manage-goods/purchase-orders/${poId}`
+    );
   };
 
   const handleBack = () => {
     setCurrentView('list');
     setSelectedPoId(null);
+    window.history.back();
   };
 
   const handleSave = (poId: string) => {
@@ -66,6 +72,21 @@ export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersM
       setSelectedPoId(selectedPoId);
     }
   };
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.poView === 'list') {
+        setCurrentView('list');
+        setSelectedPoId(null);
+      } else if (event.state?.poView === 'detail' && event.state?.poId) {
+        setCurrentView('detail');
+        setSelectedPoId(event.state.poId);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleDashboardNavigate = (tab: string, view?: string, id?: string) => {
     if (tab === 'work-orders' && id && onNavigateToWorkOrder) {

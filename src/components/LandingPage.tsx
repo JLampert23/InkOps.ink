@@ -20,9 +20,9 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
               <img
-                src={darkMode ? "/headerlogo.png" : "/inkops_logo-01.png"}
-                alt="INKOPS"
-                className="h-10 w-auto transition-opacity duration-200"
+                src="/InkOps-01-copy.png"
+                alt="InkOps Pro"
+                className="h-12 w-auto"
               />
             </div>
             <div className="flex items-center gap-3">

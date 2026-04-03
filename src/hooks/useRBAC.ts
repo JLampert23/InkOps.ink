@@ -41,6 +41,8 @@ export function useRBAC() {
 
   const isSuperAdmin = userProfile ? RBACService.isSuperAdmin(userProfile.role) : false;
   const isAdmin = userProfile ? RBACService.isAdmin(userProfile.role) : false;
+  const isUser = userProfile ? RBACService.isUser(userProfile.role) : false;
+  const isAdminOrAbove = isSuperAdmin || isAdmin;
   const role = userProfile?.role || null;
 
   const hasPermission = (permission: keyof RBACPermissions): boolean => {
@@ -55,8 +57,14 @@ export function useRBAC() {
     loading,
     isSuperAdmin,
     isAdmin,
+    isUser,
+    isAdminOrAbove,
     hasPermission,
     canAccessIntegrations: permissions?.canAccessIntegrations || false,
+    canViewPricing: permissions?.canViewPricing || false,
+    canAccessAccountSettings: permissions?.canAccessAccountSettings || false,
+    canAccessAccounting: permissions?.canAccessAccounting || false,
+    canAccessProduction: permissions?.canAccessProduction || false,
     refreshProfile: loadUserProfile,
   };
 }

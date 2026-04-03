@@ -63,11 +63,35 @@ Deno.serve(async (req: Request) => {
     const { action, email, full_name, role, userId, password } = await req.json();
 
     const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
+    const isSuperAdmin = profile?.role === "super_admin";
     const isUpdatingSelf = action === "update" && userId === user.id;
 
     if (!isAdmin && !isUpdatingSelf) {
       return new Response(
         JSON.stringify({ error: "Admin access required" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate role value
+    const validRoles = ["super_admin", "admin", "user"];
+    if (role && !validRoles.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid role: ${role}. Must be one of: ${validRoles.join(", ")}` }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Only super_admin can assign the super_admin role
+    if (role === "super_admin" && !isSuperAdmin) {
+      return new Response(
+        JSON.stringify({ error: "Only super admins can assign the super_admin role" }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

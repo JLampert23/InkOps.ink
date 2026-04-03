@@ -116,9 +116,18 @@ Deno.serve(async (req: Request) => {
       throw new Error('Missing Authorization header');
     }
 
-    const bearerToken = authHeader.replace('Bearer ', '');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const bearerToken = authHeader.replace('Bearer ', '').trim();
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim() ?? '';
     const isServiceRole = bearerToken === supabaseServiceKey;
+
+    console.log('crypto-service auth check:', {
+      hasAuthHeader: !!authHeader,
+      bearerTokenLength: bearerToken.length,
+      serviceKeyLength: supabaseServiceKey.length,
+      isServiceRole,
+      tokenPrefix: bearerToken.substring(0, 20),
+      serviceKeyPrefix: supabaseServiceKey.substring(0, 20),
+    });
 
     if (!isServiceRole) {
       const supabaseClient = createClient(
@@ -133,8 +142,12 @@ Deno.serve(async (req: Request) => {
 
       const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
       if (userError || !user) {
+        console.error('User authentication failed:', userError);
         throw new Error('Unauthorized');
       }
+      console.log('User authenticated:', user.id);
+    } else {
+      console.log('Service role authenticated successfully');
     }
 
     const { action, token } = await req.json();

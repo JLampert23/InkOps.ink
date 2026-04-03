@@ -181,9 +181,9 @@ export class AutomationService {
       const { data: rawInvoices, error } = await supabase
         .from('printavo_invoices')
         .select('*')
-        .eq('status_stage', 'accounts_receivable')
+        .in('status_stage', ['billing_queue', 'accounts_receivable'])
         .gt('amount_outstanding', 0)
-        .order('due_date', { ascending: true });
+        .order('due_date', { ascending: true, nullsFirst: false });
 
       if (error) {
         throw new Error(`Failed to fetch AR invoice data: ${error.message}`);
@@ -195,7 +195,7 @@ export class AutomationService {
         const total = parseFloat(inv.total || 0);
         const amountPaid = parseFloat(inv.amount_paid || 0);
         const balanceRemaining = parseFloat(inv.amount_outstanding || 0);
-        const dueDate = new Date(inv.due_date);
+        const dueDate = inv.due_date ? new Date(inv.due_date) : new Date(inv.invoice_date);
         const today = new Date();
         const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -208,7 +208,7 @@ export class AutomationService {
           customer: inv.customer_name || 'Unknown',
           invoiceNumber: inv.invoice_number || '',
           invoiceDate: inv.invoice_date,
-          dueDate: inv.due_date,
+          dueDate: inv.due_date || inv.invoice_date,
           total: total,
           outstanding: balanceRemaining,
           agingBucket: agingBucket,

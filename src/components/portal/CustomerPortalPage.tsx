@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabaseAnon } from '../../lib/supabase-anon-client';
-import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package } from 'lucide-react';
+import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package, User, Eye, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { PortalPaymentsTab } from './PortalPaymentsTab';
 import { PortalPaymentModal } from './PortalPaymentModal';
 import { PortalProofsTab } from './PortalProofsTab';
 import { PortalOrdersTab } from './PortalOrdersTab';
+import { PortalCustomerInfoTab } from './PortalCustomerInfoTab';
+import { PortalQuoteViewerModal } from './PortalQuoteViewerModal';
 
 interface CustomerPortalPageProps {
   customerId: string;
@@ -59,15 +61,23 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
   const [branding, setBranding] = useState<CompanyBranding | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments' | 'proofs' | 'orders'>('quotes');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments' | 'proofs' | 'orders' | 'account'>('quotes');
   const [stripeConfig, setStripeConfig] = useState<StripeConfig>({ enabled: false });
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [viewingQuoteId, setViewingQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomerData();
     checkPaymentSuccess();
   }, [customerId]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('customer_portal_user');
+    localStorage.removeItem('customer_portal_branding');
+    localStorage.removeItem('customer_portal_token');
+    window.location.href = '/portal/login';
+  };
 
   const checkPaymentSuccess = () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -120,6 +130,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
         .select('id, quote_number, created_at, status, subtotal, tax_amount, nickname')
         .eq('customer_id', customerId)
         .eq('company_id', customerData.company_id)
+        .neq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;
@@ -257,11 +268,21 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                 <h1 className="text-xl font-bold text-gray-900">{branding.company_name}</h1>
               )}
             </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{customer?.company_name}</p>
-              {customer?.contact_name && (
-                <p className="text-xs text-gray-500">{customer.contact_name}</p>
-              )}
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{customer?.company_name}</p>
+                {customer?.contact_name && (
+                  <p className="text-xs text-gray-500">{customer.contact_name}</p>
+                )}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
             </div>
           </div>
         </div>
@@ -269,61 +290,78 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             <button
               onClick={() => setActiveTab('quotes')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'quotes'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <FileText className="w-4 h-4" />
-              Quotes ({quotes.length})
+              <span className="hidden sm:inline">Quotes</span>
+              <span className="sm:hidden">Quotes</span>
             </button>
             <button
               onClick={() => setActiveTab('invoices')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'invoices'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Receipt className="w-4 h-4" />
-              Invoices ({invoices.length})
+              <span className="hidden sm:inline">Invoices</span>
+              <span className="sm:hidden">Invoices</span>
             </button>
             <button
               onClick={() => setActiveTab('payments')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'payments'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <CreditCard className="w-4 h-4" />
-              Payments
+              <span className="hidden sm:inline">Payments</span>
+              <span className="sm:hidden">Pay</span>
             </button>
             <button
               onClick={() => setActiveTab('proofs')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'proofs'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Image className="w-4 h-4" />
-              Proofs
+              <span className="hidden sm:inline">Proofs</span>
+              <span className="sm:hidden">Proofs</span>
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'orders'
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
               <Package className="w-4 h-4" />
-              Orders
+              <span className="hidden sm:inline">Orders</span>
+              <span className="sm:hidden">Orders</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('account')}
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                activeTab === 'account'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span className="hidden sm:inline">Account</span>
+              <span className="sm:hidden">Acct</span>
             </button>
           </div>
         </div>
@@ -381,15 +419,13 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                           ${((quote.subtotal || 0) + (quote.tax_amount || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <a
-                            href={`/quote-approval/${quote.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                          <button
+                            onClick={() => setViewingQuoteId(quote.id)}
+                            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
                           >
+                            <Eye className="w-4 h-4" />
                             View
-                            <ChevronRight className="w-4 h-4" />
-                          </a>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -488,6 +524,13 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
             companyId={customer.company_id}
           />
         )}
+
+        {activeTab === 'account' && customer && (
+          <PortalCustomerInfoTab
+            customerId={customer.id}
+            companyId={customer.company_id}
+          />
+        )}
       </main>
 
       {selectedInvoiceForPayment && customer && (
@@ -503,6 +546,19 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
             loadCustomerData();
             setActiveTab('payments');
           }}
+        />
+      )}
+
+      {viewingQuoteId && customer && (
+        <PortalQuoteViewerModal
+          quoteId={viewingQuoteId}
+          onClose={() => setViewingQuoteId(null)}
+          onApprovalComplete={() => {
+            setViewingQuoteId(null);
+            loadCustomerData();
+          }}
+          customerId={customer.id}
+          companyId={customer.company_id}
         />
       )}
 

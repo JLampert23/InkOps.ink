@@ -14,25 +14,64 @@ import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
 import { CustomerPortalProvider } from './contexts/CustomerPortalContext';
 import { PortalLogin } from './components/portal/PortalLogin';
-import { PortalInvoices } from './components/portal/PortalInvoices';
-import { PortalQuotes } from './components/portal/PortalQuotes';
-import { PortalProofs } from './components/portal/PortalProofs';
-import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
-import { PortalDashboard } from './components/portal/PortalDashboard';
-import { PortalPaymentMethods } from './components/portal/PortalPaymentMethods';
+import { PortalPasswordSetup } from './components/portal/PortalPasswordSetup';
+import { PortalForgotPassword } from './components/portal/PortalForgotPassword';
+import { PortalResetPassword } from './components/portal/PortalResetPassword';
 import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
 import { NotificationBell } from './components/NotificationBell';
 import { hideInitialLoader } from './utils/loader';
 
+function PortalRedirect() {
+  useEffect(() => {
+    const storedUser = localStorage.getItem('customer_portal_user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed.customer_id) {
+          window.location.href = `/portal/customer/${parsed.customer_id}`;
+          return;
+        }
+      } catch (e) {
+        console.error('Error parsing stored user:', e);
+      }
+    }
+    window.location.href = '/portal/login';
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+        <p className="text-gray-600">Redirecting...</p>
+      </div>
+    </div>
+  );
+}
+
 function getSubdomainFromHost(): string | null {
   const hostname = window.location.hostname;
   const parts = hostname.split('.');
+
+  // Check for inkops.io domain
+  if (parts.length >= 3 && parts[parts.length - 2] === 'inkops' && parts[parts.length - 1] === 'io') {
+    return parts.slice(0, -2).join('.');
+  }
+
+  // Check for inkops.ink domain (legacy support)
   if (parts.length >= 3 && parts[parts.length - 2] === 'inkops' && parts[parts.length - 1] === 'ink') {
     return parts.slice(0, -2).join('.');
   }
-  if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
-    return parts.length > 1 ? parts[0] : null;
+
+  // For localhost development
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return null; // No subdomain validation on localhost
   }
+
+  // For localhost with subdomain (e.g., mycompany.localhost)
+  if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
+    return parts[0];
+  }
+
   return null;
 }
 
@@ -68,10 +107,13 @@ function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
         }
 
         if (!companyData) {
+          console.error('Subdomain not found:', { subdomain, hostname: window.location.hostname });
           setError('Invalid domain');
           setLoading(false);
           return;
         }
+
+        console.log('Company found for subdomain:', { subdomain, companyId: companyData.id });
 
         const { data: customerData, error: customerError } = await supabaseAnon
           .from('customers')
@@ -87,12 +129,18 @@ function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
         }
 
         if (!customerData) {
+          console.error('Customer not found:', { customerId, companyData });
           setError('Customer not found');
           setLoading(false);
           return;
         }
 
         if (customerData.company_id !== companyData.id) {
+          console.error('Company mismatch:', {
+            customerCompanyId: customerData.company_id,
+            expectedCompanyId: companyData.id,
+            subdomain,
+          });
           setError('Access denied - customer does not belong to this company');
           setLoading(false);
           return;
@@ -207,14 +255,16 @@ function AppContent() {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>(undefined);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
   const [quoteContactId, setQuoteContactId] = useState<string | undefined>(undefined);
+  const [navigateToQuoteId, setNavigateToQuoteId] = useState<string | undefined>(undefined);
   const previousTabRef = useRef<Tab | null>(null);
   const isNavigatingRef = useRef(false);
   const { signOut, user } = useAuth();
-  const { userProfile, canAccessIntegrations, isAdmin, isSuperAdmin } = useRBAC();
+  const { userProfile, canAccessIntegrations, isAdmin, isSuperAdmin, isUser, isAdminOrAbove, canAccessAccounting, canAccessAccountSettings, canViewPricing } = useRBAC();
   const { showNotification } = useNotification();
   const { darkMode, toggleDarkMode } = useTheme();
 
@@ -230,7 +280,18 @@ function AppContent() {
     if (ACCOUNTING_TABS.includes(activeTab)) {
       setAccountingExpanded(true);
     }
+
+    if (activeTab !== 'customers') {
+      setSelectedCustomerId(undefined);
+    }
   }, [activeTab]);
+
+  // RBAC: Redirect 'user' role to production if they land on a restricted tab
+  useEffect(() => {
+    if (isUser && activeTab !== 'production') {
+      setActiveTab('production');
+    }
+  }, [isUser, activeTab]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -363,6 +424,23 @@ function AppContent() {
     setActiveTab('production');
   };
 
+  const handleViewCustomer = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setCustomerSearchTerm('');
+    setActiveTab('customers');
+    setAccountingExpanded(true);
+  };
+
+  const handleViewQuote = (quoteId: string) => {
+    setNavigateToQuoteId(quoteId);
+    setActiveTab('production');
+  };
+
+  const handleDuplicateQuote = (quoteId: string) => {
+    setNavigateToQuoteId(quoteId);
+    setActiveTab('production');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 transition-colors">
       {/* Sidebar */}
@@ -401,7 +479,7 @@ function AppContent() {
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
                     <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                      Production<br />Dashboard
+                      Production
                     </div>
                   </div>
                   {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -411,6 +489,8 @@ function AppContent() {
           </div>
 
           {/* Separator */}
+          {canAccessAccounting && (
+            <>
           <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
 
           {/* 2. ACCOUNTING - Collapsible section */}
@@ -471,8 +551,12 @@ function AppContent() {
               </div>
             )}
           </div>
+            </>
+          )}
 
-          {/* Separator */}
+          {/* Separator + SQUARE DASHBOARD - only show for admin+ */}
+          {canAccessAccounting && (
+            <>
           <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
 
           {/* 3. SQUARE DASHBOARD - Top-level link */}
@@ -502,6 +586,8 @@ function AppContent() {
               );
             })}
           </div>
+            </>
+          )}
         </nav>
 
         {/* User & Controls */}
@@ -512,6 +598,7 @@ function AppContent() {
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={user.email}>{user.email}</p>
             </div>
           )}
+          {isSuperAdmin && (
           <button
             onClick={() => setActiveTab('settings')}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
@@ -519,6 +606,7 @@ function AppContent() {
             <Settings className="w-4 h-4" />
             <span className="text-sm font-medium">Account Settings</span>
           </button>
+          )}
           <button
             onClick={toggleDarkMode}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
@@ -651,9 +739,12 @@ function AppContent() {
               </div>
             }>
               <CustomersReport
-                key={customersKey}
+                key={`${customersKey}-${selectedCustomerId || ''}`}
                 initialSearchTerm={customerSearchTerm}
+                initialCustomerId={selectedCustomerId}
                 onCreateQuote={handleCreateQuoteForCustomer}
+                onViewQuote={handleViewQuote}
+                onDuplicateQuote={handleDuplicateQuote}
               />
             </Suspense>
           )}
@@ -701,18 +792,21 @@ function AppContent() {
                   setActiveTab('customers');
                   setAccountingExpanded(true);
                 }}
+                onViewCustomer={handleViewCustomer}
                 initialCustomerId={quoteCustomerId}
                 initialContactId={quoteContactId}
+                initialQuoteId={navigateToQuoteId}
                 onCustomerIdConsumed={() => {
                   setQuoteCustomerId(undefined);
                   setQuoteContactId(undefined);
+                  setNavigateToQuoteId(undefined);
                 }}
               />
             </Suspense>
           )}
 
 
-          {activeTab === 'settings' && (
+          {activeTab === 'settings' && isSuperAdmin && (
             <AccountSettings
               initialTab={settingsInitialTab as any}
               canAccessIntegrations={canAccessIntegrations}
@@ -792,18 +886,19 @@ function App() {
                 <DomainAwareCustomerPortal customerId={customerMatch[1]} />
               ) : path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
                 <PortalLogin />
-              ) : path.startsWith('/portal/dashboard') ? (
-                <PortalDashboard />
-              ) : path.startsWith('/portal/invoices') ? (
-                <PortalInvoices />
-              ) : path.startsWith('/portal/quotes') ? (
-                <PortalQuotes />
-              ) : path.startsWith('/portal/proofs') ? (
-                <PortalProofs />
-              ) : path.startsWith('/portal/orders') ? (
-                <PortalOrderHistory />
-              ) : path.startsWith('/portal/payment-methods') ? (
-                <PortalPaymentMethods />
+              ) : path === '/portal/setup-password' ? (
+                <PortalPasswordSetup />
+              ) : path === '/portal/forgot-password' ? (
+                <PortalForgotPassword />
+              ) : path === '/portal/reset-password' ? (
+                <PortalResetPassword />
+              ) : path.startsWith('/portal/dashboard') ||
+                path.startsWith('/portal/invoices') ||
+                path.startsWith('/portal/quotes') ||
+                path.startsWith('/portal/proofs') ||
+                path.startsWith('/portal/orders') ||
+                path.startsWith('/portal/payment-methods') ? (
+                <PortalRedirect />
               ) : (
                 <PortalLogin />
               )}

@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin';
+export type UserRole = 'super_admin' | 'admin' | 'user';
 
 export interface UserProfile {
   id: string;
@@ -18,6 +18,8 @@ export interface RBACPermissions {
   canAccessReports: boolean;
   canAccessAutomations: boolean;
   canAccessSettings: boolean;
+  canViewPricing: boolean;
+  canAccessAccountSettings: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RBACPermissions> = {
@@ -30,6 +32,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RBACPermissions> = {
     canAccessReports: true,
     canAccessAutomations: true,
     canAccessSettings: true,
+    canViewPricing: true,
+    canAccessAccountSettings: true,
   },
   admin: {
     canAccessIntegrations: true,
@@ -39,6 +43,20 @@ export const ROLE_PERMISSIONS: Record<UserRole, RBACPermissions> = {
     canAccessCustomers: true,
     canAccessReports: true,
     canAccessAutomations: true,
-    canAccessSettings: true,
+    canAccessSettings: false,
+    canViewPricing: true,
+    canAccessAccountSettings: false,
+  },
+  user: {
+    canAccessIntegrations: false,
+    canAccessDashboard: false,
+    canAccessAccounting: false,
+    canAccessProduction: true,
+    canAccessCustomers: false,
+    canAccessReports: false,
+    canAccessAutomations: false,
+    canAccessSettings: false,
+    canViewPricing: false,
+    canAccessAccountSettings: false,
   },
 };

@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-import { X, Send, Mail, Loader2, Eye, AlertCircle } from 'lucide-react';
+import { X, Send, Mail, Loader2, Eye, AlertCircle, Smartphone, MessageSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import DOMPurify from 'dompurify';
 import { getQuoteApprovalUrl } from '../../utils/portal-url';
+import type { CommunicationChannel } from '../../types/communication-template';
 
 interface SendQuoteModalProps {
   quoteId: string;
   quoteNumber: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
   totalAmount: number;
   onClose: () => void;
   onSuccess: () => void;
@@ -23,14 +25,19 @@ interface EmailTemplate {
   subject_template: string;
   body_template: string;
   template_type: string;
+  channel: CommunicationChannel;
+  sms_body_template: string;
   auto_attach_quote_link: boolean;
 }
+
+type DeliveryMethod = 'email' | 'sms' | 'both';
 
 export function SendQuoteModal({
   quoteId,
   quoteNumber,
   customerName,
   customerEmail,
+  customerPhone: initialCustomerPhone,
   totalAmount,
   onClose,
   onSuccess,
@@ -45,9 +52,13 @@ export function SendQuoteModal({
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewSubject, setPreviewSubject] = useState('');
+  const [previewSms, setPreviewSms] = useState('');
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState<string | null>(null);
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('email');
+  const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone || '');
+  const [twilioEnabled, setTwilioEnabled] = useState(false);
 
   useEffect(() => {
     loadTemplates();
@@ -57,13 +68,16 @@ export function SendQuoteModal({
   const loadCompanySettings = async () => {
     const { data } = await supabase
       .from('company_settings')
-      .select('inkops_subdomain, company_name')
+      .select('inkops_subdomain, company_name, twilio_enabled')
       .maybeSingle();
     if (data?.inkops_subdomain) {
       setInkopsSubdomain(data.inkops_subdomain);
     }
     if (data?.company_name) {
       setCompanyName(data.company_name);
+    }
+    if (data?.twilio_enabled) {
+      setTwilioEnabled(true);
     }
   };
 
@@ -124,6 +138,7 @@ export function SendQuoteModal({
       const expiryDate = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
 
       const shortcodeData = {
+        customer_first_name: quote.customer_name?.split(' ')[0] || '',
         customer_full_name: quote.customer_name || '',
         customer_company: quote.customer_name || '',
         customer_email: quote.customer_email || '',
@@ -136,13 +151,18 @@ export function SendQuoteModal({
         quote_link: approvalUrl,
         quote_status: quote.status || 'draft',
         custom_message: customMessage,
+        company_name: companyName || '',
       };
 
       const processedSubject = ShortCodeEngine.renderTemplate(template.subject_template, shortcodeData);
       const processedBody = ShortCodeEngine.renderTemplate(template.body_template, shortcodeData);
+      const processedSms = template.sms_body_template
+        ? ShortCodeEngine.renderTemplate(template.sms_body_template, shortcodeData)
+        : '';
 
       setPreviewSubject(processedSubject);
       setPreviewHtml(processedBody);
+      setPreviewSms(processedSms);
     } catch (error) {
       console.error('Error generating preview:', error);
     }
@@ -150,7 +170,19 @@ export function SendQuoteModal({
 
   const handleSend = async () => {
     if (!selectedTemplateId) {
-      showNotification('error', 'Template Required', 'Please select an email template');
+      showNotification('error', 'Template Required', 'Please select a template');
+      return;
+    }
+
+    // Validate phone number for SMS delivery
+    if ((deliveryMethod === 'sms' || deliveryMethod === 'both') && !customerPhone) {
+      showNotification('error', 'Phone Required', 'Please enter a phone number for SMS delivery');
+      return;
+    }
+
+    // Validate email for email delivery
+    if ((deliveryMethod === 'email' || deliveryMethod === 'both') && !customerEmail) {
+      showNotification('error', 'Email Required', 'Please ensure the customer has an email address');
       return;
     }
 
@@ -182,6 +214,8 @@ export function SendQuoteModal({
           single_use: false,
           auto_approve_after_days: null,
           auto_convert_on_approval: false,
+          delivery_method: deliveryMethod,
+          customer_phone: customerPhone,
         },
       });
 
@@ -212,7 +246,12 @@ export function SendQuoteModal({
 
       console.log('Quote sent successfully:', data);
 
-      showNotification('success', 'Quote Sent', `Quote sent successfully to ${customerEmail}`);
+      const successMessage = deliveryMethod === 'both'
+        ? `Quote sent to ${customerEmail} and ${customerPhone}`
+        : deliveryMethod === 'sms'
+          ? `Quote sent via SMS to ${customerPhone}`
+          : `Quote sent to ${customerEmail}`;
+      showNotification('success', 'Quote Sent', successMessage);
       onSuccess();
       onClose();
     } catch (error) {
@@ -303,6 +342,73 @@ export function SendQuoteModal({
             </div>
           </div>
 
+          {/* Delivery Method Selector */}
+          {twilioEnabled && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Delivery Method
+              </label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('email')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all flex-1 justify-center ${
+                    deliveryMethod === 'email'
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Mail className="w-4 h-4" />
+                  Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('sms')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all flex-1 justify-center ${
+                    deliveryMethod === 'sms'
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Smartphone className="w-4 h-4" />
+                  SMS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('both')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all flex-1 justify-center ${
+                    deliveryMethod === 'both'
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                      : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Mail className="w-4 h-4" />
+                  <Smartphone className="w-4 h-4" />
+                  Both
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Phone Number Field - show when SMS is selected */}
+          {(deliveryMethod === 'sms' || deliveryMethod === 'both') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Enter the phone number in E.164 format (e.g., +15551234567)
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email Template
@@ -356,23 +462,49 @@ export function SendQuoteModal({
             </p>
           </div>
 
-          {showPreview && previewHtml && (
-            <div className="border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden">
-              <div className="bg-slate-100 dark:bg-slate-900 px-4 py-3 border-b border-slate-300 dark:border-slate-700">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Preview</p>
-              </div>
-              <div className="p-4 space-y-3 bg-white dark:bg-slate-800">
-                <div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400"><strong>To:</strong> {customerEmail}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400"><strong>Subject:</strong> {previewSubject}</p>
+          {showPreview && (
+            <div className="space-y-4">
+              {/* Email Preview */}
+              {(deliveryMethod === 'email' || deliveryMethod === 'both') && previewHtml && (
+                <div className="border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 dark:bg-slate-900 px-4 py-3 border-b border-slate-300 dark:border-slate-700 flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-blue-600" />
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Preview</p>
+                  </div>
+                  <div className="p-4 space-y-3 bg-white dark:bg-slate-800">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400"><strong>To:</strong> {customerEmail}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400"><strong>Subject:</strong> {previewSubject}</p>
+                    </div>
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
+                      <div
+                        className="prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
-                  <div
-                    className="prose prose-sm dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml) }}
-                  />
+              )}
+
+              {/* SMS Preview */}
+              {(deliveryMethod === 'sms' || deliveryMethod === 'both') && previewSms && (
+                <div className="border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 dark:bg-slate-900 px-4 py-3 border-b border-slate-300 dark:border-slate-700 flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-green-600" />
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">SMS Preview</p>
+                  </div>
+                  <div className="p-4 bg-white dark:bg-slate-800">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-2"><strong>To:</strong> {customerPhone || 'No phone number'}</p>
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <p className="text-sm text-slate-900 dark:text-white font-mono whitespace-pre-wrap">{previewSms}</p>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      {previewSms.length} characters
+                      {previewSms.length > 160 && ` (${Math.ceil(previewSms.length / 160)} SMS segments)`}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -387,7 +519,12 @@ export function SendQuoteModal({
           </button>
           <button
             onClick={handleSend}
-            disabled={sending || !customerEmail || !selectedTemplateId}
+            disabled={
+              sending ||
+              !selectedTemplateId ||
+              ((deliveryMethod === 'email' || deliveryMethod === 'both') && !customerEmail) ||
+              ((deliveryMethod === 'sms' || deliveryMethod === 'both') && !customerPhone)
+            }
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {sending ? (
@@ -397,8 +534,15 @@ export function SendQuoteModal({
               </>
             ) : (
               <>
-                <Mail className="w-4 h-4" />
-                Send Quote Email
+                {deliveryMethod === 'email' && <Mail className="w-4 h-4" />}
+                {deliveryMethod === 'sms' && <Smartphone className="w-4 h-4" />}
+                {deliveryMethod === 'both' && (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    <Smartphone className="w-4 h-4" />
+                  </>
+                )}
+                {deliveryMethod === 'email' ? 'Send Email' : deliveryMethod === 'sms' ? 'Send SMS' : 'Send Email & SMS'}
               </>
             )}
           </button>

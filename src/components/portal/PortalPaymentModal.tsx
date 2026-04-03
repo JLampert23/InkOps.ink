@@ -5,7 +5,6 @@ import { X, CreditCard, Loader2, CheckCircle, AlertCircle, ExternalLink } from '
 interface Invoice {
   id: string;
   invoice_number: string;
-  visual_id: string;
   total: number;
   balance_remaining: number;
 }
@@ -80,7 +79,7 @@ export function PortalPaymentModal({
             amount: amountInCents,
             customerEmail,
             customerName,
-            description: `Payment for Invoice ${invoice.visual_id || invoice.invoice_number}`,
+            description: `Payment for Invoice ${invoice.invoice_number}`,
           }),
         }
       );
@@ -205,7 +204,7 @@ export function PortalPaymentModal({
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-gray-600">Invoice</span>
                   <span className="font-medium text-gray-900">
-                    {invoice.visual_id || invoice.invoice_number}
+                    {invoice.invoice_number}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

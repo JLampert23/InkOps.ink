@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Plus, Edit, X, Save, Loader2, Trash2, Star } from 'lucide-react';
+import { Users, Search, Plus, CreditCard as Edit, X, Save, Loader2, Trash2, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -61,6 +61,18 @@ export function CustomersManager() {
   useEffect(() => {
     loadCustomers();
   }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (showForm) {
+        setShowForm(false);
+        resetForm();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showForm]);
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -141,6 +153,11 @@ export function CustomersManager() {
       }
 
       setShowForm(true);
+      window.history.pushState(
+        { customerView: 'detail', customerId },
+        '',
+        `#customers/${customerId}`
+      );
     }
   };
 
@@ -309,6 +326,7 @@ export function CustomersManager() {
               onClick={() => {
                 setShowForm(false);
                 resetForm();
+                window.history.back();
               }}
               className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700"
             >

@@ -1,16 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Save,
-  X,
-  Power,
-  PowerOff,
-  Code,
-  CheckCircle2,
-  Copy,
-} from 'lucide-react';
+import { Plus, CreditCard as Edit, Trash2, Save, X, Power, PowerOff, Code, CheckCircle2, Copy } from 'lucide-react';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase-client';
@@ -24,10 +13,12 @@ import type {
   CommunicationTemplate,
   TemplateType,
   TemplateValidation,
+  CommunicationChannel,
 } from '../../types/communication-template';
 import {
   TEMPLATE_TYPE_METADATA,
 } from '../../types/communication-template';
+import { MessageSquare, Mail, Smartphone } from 'lucide-react';
 
 export default function CommunicationTemplatesManager() {
   const { showNotification } = useNotification();
@@ -43,6 +34,8 @@ export default function CommunicationTemplatesManager() {
   const [templateName, setTemplateName] = useState('');
   const [subjectTemplate, setSubjectTemplate] = useState('');
   const [bodyTemplate, setBodyTemplate] = useState('');
+  const [channel, setChannel] = useState<CommunicationChannel>('email');
+  const [smsBodyTemplate, setSmsBodyTemplate] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [autoAttachQuoteLink, setAutoAttachQuoteLink] = useState(true);
   const [autoAttachPdf, setAutoAttachPdf] = useState(false);
@@ -95,6 +88,8 @@ export default function CommunicationTemplatesManager() {
       setTemplateName(template.template_name);
       setSubjectTemplate(template.subject_template);
       setBodyTemplate(template.body_template);
+      setChannel(template.channel || 'email');
+      setSmsBodyTemplate(template.sms_body_template || '');
       setIsActive(template.is_active);
       setAutoAttachQuoteLink(template.auto_attach_quote_link);
       setAutoAttachPdf(template.auto_attach_pdf);
@@ -107,6 +102,8 @@ export default function CommunicationTemplatesManager() {
       setTemplateName('');
       setSubjectTemplate(metadata.defaultSubject);
       setBodyTemplate(metadata.defaultBody);
+      setChannel('email');
+      setSmsBodyTemplate(metadata.defaultSmsBody || '');
       setIsActive(true);
       setAutoAttachQuoteLink(metadata.supportedAttachments.quoteLink);
       setAutoAttachPdf(metadata.supportedAttachments.pdf);
@@ -130,10 +127,15 @@ export default function CommunicationTemplatesManager() {
       const metadata = TEMPLATE_TYPE_METADATA[newType];
       setSubjectTemplate(metadata.defaultSubject);
       setBodyTemplate(metadata.defaultBody);
+      setSmsBodyTemplate(metadata.defaultSmsBody || '');
       setAutoAttachQuoteLink(metadata.supportedAttachments.quoteLink);
       setAutoAttachPdf(metadata.supportedAttachments.pdf);
       setAutoAttachMockups(metadata.supportedAttachments.mockups);
       setAutoAttachTerms(metadata.supportedAttachments.terms);
+      // Reset channel if template doesn't support SMS
+      if (!metadata.supportsSms) {
+        setChannel('email');
+      }
     }
   }
 
@@ -193,6 +195,8 @@ export default function CommunicationTemplatesManager() {
         template_name: templateName,
         subject_template: subjectTemplate,
         body_template: bodyTemplate,
+        channel: channel,
+        sms_body_template: smsBodyTemplate,
         is_active: isActive,
         auto_attach_quote_link: autoAttachQuoteLink,
         auto_attach_pdf: autoAttachPdf,
@@ -292,10 +296,10 @@ export default function CommunicationTemplatesManager() {
       <div className="flex items-center justify-between px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
         <div>
           <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
-            Email Templates
+            Communication Templates
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Manage customizable email templates with short codes
+            Manage email and SMS templates with short codes
           </p>
         </div>
         {isAdmin && (
@@ -341,6 +345,17 @@ export default function CommunicationTemplatesManager() {
                           }`}
                         >
                           {template.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        <span className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          {template.channel === 'email' && <Mail className="w-3 h-3" />}
+                          {template.channel === 'sms' && <Smartphone className="w-3 h-3" />}
+                          {template.channel === 'both' && (
+                            <>
+                              <Mail className="w-3 h-3" />
+                              <Smartphone className="w-3 h-3" />
+                            </>
+                          )}
+                          {template.channel === 'email' ? 'Email' : template.channel === 'sms' ? 'SMS' : 'Email + SMS'}
                         </span>
                       </div>
                       <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
@@ -457,6 +472,57 @@ export default function CommunicationTemplatesManager() {
                 />
               </div>
 
+              {/* Communication Channel */}
+              {TEMPLATE_TYPE_METADATA[templateType].supportsSms && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    Communication Channel
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setChannel('email')}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
+                        channel === 'email'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                          : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" />
+                      Email Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChannel('sms')}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
+                        channel === 'sms'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                          : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                      }`}
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      SMS Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChannel('both')}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${
+                        channel === 'both'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                          : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-400'
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" />
+                      <Smartphone className="w-4 h-4" />
+                      Email + SMS
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Choose how to deliver this communication to customers
+                  </p>
+                </div>
+              )}
+
               {/* Attachments */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
@@ -534,18 +600,68 @@ export default function CommunicationTemplatesManager() {
             </div>
           </div>
 
-          {/* Rich Text Email Editor */}
-          <RichTextEmailEditor
-            initialSubject={subjectTemplate}
-            initialBody={bodyTemplate}
-            onAutoSave={(subject, body) => {
-              setSubjectTemplate(subject);
-              setBodyTemplate(body);
-            }}
-            showShortCodes={true}
-            showSmartBlocks={true}
-            autoSaveDelay={2000}
-          />
+          {/* Rich Text Email Editor - only show for email or both channels */}
+          {(channel === 'email' || channel === 'both') && (
+            <RichTextEmailEditor
+              initialSubject={subjectTemplate}
+              initialBody={bodyTemplate}
+              onAutoSave={(subject, body) => {
+                setSubjectTemplate(subject);
+                setBodyTemplate(body);
+              }}
+              showShortCodes={true}
+              showSmartBlocks={true}
+              autoSaveDelay={2000}
+            />
+          )}
+
+          {/* SMS Body Editor - only show for sms or both channels */}
+          {(channel === 'sms' || channel === 'both') && TEMPLATE_TYPE_METADATA[templateType].supportsSms && (
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg">
+              <div className="flex items-center gap-2 mb-4">
+                <Smartphone className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  SMS Message
+                </h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                    SMS Body
+                  </label>
+                  <textarea
+                    value={smsBodyTemplate}
+                    onChange={(e) => setSmsBodyTemplate(e.target.value)}
+                    placeholder="Enter your SMS message with shortcodes like {{customer_first_name}}, {{quote_number}}, {{quote_link}}"
+                    rows={4}
+                    maxLength={320}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono text-sm resize-none"
+                  />
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Use shortcodes like <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">{'{{quote_link}}'}</code> for dynamic content
+                    </p>
+                    <span className={`text-xs font-medium ${
+                      smsBodyTemplate.length > 160
+                        ? smsBodyTemplate.length > 320
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-amber-600 dark:text-amber-400'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}>
+                      {smsBodyTemplate.length}/160 chars
+                      {smsBodyTemplate.length > 160 && smsBodyTemplate.length <= 320 && ' (2 SMS)'}
+                      {smsBodyTemplate.length > 320 && ' (too long)'}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>Tip:</strong> Keep SMS messages under 160 characters for a single SMS. Messages over 160 characters will be split into multiple SMS segments. The quote approval link will be shortened automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3">

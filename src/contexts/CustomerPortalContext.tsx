@@ -22,8 +22,12 @@ interface CustomerPortalContextType {
   user: CustomerPortalUser | null;
   branding: CompanyBranding | null;
   loading: boolean;
-  loginWithToken: (token: string) => Promise<boolean>;
+  loginWithToken: (token: string) => Promise<boolean | { requiresSetup: true; setupToken: string; email: string }>;
   loginWithEmail: (email: string) => Promise<boolean>;
+  loginWithPassword: (email: string, password: string) => Promise<{ success: boolean; requiresSetup?: boolean; error?: string }>;
+  requestPasswordReset: (email: string) => Promise<boolean>;
+  resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+  setupPassword: (email: string, password: string, setupToken: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -54,7 +58,7 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginWithToken = useCallback(async (token: string): Promise<boolean> => {
+  const loginWithToken = useCallback(async (token: string): Promise<boolean | { requiresSetup: true; setupToken: string; email: string }> => {
     try {
       setLoading(true);
 
@@ -71,6 +75,14 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
       });
 
       const result = await response.json();
+
+      if (response.ok && result.success && result.requiresPasswordSetup) {
+        return {
+          requiresSetup: true,
+          setupToken: result.setupToken || token,
+          email: result.customer?.email || ''
+        };
+      }
 
       if (!response.ok || !result.success) {
         const { data: quoteApproval } = await supabase
@@ -167,12 +179,127 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginWithPassword = useCallback(async (email: string, password: string): Promise<{ success: boolean; requiresSetup?: boolean; error?: string }> => {
+    try {
+      setLoading(true);
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/verify-customer-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return {
+          success: false,
+          requiresSetup: result.requiresSetup,
+          error: result.error || 'Invalid email or password'
+        };
+      }
+
+      const portalUser = {
+        email: result.customer.email,
+        name: result.customer.name,
+        company_id: result.customer.company_id,
+        customer_id: result.customer.id,
+      };
+
+      setUser(portalUser);
+      setBranding(result.branding);
+
+      localStorage.setItem('customer_portal_user', JSON.stringify(portalUser));
+      localStorage.setItem('customer_portal_branding', JSON.stringify(result.branding));
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error logging in with password:', error);
+      return { success: false, error: 'An error occurred. Please try again.' };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string): Promise<boolean> => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/request-password-reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ email })
+      });
+
+      const result = await response.json();
+      return response.ok && result.success;
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      return false;
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, newPassword: string): Promise<boolean> => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/reset-customer-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ token, newPassword })
+      });
+
+      const result = await response.json();
+      return response.ok && result.success;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      return false;
+    }
+  }, []);
+
+  const setupPassword = useCallback(async (email: string, password: string, setupToken: string): Promise<boolean> => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/set-customer-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ email, password, setupToken })
+      });
+
+      const result = await response.json();
+      return response.ok && result.success;
+    } catch (error) {
+      console.error('Error setting up password:', error);
+      return false;
+    }
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     setBranding(null);
     localStorage.removeItem('customer_portal_user');
     localStorage.removeItem('customer_portal_branding');
     localStorage.removeItem('customer_portal_token');
+    window.location.href = '/portal/login';
   }, []);
 
   const value = useMemo(() => ({
@@ -181,8 +308,12 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     loading,
     loginWithToken,
     loginWithEmail,
+    loginWithPassword,
+    requestPasswordReset,
+    resetPassword,
+    setupPassword,
     logout
-  }), [user, branding, loading, loginWithToken, loginWithEmail, logout]);
+  }), [user, branding, loading, loginWithToken, loginWithEmail, loginWithPassword, requestPasswordReset, resetPassword, setupPassword, logout]);
 
   return (
     <CustomerPortalContext.Provider value={value}>

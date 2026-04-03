@@ -54,6 +54,10 @@ export class RBACService {
     return role === 'admin';
   }
 
+  static isUser(role: UserRole): boolean {
+    return role === 'user';
+  }
+
   static canAccessIntegrations(role: UserRole): boolean {
     return this.getPermissions(role).canAccessIntegrations;
   }

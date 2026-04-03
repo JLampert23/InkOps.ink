@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink, Receipt, Copy } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import EditCustomerModal from './EditCustomerModal';
 import ContactSelectionModal from './ContactSelectionModal';
 import { CustomerArtworkLibrary } from './CustomerArtworkLibrary';
@@ -52,11 +53,15 @@ interface FundraisingCredit {
 
 interface CustomersReportProps {
   initialSearchTerm?: string;
+  initialCustomerId?: string;
   onCreateQuote?: (customerId: string, contactId?: string) => void;
+  onViewQuote?: (quoteId: string) => void;
+  onDuplicateQuote?: (quoteId: string) => void;
 }
 
-export default function CustomersReport({ initialSearchTerm, onCreateQuote }: CustomersReportProps = {}) {
+export default function CustomersReport({ initialSearchTerm, initialCustomerId, onCreateQuote, onViewQuote, onDuplicateQuote }: CustomersReportProps = {}) {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm || '');
@@ -83,8 +88,11 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
   const [portalEnabled, setPortalEnabled] = useState(false);
   const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
   const [showContactSelection, setShowContactSelection] = useState(false);
   const [selectedCustomerForQuote, setSelectedCustomerForQuote] = useState<Customer | null>(null);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'quotes'>('invoices');
+  const [quotes, setQuotes] = useState<any[]>([]);
 
   useEffect(() => {
     loadCustomers();
@@ -93,7 +101,12 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   }, []);
 
   useEffect(() => {
-    if (initialSearchTerm && customers.length > 0 && !selectedCustomer) {
+    if (initialCustomerId && customers.length > 0 && !selectedCustomer) {
+      const matchedCustomer = customers.find(c => c.id === initialCustomerId);
+      if (matchedCustomer) {
+        loadCustomerDetails(matchedCustomer);
+      }
+    } else if (initialSearchTerm && customers.length > 0 && !selectedCustomer) {
       const matchedCustomer = customers.find(c =>
         c.company_name.toLowerCase().includes(initialSearchTerm.toLowerCase()) ||
         c.email.toLowerCase().includes(initialSearchTerm.toLowerCase())
@@ -102,7 +115,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
         loadCustomerDetails(matchedCustomer);
       }
     }
-  }, [initialSearchTerm, customers, selectedCustomer]);
+  }, [initialSearchTerm, initialCustomerId, customers, selectedCustomer]);
 
   useEffect(() => {
     if (selectedCustomer?.id && companyId) {
@@ -250,6 +263,17 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
       });
 
       setCustomerInvoices(details);
+
+      // Load quotes for this customer
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false });
+
+      if (!quotesError && quotesData) {
+        setQuotes(quotesData);
+      }
     } catch (error) {
       console.error('Error loading customer details:', error);
     } finally {
@@ -363,6 +387,49 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
     loadCustomers();
     if (selectedCustomer) {
       loadCustomerDetails(selectedCustomer);
+    }
+  };
+
+  const handleDuplicate = async (quoteId: string) => {
+    const confirmed = await confirm({
+      title: 'Duplicate Quote',
+      message: 'Create a copy of this quote?',
+      confirmLabel: 'Duplicate',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    setDuplicating(quoteId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('You must be logged in to duplicate quotes');
+      }
+
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/duplicate`, {
+        method: 'POST',
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to duplicate quote');
+      }
+
+      showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
+
+      // Reload customer details to show the new quote
+      if (selectedCustomer) {
+        loadCustomerDetails(selectedCustomer);
+      }
+
+      // If a callback is provided, call it
+      if (onDuplicateQuote) {
+        onDuplicateQuote(data.quote.id);
+      }
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to duplicate quote', 'error');
+    } finally {
+      setDuplicating(null);
     }
   };
 
@@ -649,17 +716,47 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                 </div>
               </div>
 
-              <div className="overflow-y-auto mt-4" style={{ maxHeight: '520px' }}>
-                {/* Invoice History */}
-                {loadingDetails ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
+              <div className="mt-4">
+                {/* Tabs */}
+                <div className="border-b border-gray-200 dark:border-slate-700">
+                  <div className="flex">
+                    <button
+                      onClick={() => setActiveTab('invoices')}
+                      className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'invoices'
+                          ? 'border-green-500 text-green-600 dark:text-green-400'
+                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Invoice History ({customerInvoices.length})
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('quotes')}
+                      className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'quotes'
+                          ? 'border-green-500 text-green-600 dark:text-green-400'
+                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Receipt className="w-4 h-4" />
+                        Quotes ({quotes.length})
+                      </div>
+                    </button>
                   </div>
-                ) : (
-                  <div className="border-b border-gray-200 dark:border-slate-700">
-                    <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Invoice History</h4>
+                </div>
+
+                {/* Tab Content */}
+                <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+                  {loadingDetails ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
                     </div>
+                  ) : activeTab === 'invoices' ? (
+                    <div className="border-b border-gray-200 dark:border-slate-700">
                     <table className="w-full">
                       <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0">
                         <tr>
@@ -699,8 +796,74 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Quote #</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                        {quotes.length > 0 ? (
+                          quotes.map((quote) => (
+                            <tr key={quote.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => onViewQuote?.(quote.id)}
+                                  className="text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline cursor-pointer"
+                                >
+                                  {quote.quote_number}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                {format(new Date(quote.created_at), 'MMM dd, yyyy')}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                ${quote.total?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  quote.status === 'approved' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' :
+                                  quote.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' :
+                                  quote.status === 'rejected' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' :
+                                  quote.status === 'converted' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400' :
+                                  'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-400'
+                                }`}>
+                                  {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={() => handleDuplicate(quote.id)}
+                                  disabled={duplicating === quote.id}
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Duplicate Quote"
+                                >
+                                  {duplicating === quote.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Copy className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                              No quotes found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
 
                 {/* Fundraising Credits Section */}
                 <div className="border-b border-gray-200 dark:border-slate-700">
@@ -985,13 +1148,13 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
       const { data } = await supabase
         .from('payments')
-        .select('invoice_id, invoices!inner(visual_id)')
+        .select('invoice_id, printavo_invoices!inner(invoice_number)')
         .eq('fundraising_credit_id', credit.id)
         .eq('company_id', companyId)
         .maybeSingle();
 
-      if (data && data.invoices) {
-        setInvoiceNumber(data.invoices.visual_id);
+      if (data && data.printavo_invoices) {
+        setInvoiceNumber(data.printavo_invoices.invoice_number);
       }
     }
 

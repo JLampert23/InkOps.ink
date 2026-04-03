@@ -52,12 +52,16 @@ export function AuthScreen() {
       <div className="w-full max-w-md">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 sm:p-10 backdrop-blur-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 rounded-2xl mb-6 shadow-lg shadow-slate-500/30 transform hover:scale-105 transition-transform duration-200">
-              <Lock className="w-10 h-10 text-white" />
+            <div className="inline-flex items-center justify-center mb-6">
+              <img
+                src="/InkOps-01-copy.png"
+                alt="InkOps Pro"
+                className="h-12 w-auto"
+              />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
               {isSignUp ? 'Create Account' : 'Welcome Back'}
-            </h1>
+            </h2>
             <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">
               {isSignUp
                 ? 'Sign up to access your dashboard'

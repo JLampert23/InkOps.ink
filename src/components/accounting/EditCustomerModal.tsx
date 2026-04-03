@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Copy, Upload, Building2, User, Mail, Phone, MapPin, CreditCard, FileText, DollarSign, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, Copy, Upload, Building2, User, Mail, Phone, MapPin, CreditCard, FileText, DollarSign, Loader2, Globe, Key, Send, Link as LinkIcon, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -84,6 +84,13 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
   const [notes, setNotes] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
 
+  // Portal Access
+  const [portalAccessEnabled, setPortalAccessEnabled] = useState(false);
+  const [hasPasswordSet, setHasPasswordSet] = useState(false);
+  const [passwordSetAt, setPasswordSetAt] = useState<string | null>(null);
+  const [sendingWelcome, setSendingWelcome] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
+
   const [companyId, setCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -160,6 +167,11 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
       // Notes
       setNotes(customer.notes || '');
       setInternalNotes(customer.internal_notes || '');
+
+      // Portal Access
+      setPortalAccessEnabled(customer.portal_access_enabled || false);
+      setHasPasswordSet(!!customer.portal_password_hash);
+      setPasswordSetAt(customer.portal_password_set_at || null);
 
       // Load contacts
       const { data: contactsData } = await supabase
@@ -313,6 +325,119 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
     setPaymentMethods(updated);
   };
 
+  const handleSendWelcomeEmail = async () => {
+    if (!email) {
+      showNotification('Email address is required', 'error');
+      return;
+    }
+
+    setSendingWelcome(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        showNotification('You must be logged in to send welcome emails', 'error');
+        setSendingWelcome(false);
+        return;
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-customer-portal-welcome`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          customerId,
+          email,
+          customerName: `${primaryFirstName} ${primaryLastName}`.trim() || companyName
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        showNotification('Welcome email sent successfully!', 'success');
+      } else {
+        showNotification(result.error || 'Failed to send welcome email', 'error');
+      }
+    } catch (error) {
+      console.error('Error sending welcome email:', error);
+      showNotification('Failed to send welcome email', 'error');
+    } finally {
+      setSendingWelcome(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      showNotification('Email address is required', 'error');
+      return;
+    }
+
+    setSendingReset(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/request-password-reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ email })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        showNotification('Password reset email sent!', 'success');
+      } else {
+        showNotification('Failed to send password reset email', 'error');
+      }
+    } catch (error) {
+      console.error('Error sending password reset:', error);
+      showNotification('Failed to send password reset email', 'error');
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
+  const copyPortalLink = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('inkops_subdomain, customer_url')
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      const customUrl = settings?.customer_url;
+      const isValidPortalUrl = customUrl && customUrl.includes('/portal');
+      const portalUrl = isValidPortalUrl ? customUrl :
+                        (settings?.inkops_subdomain ? `https://${settings.inkops_subdomain}.inkops.ink/portal` : '') ||
+                        `${window.location.origin}/portal/login`;
+
+      await navigator.clipboard.writeText(portalUrl);
+      showNotification('Portal link copied to clipboard!', 'success');
+    } catch (error) {
+      console.error('Error copying portal link:', error);
+      showNotification('Failed to copy portal link', 'error');
+    }
+  };
+
   const validateForm = () => {
     if (!companyName.trim()) {
       showNotification('Company name is required', 'error');
@@ -369,7 +494,8 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
           tax_id: taxId,
           payment_terms: finalPaymentTerms,
           notes: notes,
-          internal_notes: internalNotes
+          internal_notes: internalNotes,
+          portal_access_enabled: portalAccessEnabled
         })
         .eq('id', customerId);
 
@@ -1097,6 +1223,108 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter custom payment terms"
                       />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION: PORTAL ACCESS */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-slate-700">
+                  <Globe className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Portal Access</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={portalAccessEnabled}
+                      onChange={(e) => setPortalAccessEnabled(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable portal access for this customer</span>
+                  </label>
+
+                  {portalAccessEnabled && (
+                    <div className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Password Status</h4>
+                          <div className="flex items-center gap-2">
+                            {hasPasswordSet ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                  Password set {passwordSetAt && `on ${format(new Date(passwordSetAt), 'MMM d, yyyy')}`}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-600 dark:text-gray-400">No password set</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSendWelcomeEmail}
+                          disabled={sendingWelcome || !email}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          {sendingWelcome ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              Send Welcome Email
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={copyPortalLink}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                        >
+                          <LinkIcon className="w-4 h-4" />
+                          Copy Portal Link
+                        </button>
+
+                        {hasPasswordSet && (
+                          <button
+                            type="button"
+                            onClick={handleResetPassword}
+                            disabled={sendingReset || !email}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          >
+                            {sendingReset ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Key className="w-4 h-4" />
+                                Send Password Reset
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-blue-800 dark:text-blue-300">
+                          When enabled, customers can log in to view their invoices, quotes, proofs, and order history.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

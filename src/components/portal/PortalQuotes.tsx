@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { PortalLayout } from './PortalLayout';
 import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
-import { supabase } from '../../lib/supabase-client';
-import { FileText, CheckCircle, XCircle, Eye, Loader2, Download } from 'lucide-react';
-import { portalAnalyticsService } from '../../services/portal-analytics-service';
+import { FileText, CheckCircle, XCircle, Eye, Loader2 } from 'lucide-react';
+import { PortalQuoteViewerModal } from './PortalQuoteViewerModal';
 
 interface Quote {
   id: string;
@@ -21,8 +20,7 @@ export function PortalQuotes() {
   const { user } = useCustomerPortal();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
-  const [approving, setApproving] = useState(false);
+  const [viewingQuoteId, setViewingQuoteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -55,13 +53,12 @@ export function PortalQuotes() {
 
       const result = await response.json();
 
-      // Map the data to match the expected Quote interface
       const mappedQuotes = (result.data || []).map((q: any) => ({
         id: q.id,
         quote_number: q.quote_number,
         created_date: q.created_at,
         expiry_date: q.expiry_date,
-        total_amount: parseFloat(q.subtotal || 0) + parseFloat(q.tax_amount || 0),
+        total_amount: parseFloat(q.total || q.subtotal || 0) + (q.total ? 0 : parseFloat(q.tax_amount || 0)),
         status: q.status,
         customer_name: q.customer_name,
         customer_email: q.customer_email,
@@ -91,36 +88,17 @@ export function PortalQuotes() {
     }
   };
 
-  const handleApprove = async (quoteId: string) => {
-    setApproving(true);
-    try {
-      const token = localStorage.getItem('customer_portal_token');
-      if (!token) {
-        alert('Session expired. Please log in again.');
-        return;
-      }
-
-      window.location.href = `/quote-approval/${token}`;
-    } catch (error) {
-      console.error('Error approving quote:', error);
-      alert('Failed to approve quote. Please try again.');
-    } finally {
-      setApproving(false);
-    }
+  const handleViewQuote = (quoteId: string) => {
+    setViewingQuoteId(quoteId);
   };
 
-  const handleViewQuote = async (quote: Quote) => {
-    setSelectedQuote(quote);
+  const handleModalClose = () => {
+    setViewingQuoteId(null);
+  };
 
-    if (user?.company_id && user?.customer_id) {
-      await portalAnalyticsService.trackEvent({
-        companyId: user.company_id,
-        customerId: user.customer_id,
-        eventType: 'quote_viewed',
-        resourceType: 'quote',
-        resourceId: quote.id
-      });
-    }
+  const handleApprovalComplete = () => {
+    setViewingQuoteId(null);
+    loadQuotes();
   };
 
   if (loading) {
@@ -133,86 +111,15 @@ export function PortalQuotes() {
     );
   }
 
-  if (selectedQuote) {
-    return (
-      <PortalLayout activeTab="quotes">
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Quote {selectedQuote.quote_number}
-            </h2>
-            <button
-              onClick={() => setSelectedQuote(null)}
-              className="text-sm text-blue-600 hover:text-blue-700"
-            >
-              Back to Quotes
-            </button>
-          </div>
-
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Quote Date</p>
-                <p className="text-base font-medium text-gray-900">
-                  {new Date(selectedQuote.created_date).toLocaleDateString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Expiry Date</p>
-                <p className="text-base font-medium text-gray-900">
-                  {selectedQuote.expiry_date
-                    ? new Date(selectedQuote.expiry_date).toLocaleDateString()
-                    : 'N/A'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Amount</p>
-                <p className="text-base font-medium text-gray-900">
-                  ${selectedQuote.total_amount.toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Status</p>
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedQuote.status)}`}>
-                  {selectedQuote.status}
-                </span>
-              </div>
-            </div>
-
-            {selectedQuote.notes && (
-              <div>
-                <p className="text-sm text-gray-600 mb-2">Notes</p>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-900">{selectedQuote.notes}</p>
-                </div>
-              </div>
-            )}
-
-            {selectedQuote.status === 'sent' && (
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleApprove(selectedQuote.id)}
-                  disabled={approving}
-                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  {approving ? 'Processing...' : 'Approve Quote'}
-                </button>
-                <button
-                  className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  <Download className="w-5 h-5" />
-                  Download PDF
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </PortalLayout>
-    );
-  }
-
   return (
+    <>
+      {viewingQuoteId && (
+        <PortalQuoteViewerModal
+          quoteId={viewingQuoteId}
+          onClose={handleModalClose}
+          onApprovalComplete={handleApprovalComplete}
+        />
+      )}
     <PortalLayout activeTab="quotes">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -283,17 +190,16 @@ export function PortalQuotes() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => handleViewQuote(quote)}
-                          className="text-blue-600 hover:text-blue-700 p-1"
+                          onClick={() => handleViewQuote(quote.id)}
+                          className="text-blue-600 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded transition-colors"
                           title="View Quote"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         {quote.status === 'sent' && (
                           <button
-                            onClick={() => handleApprove(quote.id)}
-                            disabled={approving}
-                            className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
+                            onClick={() => handleViewQuote(quote.id)}
+                            className="text-green-600 hover:text-green-700 p-1.5 hover:bg-green-50 rounded transition-colors"
                             title="Approve Quote"
                           >
                             <CheckCircle className="w-4 h-4" />
@@ -309,5 +215,6 @@ export function PortalQuotes() {
         )}
       </div>
     </PortalLayout>
+    </>
   );
 }

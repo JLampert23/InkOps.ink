@@ -256,13 +256,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [catalogSyncResult, setCatalogSyncResult] = useState<any>(null);
 
-  const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
-  const [testStyleNumber, setTestStyleNumber] = useState('18000');
-  const [testPartId, setTestPartId] = useState('');
-  const [testingPricing, setTestingPricing] = useState(false);
-  const [pricingTestResult, setPricingTestResult] = useState<any>(null);
-  const [lookingUpParts, setLookingUpParts] = useState(false);
-  const [availableParts, setAvailableParts] = useState<any[]>([]);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -458,6 +451,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   }, [companySettings]);
 
+  // Sync customerUrl state with database value
+  useEffect(() => {
+    console.log('[useEffect] companySettings changed:', {
+      customer_url: companySettings?.customer_url,
+      customer_url_is_undefined: companySettings?.customer_url === undefined
+    });
+    if (companySettings?.customer_url !== undefined) {
+      console.log('[useEffect] Setting customerUrl state to:', companySettings.customer_url || '(empty)');
+      setCustomerUrl(companySettings.customer_url || '');
+    }
+  }, [companySettings?.customer_url]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -486,6 +491,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
+
+      console.log('[AccountSettings] Loaded company_settings data:', {
+        customer_url: data?.customer_url,
+        verification_status: data?.customer_url_verification_status,
+        verification_token: data?.customer_url_verification_token
+      });
 
       if (data) {
         setCompanySettings(data);
@@ -771,6 +782,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSavingGarmentMarkup(false);
     }
   };
+
 
   const loadStatusesFromDatabase = async () => {
     try {
@@ -2244,170 +2256,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const testSSAPricing = async () => {
-    if (!testStyleNumber.trim()) {
-      setPricingTestResult({
-        success: false,
-        error: 'Please enter a style number to test',
-      });
-      return;
-    }
-
-    try {
-      setTestingPricing(true);
-      setPricingTestResult(null);
-
-      if (!companySettings?.id) {
-        setPricingTestResult({
-          success: false,
-          error: 'Company settings not loaded. Please refresh the page.',
-        });
-        return;
-      }
-
-      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
-      if (!ssaHasCreds) {
-        setPricingTestResult({
-          success: false,
-          error: 'SSActivewear credentials not saved. Please save your credentials first.',
-        });
-        return;
-      }
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        setPricingTestResult({
-          success: false,
-          error: 'No authentication token available. Please sign in again.',
-        });
-        return;
-      }
-
-      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(testStyleNumber.trim())}&companyId=${encodeURIComponent(companySettings?.id || '')}`;
-      if (testPartId.trim()) {
-        testUrl += `&partId=${encodeURIComponent(testPartId.trim())}`;
-      }
-      console.log('[Pricing Test] Calling S&S Activewear API:', testUrl);
-
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'X-User-Token': token,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log('[Pricing Test] Response:', data);
-
-      if (response.ok && data.success && data.data && data.data.length > 0) {
-        const pricingData = data.data;
-        const firstPart = pricingData[0];
-        const firstPrice = firstPart?.prices?.[0];
-
-        const partsList = pricingData.map((part: any) => ({
-          partId: part.partId,
-          prices: part.prices || []
-        }));
-
-        setPricingTestResult({
-          success: true,
-          productName: testStyleNumber.trim(),
-          partIdProvided: !!testPartId.trim(),
-          productId: data.productId,
-          supplier: 'S&S Activewear',
-          partsCount: pricingData.length,
-          parts: partsList,
-          firstPrice: firstPrice?.price,
-          firstQuantity: firstPrice?.quantity,
-          message: firstPrice
-            ? `Found pricing for ${pricingData.length} part(s). Base price: $${firstPrice.price.toFixed(2)} (min qty: ${firstPrice.quantity})`
-            : `Found ${pricingData.length} part(s) but no pricing available`,
-          rawData: data,
-        });
-      } else if (response.ok && data.success && (!data.data || data.data.length === 0)) {
-        setPricingTestResult({
-          success: false,
-          error: `Style ${testStyleNumber.trim()} not found in S&S Activewear catalog`,
-          details: data.errorDetails || 'No pricing data returned',
-        });
-      } else {
-        setPricingTestResult({
-          success: false,
-          error: data.error || `Request failed (${response.status})`,
-          details: data.errorDetails || data.details,
-        });
-      }
-    } catch (err) {
-      console.error('[Pricing Test] Exception:', err);
-      setPricingTestResult({
-        success: false,
-        error: err instanceof Error ? err.message : 'Test failed',
-      });
-    } finally {
-      setTestingPricing(false);
-    }
-  };
-
-  const lookupParts = async () => {
-    if (!testStyleNumber.trim()) {
-      showNotification('Please enter a style number', 'error');
-      return;
-    }
-
-    try {
-      setLookingUpParts(true);
-      setAvailableParts([]);
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        showNotification('Session expired. Please refresh the page.', 'error');
-        return;
-      }
-
-      console.log('[Part Lookup] Fetching parts for style:', testStyleNumber.trim());
-      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(testStyleNumber.trim())}&companyId=${encodeURIComponent(companySettings?.id || '')}`;
-
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'X-User-Token': token,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log('[Part Lookup] Response:', data);
-
-      if (response.ok && data.success && data.data && data.data.length > 0 && data.data[0]?.parts) {
-        const productInfo = data.data[0];
-        const uniqueParts = productInfo.parts.slice(0, 20).map((part: any) => ({
-          partId: part.partId,
-          colorName: part.colorName,
-          size: part.labelSize,
-        }));
-        setAvailableParts(uniqueParts);
-        showNotification(`Found ${uniqueParts.length} parts for ${productInfo.productBrand || ''} ${productInfo.productName || testStyleNumber.trim()}`, 'success');
-      } else if (response.ok && data.success && (!data.data || data.data.length === 0)) {
-        showNotification(`Style ${testStyleNumber.trim()} not found in S&S Activewear catalog`, 'error');
-      } else {
-        showNotification(data.error || 'Failed to lookup parts from S&S Activewear', 'error');
-      }
-    } catch (err) {
-      console.error('[Part Lookup] Exception:', err);
-      showNotification(err instanceof Error ? err.message : 'Failed to lookup parts', 'error');
-    } finally {
-      setLookingUpParts(false);
-    }
-  };
 
   const syncSSACatalog = async () => {
     try {
@@ -4002,7 +3850,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
                     <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Email Templates
+                      Communication Templates
                     </div>
                   </div>
                   {activeTab === 'email-templates' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -5007,7 +4855,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
 
                 <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Available Email Templates:</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Available Communication Templates:</p>
                   <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1 ml-4 list-disc">
                     <li>Invoice Reminders</li>
                     <li>Payment Confirmations</li>
@@ -5315,6 +5163,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       >
                         <option value="super_admin">Super Admin</option>
                         <option value="admin">Admin</option>
+                        <option value="user">User</option>
                       </select>
                     </div>
                     <div className="flex gap-2">
@@ -5394,6 +5243,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                               >
                                 <option value="super_admin">Super Admin</option>
                                 <option value="admin">Admin</option>
+                                <option value="user">User</option>
                               </select>
                             </div>
                             <div className="border-t border-gray-200 dark:border-slate-600 pt-3">
@@ -6300,11 +6150,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           {showSsaApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                       </div>
-                      {ssaHasCredentials && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Enter a new API key only if you want to update it
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {ssaHasCredentials
+                          ? 'Enter a new API key only if you want to update it'
+                          : (
+                            <>
+                              Email <a href="mailto:api@ssactivewear.com" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">api@ssactivewear.com</a> to request an API token
+                            </>
+                          )
+                        }
+                      </p>
                     </div>
 
                     <div>
@@ -6432,179 +6287,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </div>
                     )}
 
-                    {/* Collapsible Pricing Diagnostics */}
-                    <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => setDiagnosticsExpanded(!diagnosticsExpanded)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Wrench className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pricing API Diagnostics</span>
-                        </div>
-                        {diagnosticsExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-gray-500" />
-                        )}
-                      </button>
-
-                      {diagnosticsExpanded && (
-                        <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                            <p>Test the S&S Activewear PromoStandards Customer NET Pricing API.</p>
-                            <p className="text-amber-600 dark:text-amber-400">Note: Click the magnifying glass to lookup available parts, then select one to test pricing.</p>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                Style Number
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  value={testStyleNumber}
-                                  onChange={(e) => {
-                                    setTestStyleNumber(e.target.value);
-                                    setAvailableParts([]);
-                                    setTestPartId('');
-                                  }}
-                                  placeholder="e.g., 18000, 5000, 64000"
-                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <button
-                                  onClick={lookupParts}
-                                  disabled={lookingUpParts || !testStyleNumber.trim()}
-                                  className="px-3 py-2 bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg hover:bg-gray-200 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                  title="Lookup available parts"
-                                >
-                                  {lookingUpParts ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Search className="w-4 h-4" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                Part ID <span className="text-amber-500">(for PPC test)</span>
-                              </label>
-                              {availableParts.length > 0 ? (
-                                <select
-                                  value={testPartId}
-                                  onChange={(e) => setTestPartId(e.target.value)}
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                  <option value="">Select a part...</option>
-                                  {availableParts.map((part, idx) => (
-                                    <option key={idx} value={part.partId}>
-                                      {part.partId} - {part.colorName} / {part.size}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={testPartId}
-                                  onChange={(e) => setTestPartId(e.target.value)}
-                                  placeholder="e.g., B00660093"
-                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex justify-end">
-                            <button
-                              onClick={testSSAPricing}
-                              disabled={testingPricing || !testStyleNumber.trim()}
-                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                            >
-                              {testingPricing ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  Testing...
-                                </>
-                              ) : (
-                                <>
-                                  <Zap className="w-4 h-4" />
-                                  Test Pricing
-                                </>
-                              )}
-                            </button>
-                          </div>
-
-                          {pricingTestResult && (
-                            <div className={`p-4 rounded-lg border ${pricingTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'}`}>
-                              <div className="flex items-start gap-3">
-                                <div className={`flex-shrink-0 w-6 h-6 rounded-full ${pricingTestResult.success ? 'bg-green-500' : 'bg-amber-500'} flex items-center justify-center text-white text-sm font-bold`}>
-                                  {pricingTestResult.success ? '✓' : '!'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className={`font-medium ${pricingTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-amber-900 dark:text-amber-100'}`}>
-                                    {pricingTestResult.success ? 'Pricing Retrieved Successfully' : pricingTestResult.error ? 'Test Failed' : 'No Pricing Data Found'}
-                                  </h4>
-                                  <p className={`text-sm mt-1 ${pricingTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
-                                    {pricingTestResult.message || pricingTestResult.error}
-                                  </p>
-
-                                  {pricingTestResult.productId && (
-                                    <div className="mt-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded border border-gray-200 dark:border-gray-700">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Product ID:</p>
-                                      <code className="px-2 py-1 bg-gray-100 dark:bg-slate-700 rounded font-mono text-sm">
-                                        {pricingTestResult.productId}
-                                      </code>
-                                    </div>
-                                  )}
-
-                                  {pricingTestResult.success && pricingTestResult.parts && pricingTestResult.parts.length > 0 && (
-                                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                      <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Available Parts with Pricing:</p>
-                                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                                        {pricingTestResult.parts.slice(0, 10).map((part: any, idx: number) => (
-                                          <div key={idx} className="p-2 bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700">
-                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">{part.partId}</p>
-                                            {part.prices && part.prices.length > 0 && (
-                                              <div className="flex flex-wrap gap-2 text-xs">
-                                                {part.prices.map((price: any, pidx: number) => (
-                                                  <span key={pidx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-100">
-                                                    {price.quantity}+ @ ${price.price?.toFixed(2)}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                        {pricingTestResult.parts.length > 10 && (
-                                          <p className="text-xs text-blue-700 dark:text-blue-300 italic">
-                                            Showing first 10 of {pricingTestResult.parts.length} parts
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {pricingTestResult.details && (
-                                    <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
-                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Details:</p>
-                                      <p className="text-sm text-amber-600 dark:text-amber-400">{pricingTestResult.details}</p>
-                                    </div>
-                                  )}
-
-                                  {pricingTestResult.success && pricingTestResult.supplier && (
-                                    <div className="mt-2 text-xs text-green-700 dark:text-green-300">
-                                      <p>Supplier: <span className="font-medium">{pricingTestResult.supplier}</span></p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>
@@ -8245,6 +7927,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </button>
                 </div>
               </div>
+
 
               {/* REMOVED: Old Payment Terms section replaced by rich text editors above */}
               {false && <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
