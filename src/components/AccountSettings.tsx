@@ -5163,6 +5163,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       >
                         <option value="super_admin">Super Admin</option>
                         <option value="admin">Admin</option>
+                        <option value="user">User</option>
                       </select>
                     </div>
                     <div className="flex gap-2">
@@ -5242,6 +5243,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                               >
                                 <option value="super_admin">Super Admin</option>
                                 <option value="admin">Admin</option>
+                                <option value="user">User</option>
                               </select>
                             </div>
                             <div className="border-t border-gray-200 dark:border-slate-600 pt-3">

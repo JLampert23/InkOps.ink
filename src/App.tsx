@@ -264,7 +264,7 @@ function AppContent() {
   const previousTabRef = useRef<Tab | null>(null);
   const isNavigatingRef = useRef(false);
   const { signOut, user } = useAuth();
-  const { userProfile, canAccessIntegrations, isAdmin, isSuperAdmin } = useRBAC();
+  const { userProfile, canAccessIntegrations, isAdmin, isSuperAdmin, isUser, isAdminOrAbove, canAccessAccounting, canAccessAccountSettings, canViewPricing } = useRBAC();
   const { showNotification } = useNotification();
   const { darkMode, toggleDarkMode } = useTheme();
 
@@ -285,6 +285,13 @@ function AppContent() {
       setSelectedCustomerId(undefined);
     }
   }, [activeTab]);
+
+  // RBAC: Redirect 'user' role to production if they land on a restricted tab
+  useEffect(() => {
+    if (isUser && activeTab !== 'production') {
+      setActiveTab('production');
+    }
+  }, [isUser, activeTab]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -482,6 +489,8 @@ function AppContent() {
           </div>
 
           {/* Separator */}
+          {canAccessAccounting && (
+            <>
           <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
 
           {/* 2. ACCOUNTING - Collapsible section */}
@@ -542,8 +551,12 @@ function AppContent() {
               </div>
             )}
           </div>
+            </>
+          )}
 
-          {/* Separator */}
+          {/* Separator + SQUARE DASHBOARD - only show for admin+ */}
+          {canAccessAccounting && (
+            <>
           <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
 
           {/* 3. SQUARE DASHBOARD - Top-level link */}
@@ -573,6 +586,8 @@ function AppContent() {
               );
             })}
           </div>
+            </>
+          )}
         </nav>
 
         {/* User & Controls */}
@@ -583,6 +598,7 @@ function AppContent() {
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={user.email}>{user.email}</p>
             </div>
           )}
+          {isSuperAdmin && (
           <button
             onClick={() => setActiveTab('settings')}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
@@ -590,6 +606,7 @@ function AppContent() {
             <Settings className="w-4 h-4" />
             <span className="text-sm font-medium">Account Settings</span>
           </button>
+          )}
           <button
             onClick={toggleDarkMode}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
@@ -789,7 +806,7 @@ function AppContent() {
           )}
 
 
-          {activeTab === 'settings' && (
+          {activeTab === 'settings' && isSuperAdmin && (
             <AccountSettings
               initialTab={settingsInitialTab as any}
               canAccessIntegrations={canAccessIntegrations}
