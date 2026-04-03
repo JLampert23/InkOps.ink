@@ -785,8 +785,9 @@ Deno.serve(async (req: Request) => {
         "2xl": item.qty_2xl || 0, "3xl": item.qty_3xl || 0, "4xl": item.qty_4xl || 0,
       });
 
-      const workOrderNumber = quote.quote_number;
-      const invoiceNumber = quote.quote_number;
+      const numericPart = quote.quote_number.replace(/^[A-Z]+-/, '');
+      const workOrderNumber = `WO-${numericPart}`;
+      const invoiceNumber = `INV-${numericPart}`;
 
       const garmentItems = lineItems?.filter((item: any) => item.line_type === "item" || !item.line_type) || [];
       const totalQuantity = garmentItems.reduce((sum: number, item: any) => sum + (sumQty(item) || item.quantity || 0), 0);
@@ -963,22 +964,37 @@ Deno.serve(async (req: Request) => {
 
         console.log(`Creating ${imprints.length} schedule entries for quote ${quote.quote_number}`);
 
-        const scheduleEntries = imprints.map((imp: any, idx: number) => ({
-          company_id: profile.company_id,
-          quote_id: quoteId,
-          work_order_id: workOrder.id,
-          imprint_id: imp.id,
-          type_of_work: imp.type_of_work || "Screen Print",
-          imprint_number: imp.imprint_number || `IMP-${idx + 1}`,
-          production_due_date: dueDate,
-          quantity: totalQtyAll,
-          customer_name: quote.customer_name,
-          quote_number: quote.quote_number,
-          scheduler_column: "Unscheduled",
-          colors: imp.thread_ink_color || null,
-          step_statuses: {},
-          priority_order: idx,
-        }));
+        const scheduleEntries = imprints.map((imp: any, idx: number) => {
+          let artworkThumbUrl = null;
+          if (imp.artwork_url) {
+            artworkThumbUrl = imp.artwork_url;
+          } else if (imp.artwork_images && Array.isArray(imp.artwork_images) && imp.artwork_images.length > 0) {
+            artworkThumbUrl = imp.artwork_images[0];
+          } else if (imp.mockups && typeof imp.mockups === 'object') {
+            const mockupValues = Object.values(imp.mockups);
+            if (mockupValues.length > 0 && typeof mockupValues[0] === 'string') {
+              artworkThumbUrl = mockupValues[0];
+            }
+          }
+
+          return {
+            company_id: profile.company_id,
+            quote_id: quoteId,
+            work_order_id: workOrder.id,
+            imprint_id: imp.id,
+            type_of_work: imp.type_of_work || "Screen Print",
+            imprint_number: imp.imprint_number || `IMP-${idx + 1}`,
+            production_due_date: dueDate,
+            quantity: totalQtyAll,
+            customer_name: quote.customer_name,
+            quote_number: quote.quote_number,
+            scheduler_column: "Unscheduled",
+            colors: imp.thread_ink_color || null,
+            step_statuses: {},
+            priority_order: idx,
+            artwork_thumb_url: artworkThumbUrl,
+          };
+        });
 
         console.log("Schedule entries to insert:", JSON.stringify(scheduleEntries, null, 2));
 

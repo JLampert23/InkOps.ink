@@ -258,6 +258,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   };
 
   const [quoteNumber, setQuoteNumber] = useState('');
+  const [quoteStatus, setQuoteStatus] = useState<string>('draft');
   const [createdDate, setCreatedDate] = useState(new Date().toISOString().split('T')[0]);
   const [productionDueDate, setProductionDueDate] = useState('');
   const [customerDueDate, setCustomerDueDate] = useState('');
@@ -656,6 +657,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
     if (quote) {
       setQuoteNumber(quote.quote_number || '');
+      setQuoteStatus(quote.status || 'draft');
       setSelectedCustomerId(quote.customer_id || '');
       setSelectedContactId(quote.contact_id || '');
       if (quote.customer_id) {
@@ -2061,7 +2063,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         customer_name: customerData?.company_name || 'Draft Quote',
         customer_email: customerData?.email || null,
         customer_phone: customerData?.phone || null,
-        status: statusOverride || 'draft',
+        status: statusOverride || quoteStatus || 'draft',
         created_date: createdDate,
         production_due_date: productionDueDate || null,
         customer_due_date: customerDueDate || null,
