@@ -593,7 +593,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {(quote.status === 'draft' || quote.status === 'sent') && (
+          {(quote.status === 'draft' || quote.status === 'sent' || quote.status === 'rejected') && (
             <button
               onClick={onEdit}
               className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -674,6 +674,21 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
           <p className="text-amber-800 dark:text-amber-300 text-sm font-medium">
             This quote has been reopened for editing.
           </p>
+        </div>
+      )}
+
+      {/* Rejected Banner */}
+      {quote.status === 'rejected' && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-3">
+          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+          <div>
+            <p className="text-red-800 dark:text-red-300 text-sm font-medium">
+              This quote was rejected by the customer.
+            </p>
+            <p className="text-red-700 dark:text-red-400 text-xs mt-1">
+              Click "Edit Quote" to make changes, then "Resend" to send the revised quote for approval.
+            </p>
+          </div>
         </div>
       )}
 
