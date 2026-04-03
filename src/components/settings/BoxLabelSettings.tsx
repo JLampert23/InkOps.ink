@@ -68,9 +68,7 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
         setLogoChoice(data.box_label_logo_choice || 'primary');
 
         if (data.box_label_layout && Array.isArray(data.box_label_layout) && data.box_label_layout.length > 0) {
-          const savedLayout = (data.box_label_layout as BoxLabelElement[]).filter(
-            el => el.id !== 'qr_code'
-          );
+          const savedLayout = data.box_label_layout as BoxLabelElement[];
           const migratedLayout = migrateOldLayout(savedLayout);
 
           const knownIds = new Set(DEFAULT_BOX_LABEL_LAYOUT.map(d => d.id));

@@ -341,7 +341,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
         const layoutRaw = settings.box_label_layout;
         const savedLayout = Array.isArray(layoutRaw) && layoutRaw.length > 0
-          ? layoutRaw.filter((el: { id: string }) => el.id !== 'qr_code')
+          ? layoutRaw
           : undefined;
 
         setBoxLabelConfig({
