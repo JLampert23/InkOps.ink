@@ -14,6 +14,7 @@ import {
   Pause,
   Play,
   AlertCircle,
+  Ban,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { WorkOrderService, WorkOrderLineItem, CustomInvoiceStatus } from '../../services/work-order-service';
@@ -159,6 +160,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [workflowTracking, setWorkflowTracking] = useState<WorkflowTracking | null>(null);
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [processingHold, setProcessingHold] = useState(false);
+  const [cancellingOrder, setCancellingOrder] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -507,6 +509,63 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!workOrder) return;
+
+    const confirmed = await confirm({
+      title: 'Cancel Order',
+      message: `Cancel work order ${workOrder.work_order_number}?\n\nThis will:\n• Mark the work order as "Cancelled"\n• Cancel the associated invoice (if any)\n• Remove from billing queue\n\nThis action can be reversed by changing the status.`,
+      confirmLabel: 'Cancel Order',
+      confirmVariant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    setCancellingOrder(true);
+    try {
+      const { error: woError } = await supabase
+        .from('work_orders')
+        .update({ status: 'Cancelled' })
+        .eq('id', workOrder.id);
+
+      if (woError) throw woError;
+
+      if (workOrder.quote_id) {
+        const { data: invoices } = await supabase
+          .from('printavo_invoices')
+          .select('id, invoice_number')
+          .filter('raw_data->>quote_id', 'eq', workOrder.quote_id);
+
+        if (invoices && invoices.length > 0) {
+          for (const inv of invoices) {
+            await supabase
+              .from('printavo_invoices')
+              .update({ status: 'Cancelled', status_stage: 'cancelled' })
+              .eq('id', inv.id);
+
+            await supabase
+              .from('billing_queue')
+              .update({ payment_status: 'cancelled' })
+              .eq('printavo_invoice_id', inv.id);
+          }
+        }
+
+        await supabase
+          .from('production_schedule_entries')
+          .delete()
+          .eq('quote_id', workOrder.quote_id);
+      }
+
+      addNotification('success', `Order ${workOrder.work_order_number} has been cancelled`);
+      await loadData();
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      addNotification('error', 'Failed to cancel order. Please try again.');
+    } finally {
+      setCancellingOrder(false);
+    }
+  };
+
   const handleDownloadPDF = async () => {
     if (!workOrder) return;
 
@@ -715,6 +774,17 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             <Printer className="w-3 h-3" />
             Print Box Label
           </button>
+          {workOrder.status !== 'Cancelled' && (
+            <button
+              onClick={handleCancelOrder}
+              disabled={cancellingOrder}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors disabled:opacity-50"
+              title="Cancel Order"
+            >
+              {cancellingOrder ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+              Cancel Order
+            </button>
+          )}
           <button
             onClick={handleDeleteWorkOrder}
             className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"

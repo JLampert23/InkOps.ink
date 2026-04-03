@@ -31,6 +31,7 @@ import {
   Lock,
   Unlock,
   Truck,
+  Ban,
 } from 'lucide-react';
 import { invoiceDetailService, InvoiceDetail as InvoiceDetailType } from '../../services/invoice-detail-service';
 import { billingService } from '../../services/billing-service';
@@ -132,6 +133,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   }>>([]);
   const [selectedRateIndex, setSelectedRateIndex] = useState<number | null>(null);
   const [buyingLabelWithRate, setBuyingLabelWithRate] = useState(false);
+  const [cancellingInvoice, setCancellingInvoice] = useState(false);
 
   useEffect(() => {
     loadInvoice();
@@ -397,6 +399,67 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       showNotification('error', 'Failed to revert invoice', err.message);
     } finally {
       setReverting(false);
+    }
+  };
+
+  const handleCancelInvoice = async () => {
+    if (!invoice) return;
+
+    const confirmed = await confirm({
+      title: 'Cancel Invoice?',
+      message: `Cancel invoice ${invoice.invoiceNumber}?\n\nThis will:\n- Mark the invoice as "Cancelled"\n- Cancel any associated work orders\n- Remove from billing queue\n\nThis action cannot be easily undone.`,
+      confirmLabel: 'Cancel Invoice',
+      cancelLabel: 'Keep Invoice',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    setCancellingInvoice(true);
+    try {
+      const { error: invError } = await supabase
+        .from('printavo_invoices')
+        .update({ status: 'Cancelled', status_stage: 'cancelled' })
+        .eq('id', invoice.id);
+
+      if (invError) throw invError;
+
+      if (invoice.billingQueueId) {
+        await supabase
+          .from('billing_queue')
+          .update({ payment_status: 'cancelled' })
+          .eq('id', invoice.billingQueueId);
+      }
+
+      const quoteId = invoice.rawData?.quote_id;
+      if (quoteId) {
+        const { data: workOrders } = await supabase
+          .from('work_orders')
+          .select('id, work_order_number')
+          .eq('quote_id', quoteId);
+
+        if (workOrders && workOrders.length > 0) {
+          for (const wo of workOrders) {
+            await supabase
+              .from('work_orders')
+              .update({ status: 'Cancelled' })
+              .eq('id', wo.id);
+          }
+        }
+
+        await supabase
+          .from('production_schedule_entries')
+          .delete()
+          .eq('quote_id', quoteId);
+      }
+
+      showNotification('success', 'Invoice cancelled successfully!');
+      await loadInvoice();
+    } catch (err: any) {
+      console.error('Error cancelling invoice:', err);
+      showNotification('error', 'Failed to cancel invoice', err.message);
+    } finally {
+      setCancellingInvoice(false);
     }
   };
 
@@ -1444,6 +1507,21 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                         <RotateCcw className="w-3.5 h-3.5" />
                       )}
                       Revert
+                    </button>
+                  )}
+
+                  {invoice.status !== 'Cancelled' && (
+                    <button
+                      onClick={handleCancelInvoice}
+                      disabled={cancellingInvoice}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                    >
+                      {cancellingInvoice ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Ban className="w-4 h-4" />
+                      )}
+                      Cancel Invoice
                     </button>
                   )}
                 </>
