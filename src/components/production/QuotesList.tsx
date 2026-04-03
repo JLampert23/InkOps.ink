@@ -279,7 +279,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
     if (statusFilter === 'all') {
       matchesStatus = true;
     } else if (statusFilter === 'active') {
-      matchesStatus = ['draft', 'sent'].includes(quote.status);
+      matchesStatus = true;
     } else if (statusFilter === 'approved') {
       matchesStatus = ['approved', 'converted'].includes(quote.status);
     } else {
@@ -290,7 +290,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
   });
 
   const stats = {
-    active: quotes.filter(q => ['draft', 'sent'].includes(q.status)).length,
+    active: quotes.length,
     draft: quotes.filter(q => q.status === 'draft').length,
     sent: quotes.filter(q => q.status === 'sent').length,
     approved: quotes.filter(q => ['approved', 'converted'].includes(q.status)).length,
@@ -333,7 +333,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
           } p-3 text-left cursor-pointer`}
         >
           <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.active}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Active</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">All Quotes</div>
         </button>
         <button
           onClick={() => setStatusFilter('draft')}

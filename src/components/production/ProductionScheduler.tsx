@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu } from 'lucide-react';
+import { Calendar, Filter, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 import SchedulerTabManager from './SchedulerTabManager';
@@ -66,7 +66,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [loading, setLoading] = useState(true);
-  const [draggedEntry, setDraggedEntry] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ entryId: string; field: string } | null>(null);
   const [previewArtwork, setPreviewArtwork] = useState<string | null>(null);
 
@@ -151,8 +150,8 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         .eq('type_of_work', typeOfWork)
         .gte('production_due_date', startDate)
         .lte('production_due_date', endDate)
-        .order('production_due_date', { ascending: true })
-        .order('priority_order', { ascending: true });
+        .order('quote_number', { ascending: true })
+        .order('imprint_number', { ascending: true });
 
       if (stationFilter) {
         query = query.eq('station', stationFilter);
@@ -273,33 +272,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
     }
   };
 
-  const handleDragStart = (e: React.DragEvent, entryId: string) => {
-    setDraggedEntry(entryId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = (e: React.DragEvent, targetDate: string, targetStation?: string) => {
-    e.preventDefault();
-
-    if (!draggedEntry) return;
-
-    const updates: Partial<ScheduleEntry> = {
-      production_due_date: targetDate,
-    };
-
-    if (targetStation !== undefined) {
-      updates.station = targetStation;
-    }
-
-    updateEntry(draggedEntry, updates);
-    setDraggedEntry(null);
-  };
-
   const handleStatusChange = (entryId: string, stepId: string, newStatus: string) => {
     const entry = entries.find(e => e.id === entryId);
     if (!entry) return;
@@ -321,31 +293,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   const handleDateChange = (entryId: string, newDate: string) => {
     updateEntry(entryId, { production_due_date: newDate });
     setEditingCell(null);
-  };
-
-  const handleDragEnd = (e: React.DragEvent, targetEntryId: string) => {
-    e.preventDefault();
-
-    if (!draggedEntry || draggedEntry === targetEntryId) {
-      setDraggedEntry(null);
-      return;
-    }
-
-    const draggedIndex = entries.findIndex(e => e.id === draggedEntry);
-    const targetIndex = entries.findIndex(e => e.id === targetEntryId);
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedEntry(null);
-      return;
-    }
-
-    const draggedItem = entries[draggedIndex];
-    const targetItem = entries[targetIndex];
-
-    updateEntry(draggedEntry, { priority_order: targetItem.priority_order });
-    updateEntry(targetEntryId, { priority_order: draggedItem.priority_order });
-
-    setDraggedEntry(null);
   };
 
   const getStatusColor = (stepId: string, statusName: string) => {
@@ -492,9 +439,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-8">
-                  {/* Drag handle */}
-                </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
                   Artwork
                 </th>
@@ -614,7 +558,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8 + workflowSteps.length} className="px-6 py-12 text-center">
+                  <td colSpan={7 + workflowSteps.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
                       <span className="text-sm text-gray-500 dark:text-gray-400">Loading schedule...</span>
@@ -623,7 +567,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={8 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs matching filters
                   </td>
                 </tr>
@@ -631,17 +575,8 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 filteredEntries.map((entry) => (
                   <tr
                     key={entry.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, entry.id)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDragEnd(e, entry.id)}
-                    className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${
-                      draggedEntry === entry.id ? 'opacity-50' : ''
-                    }`}
+                    className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                   >
-                    <td className="px-3 py-3">
-                      <GripVertical className="w-4 h-4 text-gray-400 cursor-move" />
-                    </td>
                     <td className="px-3 py-3">
                       {entry.artwork_thumb_url ? (
                         <button
