@@ -785,8 +785,9 @@ Deno.serve(async (req: Request) => {
         "2xl": item.qty_2xl || 0, "3xl": item.qty_3xl || 0, "4xl": item.qty_4xl || 0,
       });
 
-      const workOrderNumber = quote.quote_number;
-      const invoiceNumber = quote.quote_number;
+      const numericPart = quote.quote_number.replace(/^[A-Z]+-/, '');
+      const workOrderNumber = `WO-${numericPart}`;
+      const invoiceNumber = `INV-${numericPart}`;
 
       const garmentItems = lineItems?.filter((item: any) => item.line_type === "item" || !item.line_type) || [];
       const totalQuantity = garmentItems.reduce((sum: number, item: any) => sum + (sumQty(item) || item.quantity || 0), 0);
