@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileText, ClipboardList, CalendarDays, Package, Users, Calendar } from 'lucide-react';
 import { QuotesManager } from './QuotesManager';
 import { WorkOrdersManager } from './WorkOrdersManager';
@@ -97,13 +97,13 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
     setActiveTab('work-orders');
   };
 
-  const handleQuoteCustomerConsumed = () => {
+  const handleQuoteCustomerConsumed = useCallback(() => {
     setCustomerIdForQuote(undefined);
     setContactIdForQuote(undefined);
     if (onCustomerIdConsumed) {
       onCustomerIdConsumed();
     }
-  };
+  }, [onCustomerIdConsumed]);
 
   const renderTabContent = () => {
     switch (activeTab) {

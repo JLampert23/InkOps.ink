@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import QuotesList from './QuotesList';
 import QuoteDetail from './QuoteDetail';
 import { QuoteBuilder } from './QuoteBuilder';
@@ -16,9 +16,11 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | undefined>(initialCustomerId);
   const [preselectedContactId, setPreselectedContactId] = useState<string | undefined>(initialContactId);
+  const processedQuoteIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (initialQuoteId) {
+    if (initialQuoteId && initialQuoteId !== processedQuoteIdRef.current) {
+      processedQuoteIdRef.current = initialQuoteId;
       setSelectedQuoteId(initialQuoteId);
       setView('detail');
     } else if (initialCustomerId) {
