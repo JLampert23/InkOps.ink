@@ -336,7 +336,7 @@ export const stripeService = {
     try {
       const session = await getValidSession();
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/stripe-refund`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -344,14 +344,14 @@ export const stripeService = {
           'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
-          action: 'createRefund',
-          data: refund,
+          paymentId: refund.paymentId,
+          reason: refund.reason || 'requested_by_customer',
         }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to initiate refund');
+        throw new Error(error.error || error.details || 'Failed to initiate refund');
       }
     } catch (error) {
       console.error('Error initiating refund:', error);

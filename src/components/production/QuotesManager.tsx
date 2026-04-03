@@ -36,6 +36,9 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
       if (event.state?.quoteView === 'list') {
         setView('list');
         setSelectedQuoteId(null);
+      } else if (event.state?.quoteView === 'edit' && event.state?.quoteId) {
+        setView('edit');
+        setSelectedQuoteId(event.state.quoteId);
       } else if (event.state?.quoteView === 'detail' && event.state?.quoteId) {
         setView('detail');
         setSelectedQuoteId(event.state.quoteId);
@@ -59,6 +62,11 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
   const handleEditQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
     setView('edit');
+    window.history.pushState(
+      { quoteView: 'edit', quoteId },
+      '',
+      `#production/quotes/${quoteId}/edit`
+    );
   };
 
   const handleCreateQuote = () => {
@@ -73,7 +81,10 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
     setPreselectedCustomerId(undefined);
     setPreselectedContactId(undefined);
     setView('list');
-    window.history.back();
+    // Only go back if we have history to go back to
+    if (window.history.state?.quoteView) {
+      window.history.back();
+    }
   };
 
   if (view === 'detail' && selectedQuoteId) {

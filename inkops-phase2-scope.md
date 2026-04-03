@@ -29,13 +29,44 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 ## 📊 PHASE 2 PROGRESS TRACKER
 
-### Feature 1: Subscription Tiers — ⏸️ BLOCKED (waiting on client)
-**Status:** Cannot start until we get the following from the client:
-- [ ] **Stripe Price IDs** for the $199/month and $299/month products (from the InkOps Stripe account, NOT the Todd Sporting Goods one)
-- [ ] **Tier feature breakdown** — what does $199 get vs $299? Client is still deciding what the lower tier includes
-- [ ] **Confirmation** on whether he wants Stripe Checkout (redirect) or embedded payment form
+### Feature 1: Subscription Tiers — ⏸️ BLOCKED (waiting on Stripe Price IDs)
+**Status:** Client shared tier breakdown! Still need Stripe Price IDs to wire up checkout.
 
-> ✅ **We DO have:** Stripe access (just received). But we can't wire up checkout without the Price IDs and tier definitions.
+**Tier Breakdown (from client spreadsheet):**
+
+| Feature | Starter ($159/mo) | Professional ($299/mo) |
+|---|---|---|
+| Quote Management | ✅ | ✅ |
+| Product Catalog Integration | ✅ | ✅ |
+| Pricing Matrices | Basic (3) | Unlimited |
+| Work Order Management | ✅ | ✅ |
+| Production Kanban | ❌ | ✅ |
+| Production Scheduler | ❌ | ✅ |
+| Proof Management | ✅ | ✅ |
+| Mockup Generator | ✅ | ✅ |
+| Purchase Orders | ❌ | ✅ |
+| Auto PO Creation | ❌ | ✅ |
+| Receiving Workflow | ❌ | ✅ |
+| Invoice Management | ✅ | ✅ |
+| Stripe Payments | ✅ | ✅ |
+| Partial Payments | ❌ | ✅ |
+| Customer Portal | ❌ | ✅ |
+| Custom Domain | ❌ | ✅ |
+| ShipStation Integration | ❌ | ✅ |
+| Email Templates | Basic | ✅ |
+| Workflow Automation | ❌ | Unlimited |
+| Reports & Analytics | Basic | ✅ |
+| Automated Reports | ❌ | ✅ |
+| Chipply Integration | ❌ | ✅ |
+| User Seats | 2 users | 25 |
+| Support | Email | Priority + Phone |
+| API Access | ❌ | Full Access |
+
+**⚠️ Additional requirement:** Client said subscriptions must charge tax (Stripe Tax).
+
+**Still waiting on:**
+- [ ] **Stripe Price IDs** for both tiers (from the InkOps Stripe account)
+- [ ] **Confirmation** on checkout flow (Stripe Checkout redirect vs embedded)
 
 ---
 
@@ -77,8 +108,8 @@ No blockers. Can start when ready.
 
 ---
 
-### Feature 6: Payment Refund Fix — 🔧 IN PROGRESS
-Currently being worked on. Quick win.
+### Feature 6: Payment Refund Fix — ✅ DONE
+Fixed the endpoint. The frontend now correctly calls the `stripe-refund` edge function instead of the generic `stripe-proxy`, resolving the refund failures.
 
 ---
 
