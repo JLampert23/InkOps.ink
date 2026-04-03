@@ -39,6 +39,9 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
       } else if (event.state?.quoteView === 'edit' && event.state?.quoteId) {
         setView('edit');
         setSelectedQuoteId(event.state.quoteId);
+      } else if (event.state?.quoteView === 'create') {
+        setView('create');
+        setSelectedQuoteId(null);
       } else if (event.state?.quoteView === 'detail' && event.state?.quoteId) {
         setView('detail');
         setSelectedQuoteId(event.state.quoteId);
@@ -74,6 +77,11 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
     setPreselectedCustomerId(undefined);
     setPreselectedContactId(undefined);
     setView('create');
+    window.history.pushState(
+      { quoteView: 'create' },
+      '',
+      '#production/quotes/create'
+    );
   };
 
   const handleBack = () => {
