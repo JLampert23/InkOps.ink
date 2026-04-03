@@ -53,7 +53,7 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
       ` : '';
 
       const workOrderHtml = (config?.showWorkOrderNumber ?? true)
-        ? `<div style="font-size: 22pt; font-weight: bold; letter-spacing: 1px;">WO #${label.workOrderNumber}</div>`
+        ? `<div style="font-size: 22pt; font-weight: bold; letter-spacing: 1px;">${label.workOrderNumber}</div>`
         : '';
 
       const customerHtml = (config?.showCustomerName ?? true)
