@@ -878,6 +878,71 @@ Deno.serve(async (req: Request) => {
         } catch (conversionError: any) {
           console.error("Conversion workflow error:", conversionError.message);
         }
+      } else {
+        // Quote was rejected - clean up any existing work orders/invoices if they exist
+        try {
+          console.log(`Quote ${approval.quote_id} rejected - cleaning up any existing work orders/invoices`);
+
+          const { data: existingWOs } = await supabase
+            .from("work_orders")
+            .select("id, work_order_number")
+            .eq("quote_id", approval.quote_id);
+
+          if (existingWOs && existingWOs.length > 0) {
+            for (const wo of existingWOs) {
+              await supabase.from("work_order_line_items").delete().eq("work_order_id", wo.id);
+              console.log(`Deleted work order line items for WO: ${wo.work_order_number}`);
+            }
+
+            await supabase.from("production_schedule_entries").delete().eq("quote_id", approval.quote_id);
+            console.log(`Deleted production schedule entries for quote: ${approval.quote_id}`);
+
+            await supabase.from("garment_requirements_staging").delete().eq("quote_id", approval.quote_id);
+            console.log(`Deleted garment requirements staging for quote: ${approval.quote_id}`);
+
+            for (const wo of existingWOs) {
+              await supabase.from("work_orders").delete().eq("id", wo.id);
+              console.log(`Deleted work order: ${wo.work_order_number}`);
+            }
+          }
+
+          const { data: existingInvoices } = await supabase
+            .from("printavo_invoices")
+            .select("id, invoice_number")
+            .filter("raw_data->>quote_id", "eq", approval.quote_id);
+
+          if (existingInvoices && existingInvoices.length > 0) {
+            for (const inv of existingInvoices) {
+              await supabase.from("invoice_line_items").delete().eq("invoice_id", inv.id);
+              console.log(`Deleted invoice line items for INV: ${inv.invoice_number}`);
+
+              await supabase.from("billing_queue").delete().eq("printavo_invoice_id", inv.id);
+              console.log(`Deleted billing queue entry for INV: ${inv.invoice_number}`);
+
+              await supabase.from("printavo_invoices").delete().eq("id", inv.id);
+              console.log(`Deleted invoice: ${inv.invoice_number}`);
+            }
+          }
+
+          if ((existingWOs && existingWOs.length > 0) || (existingInvoices && existingInvoices.length > 0)) {
+            await supabase
+              .from("quote_activity_log")
+              .insert([{
+                quote_id: approval.quote_id,
+                company_id: approval.company_id,
+                action: "cleanup_after_rejection",
+                performed_by: null,
+                performed_by_name: "System",
+                meta: {
+                  work_orders_deleted: existingWOs?.map(wo => wo.work_order_number) || [],
+                  invoices_deleted: existingInvoices?.map(inv => inv.invoice_number) || [],
+                },
+              }]);
+          }
+
+        } catch (cleanupError: any) {
+          console.error("Cleanup error on rejection:", cleanupError.message);
+        }
       }
 
       return new Response(

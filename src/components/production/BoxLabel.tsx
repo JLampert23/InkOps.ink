@@ -109,7 +109,7 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
 
       case 'work_order_number':
         if (!el.visible || !mergedConfig.showWorkOrderNumber) return null;
-        return `WO #${workOrderNumber}`;
+        return workOrderNumber;
 
       case 'customer_name':
         if (!el.visible || !mergedConfig.showCustomerName) return null;
