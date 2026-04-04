@@ -236,9 +236,9 @@ export default function WorkflowBuilder({ workTypeId, workTypeName, companyId, o
             {steps.map((step, stepIndex) => (
               <div
                 key={stepIndex}
-                className="bg-slate-900 dark:bg-slate-900 rounded-lg border border-gray-700"
+                className="bg-gray-100 dark:bg-slate-900 rounded-lg border border-gray-300 dark:border-gray-700"
               >
-                <div className="flex items-center gap-3 p-3 bg-slate-800 dark:bg-slate-800 rounded-t-lg border-b border-gray-700">
+                <div className="flex items-center gap-3 p-3 bg-gray-200 dark:bg-slate-800 rounded-t-lg border-b border-gray-300 dark:border-gray-700">
                   <GripVertical
                     className="w-5 h-5 text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0"
                     draggable
@@ -249,12 +249,12 @@ export default function WorkflowBuilder({ workTypeId, workTypeName, companyId, o
                     type="text"
                     value={step.step_name}
                     onChange={(e) => updateStepName(stepIndex, e.target.value)}
-                    className="flex-1 px-3 py-1.5 text-sm font-medium bg-slate-700 border border-gray-600 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-white"
+                    className="flex-1 px-3 py-1.5 text-sm font-medium bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 dark:text-white"
                     placeholder="Step Name"
                   />
                   <button
                     onClick={() => deleteStep(stepIndex)}
-                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors flex-shrink-0"
+                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-300 dark:hover:bg-slate-700 rounded transition-colors flex-shrink-0"
                     title="Delete Step"
                   >
                     <X className="w-5 h-5" />
@@ -269,14 +269,14 @@ export default function WorkflowBuilder({ workTypeId, workTypeName, companyId, o
                       onDragStart={() => handleStatusDragStart(stepIndex, statusIndex)}
                       onDragOver={(e) => handleStatusDragOver(e, stepIndex, statusIndex)}
                       onDragEnd={handleStatusDragEnd}
-                      className="flex items-center gap-3 p-2 bg-slate-800 rounded hover:bg-slate-750 transition-colors"
+                      className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-slate-800 rounded hover:bg-gray-100 dark:hover:bg-slate-750 transition-colors"
                     >
                       <GripVertical className="w-4 h-4 text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0" />
                       <input
                         type="text"
                         value={status.name}
                         onChange={(e) => updateStatusName(stepIndex, statusIndex, e.target.value)}
-                        className="flex-1 px-3 py-1.5 text-sm bg-slate-700 border border-gray-600 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-white"
+                        className="flex-1 px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 dark:text-white"
                         placeholder="Status Name"
                       />
                       <div className="flex items-center gap-2">
@@ -284,20 +284,20 @@ export default function WorkflowBuilder({ workTypeId, workTypeName, companyId, o
                           type="color"
                           value={status.color}
                           onChange={(e) => updateStatusColor(stepIndex, statusIndex, e.target.value)}
-                          className="w-8 h-8 rounded border border-gray-600 cursor-pointer bg-slate-700"
+                          className="w-8 h-8 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
                           style={{ backgroundColor: status.color }}
                         />
                         <input
                           type="text"
                           value={status.color.toUpperCase()}
                           onChange={(e) => updateStatusColor(stepIndex, statusIndex, e.target.value)}
-                          className="w-24 px-2 py-1.5 text-xs font-mono bg-slate-700 border border-gray-600 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-white uppercase"
+                          className="w-24 px-2 py-1.5 text-xs font-mono bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 dark:text-white uppercase"
                           placeholder="#000000"
                         />
                       </div>
                       <button
                         onClick={() => deleteStatus(stepIndex, statusIndex)}
-                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors flex-shrink-0"
+                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition-colors flex-shrink-0"
                         title="Delete Status"
                       >
                         <X className="w-5 h-5" />
@@ -307,7 +307,7 @@ export default function WorkflowBuilder({ workTypeId, workTypeName, companyId, o
 
                   <button
                     onClick={() => addStatus(stepIndex)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-sm text-gray-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded border border-dashed border-gray-600 hover:border-gray-500 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 rounded border border-dashed border-gray-400 dark:border-gray-600 hover:border-gray-500 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Add a Status
@@ -318,7 +318,7 @@ export default function WorkflowBuilder({ workTypeId, workTypeName, companyId, o
 
             <button
               onClick={addStep}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-600 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-500 dark:hover:border-gray-500 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-500 dark:hover:border-gray-500 transition-colors"
             >
               <Plus className="w-5 h-5" />
               <span className="text-sm font-medium">Add a Step</span>
