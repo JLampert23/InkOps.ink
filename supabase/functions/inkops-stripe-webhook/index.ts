@@ -10,8 +10,8 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const masterStripeKey = Deno.env.get('INKOPS_MASTER_STRIPE_KEY') || '';
-const webhookSecret = Deno.env.get('INKOPS_STRIPE_WEBHOOK_SECRET') || '';
+const masterStripeKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
+const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
