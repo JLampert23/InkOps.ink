@@ -1,0 +1,20 @@
+﻿4012b0b Merge branch 'InkOps-Production' of https://github.com/JLampert23/InkOps.ink into InkOps-Production
+d87b923 Fix QuotesManager popstate for create view.
+495ecf2 Merge pull request #26 from JLampert23/main
+d27ec54 Merge branch 'main' of https://github.com/JLampert23/InkOps.ink
+62e6f3f Fix MockupGenerator navigation bug and Refund API endpoint. Update scope with subscription tiers.
+337ed23 Updated LabelPreviewModal.tsx
+c549634 Remove QR code from box labels
+0f4b55d Fix artwork URLs in scheduler entries
+b772392 Added 20260403133912_backfill_scheduler_artwork_from_imprints.sql
+e8a18b9 Fix quote-actions prefixes & data migration
+dfee153 Add quote rejection cleanup & order/invoice cancel
+2f7a732 Update 'All Quotes' tab: rename & content
+806c263 Updated QuoteBuilder.tsx
+93bc918 Merge branch 'InkOps-Production' of https://github.com/JLampert23/InkOps.ink into InkOps-Production
+a7368b7 Merge main into InkOps-Production: Phase 2 RBAC + client portal updates
+e01978c Phase 2: Implement RBAC user role gating (super_admin, admin, user)
+323305d Updated MockupGenerator.tsx
+584cdc7 Merge pull request #25 from JLampert23/main
+c0d48c8 Updated App.tsx
+d1d203b Added 20260402191100_fix_verify_password_case_insensitive.sql

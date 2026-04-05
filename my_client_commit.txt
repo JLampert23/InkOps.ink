@@ -1,0 +1,65 @@
+﻿806c263 Updated QuoteBuilder.tsx
+diff --git a/src/components/production/QuoteBuilder.tsx b/src/components/production/QuoteBuilder.tsx
+index 9655218..8f4afc8 100644
+--- a/src/components/production/QuoteBuilder.tsx
++++ b/src/components/production/QuoteBuilder.tsx
+@@ -258,6 +258,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
+   };
+ 
+   const [quoteNumber, setQuoteNumber] = useState('');
++  const [quoteStatus, setQuoteStatus] = useState<string>('draft');
+   const [createdDate, setCreatedDate] = useState(new Date().toISOString().split('T')[0]);
+   const [productionDueDate, setProductionDueDate] = useState('');
+   const [customerDueDate, setCustomerDueDate] = useState('');
+@@ -656,6 +657,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
+ 
+     if (quote) {
+       setQuoteNumber(quote.quote_number || '');
++      setQuoteStatus(quote.status || 'draft');
+       setSelectedCustomerId(quote.customer_id || '');
+       setSelectedContactId(quote.contact_id || '');
+       if (quote.customer_id) {
+@@ -2061,7 +2063,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
+         customer_name: customerData?.company_name || 'Draft Quote',
+         customer_email: customerData?.email || null,
+         customer_phone: customerData?.phone || null,
+-        status: statusOverride || 'draft',
++        status: statusOverride || quoteStatus || 'draft',
+         created_date: createdDate,
+         production_due_date: productionDueDate || null,
+         customer_due_date: customerDueDate || null,
+diff --git a/src/components/production/QuoteDetail.tsx b/src/components/production/QuoteDetail.tsx
+index 3b755a0..86132f8 100644
+--- a/src/components/production/QuoteDetail.tsx
++++ b/src/components/production/QuoteDetail.tsx
+@@ -593,7 +593,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
+           </span>
+         </div>
+         <div className="flex items-center gap-1.5">
+-          {(quote.status === 'draft' || quote.status === 'sent') && (
++          {(quote.status === 'draft' || quote.status === 'sent' || quote.status === 'rejected') && (
+             <button
+               onClick={onEdit}
+               className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+@@ -677,6 +677,21 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
+         </div>
+       )}
+ 
++      {/* Rejected Banner */}
++      {quote.status === 'rejected' && (
++        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-3">
++          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
++          <div>
++            <p className="text-red-800 dark:text-red-300 text-sm font-medium">
++              This quote was rejected by the customer.
++            </p>
++            <p className="text-red-700 dark:text-red-400 text-xs mt-1">
++              Click "Edit Quote" to make changes, then "Resend" to send the revised quote for approval.
++            </p>
++          </div>
++        </div>
++      )}
++
+       {/* Traditional Invoice Layout */}
+       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+         {/* Customer Info and Quote Details */}

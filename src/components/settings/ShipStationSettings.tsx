@@ -3,6 +3,8 @@ import { Package, Save, Loader2, AlertCircle, CheckCircle, Eye, EyeOff, TestTube
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { encryptToken, decryptToken } from '../../services/crypto-service';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import { UpgradeWall } from '../common/UpgradeWall';
 
 interface ShipStationSettingsData {
   api_key: string;
@@ -33,6 +35,7 @@ export function ShipStationSettings() {
   const [showApiSecret, setShowApiSecret] = useState(false);
   const [companySettingsId, setCompanySettingsId] = useState<string | null>(null);
   const [hasCredentials, setHasCredentials] = useState(false);
+  const { canAccess } = useSubscription();
 
   const [settings, setSettings] = useState<ShipStationSettingsData>({
     api_key: '',
@@ -260,6 +263,18 @@ export function ShipStationSettings() {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!canAccess('shipstation')) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 text-center">
+        <UpgradeWall
+          title="ShipStation Integration"
+          description="Connect your ShipStation account to manage order fulfillment and generate shipping labels directly from InkOps."
+          icon={Package}
+        />
       </div>
     );
   }

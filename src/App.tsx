@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { ConfirmationProvider } from './contexts/ConfirmationContext';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { ConfirmationProvider } from './contexts/ConfirmationContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { FeaturesPage } from './components/FeaturesPage';
@@ -911,13 +913,15 @@ function App() {
 
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <NotificationProvider>
-          <ConfirmationProvider>
-            <AuthenticatedApp />
-          </ConfirmationProvider>
-        </NotificationProvider>
-      </ThemeProvider>
+      <SubscriptionProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            <ConfirmationProvider>
+              <AuthenticatedApp />
+            </ConfirmationProvider>
+          </NotificationProvider>
+        </ThemeProvider>
+      </SubscriptionProvider>
     </AuthProvider>
   );
 }
