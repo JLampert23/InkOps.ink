@@ -3,6 +3,8 @@ import { Calendar, Filter, ChevronLeft, ChevronRight, X, RefreshCw, LayoutGrid, 
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isSameDay, subWeeks, addWeeks, subMonths, addMonths, endOfWeek } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import { UpgradeWall } from '../common/UpgradeWall';
 import KanbanBoard from './KanbanBoard';
 
 interface KanbanJob {
@@ -31,6 +33,29 @@ interface KanbanCalendarProps {
 
 export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOrder, inline = false }: KanbanCalendarProps) {
   const [topView, setTopView] = useState<TopLevelView>('board');
+  const { canAccess } = useSubscription();
+
+  if (!canAccess('production_kanban')) {
+    return (
+      <div className={inline ? "flex items-center justify-center h-full min-h-[500px]" : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"}>
+        <div className={inline ? "w-full h-full max-w-4xl mx-auto" : "w-full max-w-4xl relative"}>
+          {!inline && onClose && (
+            <button
+              onClick={onClose}
+              className="absolute -top-12 right-0 p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          )}
+          <UpgradeWall
+            title="Kanban Board & Calendar"
+            description="Visually schedule your production floor, drag-and-drop jobs across dates, and manage your shop's full capacity."
+            icon={Calendar}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (inline) {
     return (

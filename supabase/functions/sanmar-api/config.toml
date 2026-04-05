@@ -1,0 +1,2 @@
+[function.sanmar-api]
+verify_jwt = false

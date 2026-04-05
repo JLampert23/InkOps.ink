@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 import SchedulerTabManager from './SchedulerTabManager';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import { UpgradeWall } from '../common/UpgradeWall';
 
 interface ScheduleEntry {
   id: string;
@@ -63,6 +65,8 @@ interface ProductionSchedulerProps {
 
 export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder }: ProductionSchedulerProps) {
   const { user, companySettings } = useAuth();
+  const { canAccess } = useSubscription();
+
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -335,6 +339,16 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workflow Steps</h3>
         <p className="text-gray-600 dark:text-gray-400">Configure workflow steps for {typeOfWork} in Settings to use the scheduler</p>
       </div>
+    );
+  }
+
+  if (!canAccess('production_scheduler')) {
+    return (
+      <UpgradeWall 
+        title="Production Scheduler" 
+        description="Get full spreadsheet-style scheduling, station assignments, custom workflows, and deep filters." 
+        icon={CalendarDays} 
+      />
     );
   }
 

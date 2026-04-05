@@ -7,6 +7,8 @@ import { GarmentOrderReport } from './GarmentOrderReport';
 import { ReceivingDashboard } from './ReceivingDashboard';
 import { ReceiveGoods } from './ReceiveGoods';
 import { ManageGoodsDashboard } from './ManageGoodsDashboard';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import { UpgradeWall } from '../common/UpgradeWall';
 
 type View = 'list' | 'create' | 'detail';
 type Tab = 'dashboard' | 'purchase-orders' | 'garment-report' | 'receiving';
@@ -21,6 +23,21 @@ export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersM
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
+  const { canAccess } = useSubscription();
+
+  if (!canAccess('purchase_orders')) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[500px] p-6">
+        <div className="w-full max-w-4xl mx-auto">
+          <UpgradeWall
+            title="Purchase Orders & Receiving"
+            description="Create electronic Purchase Orders, generate them automatically from needs, and use our receiving workflow to verify shipments."
+            icon={Package}
+          />
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateNew = () => {
     setCurrentView('create');

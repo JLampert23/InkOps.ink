@@ -1,0 +1,43 @@
+﻿commit 323305de10e2c2bfebff01ee065bacf6ca7f31d7
+Author: Jlampert23 <jamiemlampert23@gmail.com>
+Date:   Thu Apr 2 18:46:32 2026 -0400
+
+    Updated MockupGenerator.tsx
+
+diff --git a/src/components/production/MockupGenerator.tsx b/src/components/production/MockupGenerator.tsx
+index 4bb823a..132e50a 100644
+--- a/src/components/production/MockupGenerator.tsx
++++ b/src/components/production/MockupGenerator.tsx
+@@ -455,14 +455,28 @@ export default function MockupGenerator({
+         .from('user_profiles')
+         .select('company_id')
+         .eq('id', user.id)
+-        .single();
++        .maybeSingle();
+ 
+       if (profileError) {
+         console.error('MockupGenerator: Error getting profile:', profileError);
+-        throw new Error('Profile error: ' + profileError.message);
+       }
+-      if (!profile) throw new Error('Profile not found');
+-      setCompanyId(profile.company_id);
++
++      let resolvedCompanyId = profile?.company_id;
++
++      if (!resolvedCompanyId && quoteId) {
++        const { data: quoteData } = await supabase
++          .from('quotes')
++          .select('company_id')
++          .eq('id', quoteId)
++          .maybeSingle();
++        resolvedCompanyId = quoteData?.company_id;
++      }
++
++      if (!resolvedCompanyId) {
++        throw new Error('Unable to determine company context');
++      }
++
++      setCompanyId(resolvedCompanyId);
+ 
+       // Track typeOfWork locally during loading since state updates are async
+       let loadedTypeOfWork = '';

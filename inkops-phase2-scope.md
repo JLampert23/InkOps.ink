@@ -66,8 +66,7 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 **Payment Method chosen by client:** 🛡️ Stripe Checkout (Redirect)
 
-**Still waiting on:**
-- [ ] **Stripe Price IDs** for both tiers (from the InkOps Stripe account)
+*Note: We have Stripe access and will retrieve the Price IDs ourselves.*
 
 ---
 

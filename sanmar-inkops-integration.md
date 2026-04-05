@@ -1,4 +1,4 @@
-# InkOps — Project Brief (Updated)
+ # InkOps — Project Brief (Updated)
 
 ## What InkOps Is
 A SaaS platform for the screen printing & embroidery industry.  
