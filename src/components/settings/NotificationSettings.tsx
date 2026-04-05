@@ -294,18 +294,16 @@ export default function NotificationSettings() {
 
               <NotificationToggle
                 label="Payment Received"
-                description="Get notified when a payment is received (coming soon)"
+                description="Get notified when a payment is received"
                 enabled={preferences.payment_received_enabled}
                 onChange={() => handleToggle('payment_received_enabled')}
-                disabled
               />
 
               <NotificationToggle
                 label="Production Completed"
-                description="Get notified when a production job is completed (coming soon)"
+                description="Get notified when a production job is completed"
                 enabled={preferences.production_completed_enabled}
                 onChange={() => handleToggle('production_completed_enabled')}
-                disabled
               />
             </div>
           </div>
