@@ -680,4 +680,34 @@ export const stripeService = {
       throw error;
     }
   },
+
+  async createSubscriptionCheckout(productId: string, companyId: string): Promise<string> {
+    try {
+      const session = await getValidSession();
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-subscription-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          productId,
+          companyId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Failed to create subscription checkout');
+      }
+
+      const result = await response.json();
+      return result.url;
+    } catch (error) {
+      console.error('Error creating subscription checkout:', error);
+      throw error;
+    }
+  },
 };

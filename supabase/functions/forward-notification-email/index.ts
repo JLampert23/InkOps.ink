@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
 
     // Fetch company settings to get forwarding email and Resend API key
     const settingsResponse = await fetch(
-      `${supabaseUrl}/rest/v1/company_settings?id=eq.${company_id}&select=notification_forwarding_email,notification_forwarding_enabled,resend_api_key,email_from_address`,
+      `${supabaseUrl}/rest/v1/company_settings?id=eq.${company_id}&select=notification_forwarding_email,notification_forwarding_enabled,resend_api_key,email_from_address,secondary_email_from_address,quote_email_sender`,
       {
         headers: {
           "apikey": supabaseServiceKey,
@@ -149,7 +149,10 @@ Deno.serve(async (req: Request) => {
     const resendApiKey = decrypted;
 
     // Build email content
-    const fromAddress = companySettings.email_from_address || "notifications@inkops.com";
+    let fromAddress = companySettings.email_from_address || "notifications@inkops.com";
+    if (companySettings.quote_email_sender === 'primary' && companySettings.secondary_email_from_address) {
+        fromAddress = companySettings.secondary_email_from_address;
+    }
 
     let emailBody = `
       <h2>${title}</h2>

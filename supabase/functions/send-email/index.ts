@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('resend_api_key, email_from_address, company_name')
+      .select('resend_api_key, email_from_address, secondary_email_from_address, quote_email_sender, company_name')
       .eq('id', companyId)
       .maybeSingle();
 
@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!companySettings.email_from_address) {
-      throw new Error('From email address not configured. Please add it in Account Settings.');
+      throw new Error('Primary from email address not configured. Please add it in Account Settings.');
     }
 
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
@@ -195,12 +195,33 @@ Deno.serve(async (req: Request) => {
       console.error('Decrypted API key does not have expected format. Key may have been encrypted with a different ENCRYPTION_KEY.');
       throw new Error('Resend API key decryption failed. Please re-enter your Resend API key in Account Settings to re-encrypt it.');
     }
-    const fromEmail = companySettings.email_from_address;
-    const rawFromName = companySettings.company_name || '';
-    const fromName = rawFromName.replace(/[^\x00-\x7F]/g, '').trim();
 
     const emailRequest: EmailRequest = await req.json();
     const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
+
+    // Determine the correct from email address logic
+    let fromEmail = companySettings.email_from_address;
+    
+    // Check if this is a quote/invoice email based on the template
+    const isQuoteOrInvoiceEmail = 
+      template === 'invoice-reminder' || 
+      template === 'payment-received' || 
+      template === 'overdue-notice' || 
+      (typeof emailRequest.data?.quote_number !== 'undefined') ||
+      (typeof emailRequest.data?.invoiceNumber !== 'undefined');
+
+    // If it's a quote/invoice and they have a secondary email selected for quotes
+    if (isQuoteOrInvoiceEmail && companySettings.quote_email_sender === 'secondary' && companySettings.secondary_email_from_address) {
+      fromEmail = companySettings.secondary_email_from_address;
+    }
+    // Alternatively if this is NOT a quote (e.g. system alert) and they chose secondary for alerts
+    else if (!isQuoteOrInvoiceEmail && companySettings.quote_email_sender === 'primary' && companySettings.secondary_email_from_address) {
+        // If quote sender is primary, maybe secondary is meant for system alerts
+        fromEmail = companySettings.secondary_email_from_address;
+    }
+
+    const rawFromName = companySettings.company_name || '';
+    const fromName = rawFromName.replace(/[^\x00-\x7F]/g, '').trim();
 
     if (!to || !subject) {
       return new Response(

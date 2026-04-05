@@ -199,6 +199,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [resendApiKey, setResendApiKey] = useState('');
   const [showResendKey, setShowResendKey] = useState(false);
   const [emailFromAddress, setEmailFromAddress] = useState('');
+  const [secondaryEmailFromAddress, setSecondaryEmailFromAddress] = useState('');
+  const [quoteEmailSender, setQuoteEmailSender] = useState<'primary' | 'secondary'>('primary');
   const [savingResend, setSavingResend] = useState(false);
   const [testingResend, setTestingResend] = useState(false);
   const [resendTestResult, setResendTestResult] = useState<any>(null);
@@ -515,6 +517,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSquareApplicationId(data.square_application_id || '');
         setSquareLocationId(data.square_location_id || '');
         setEmailFromAddress(data.email_from_address || '');
+        setSecondaryEmailFromAddress(data.secondary_email_from_address || '');
+        setQuoteEmailSender(data.quote_email_sender || 'primary');
         setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
         setCustomerUrl(data.customer_url || '');
         setVerificationStatus(data.customer_url_verification_status || 'unverified');
@@ -1128,6 +1132,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (emailFromAddress.trim()) {
         settingsData.email_from_address = emailFromAddress.trim();
       }
+
+      settingsData.secondary_email_from_address = secondaryEmailFromAddress.trim() || null;
+      settingsData.quote_email_sender = quoteEmailSender;
 
       if (!companySettings?.id) {
         showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
@@ -4762,19 +4769,56 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </p>
                 </div>
 
-                <div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Primary Sender Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={emailFromAddress}
+                      onChange={(e) => setEmailFromAddress(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="invoices@yourdomain.com"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Must use a verified domain
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Secondary Sender Address
+                    </label>
+                    <input
+                      type="email"
+                      value={secondaryEmailFromAddress}
+                      onChange={(e) => setSecondaryEmailFromAddress(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="alerts@yourdomain.com"
+                    />
+                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Optional: Use for system notifications or alerts
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    From Email Address <span className="text-red-500">*</span>
+                    Default Sender for Quotes & Invoices
                   </label>
-                  <input
-                    type="email"
-                    value={emailFromAddress}
-                    onChange={(e) => setEmailFromAddress(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="invoices@yourdomain.com"
-                  />
+                  <select
+                    value={quoteEmailSender}
+                    onChange={(e) => setQuoteEmailSender(e.target.value as 'primary' | 'secondary')}
+                    className="w-full max-w-sm px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="primary">Primary Address ({emailFromAddress || 'Unconfigured'})</option>
+                    <option value="secondary" disabled={!secondaryEmailFromAddress}>
+                      Secondary Address ({secondaryEmailFromAddress || 'Unconfigured'})
+                    </option>
+                  </select>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Must use an email address from your verified domain (e.g., invoices@toddssportinggoods.com)
+                    System notifications & alerts will automatically use the other address.
                   </p>
                 </div>
 

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, Zap, ArrowRight, Shield, Star, CheckCircle } from 'lucide-react';
+import { Lock, Zap, ArrowRight, Shield, Star, CheckCircle, Loader2 } from 'lucide-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { stripeService } from '../../services/stripe-service';
 
 interface UpgradeWallProps {
   title: string;
@@ -10,7 +12,9 @@ interface UpgradeWallProps {
 
 export function UpgradeWall({ title, description, icon: Icon = Lock }: UpgradeWallProps) {
   const { tier } = useSubscription();
+  const { profile } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // If they are somehow already pro, we shouldn't show this, but just in case
   if (tier === 'professional') return null;
@@ -69,14 +73,34 @@ export function UpgradeWall({ title, description, icon: Icon = Lock }: UpgradeWa
           <button
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onClick={() => {
-              // TODO: Integrate Stripe Checkout Redirect here
-              alert('Redirecting to Stripe Checkout...');
+            disabled={isLoading || !profile?.company_id}
+            onClick={async () => {
+              try {
+                if (!profile?.company_id) return;
+                setIsLoading(true);
+                // InkOps Pro Test Product ID that the user provided
+                const checkoutUrl = await stripeService.createSubscriptionCheckout('prod_UAfSjOXHcF7qpk', profile.company_id);
+                window.location.href = checkoutUrl;
+              } catch (error) {
+                console.error(error);
+                alert('Failed to start checkout: ' + (error instanceof Error ? error.message : 'Unknown error'));
+              } finally {
+                setIsLoading(false);
+              }
             }}
-            className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-lg transition-all duration-300 shadow-[0_0_40px_rgba(79,70,229,0.3)] hover:shadow-[0_0_60px_rgba(79,70,229,0.5)] hover:-translate-y-1 w-full sm:w-auto"
+            className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-lg transition-all duration-300 shadow-[0_0_40px_rgba(79,70,229,0.3)] hover:shadow-[0_0_60px_rgba(79,70,229,0.5)] hover:-translate-y-1 w-full sm:w-auto disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            Upgrade Now - 14 Days Free
-            <ArrowRight className={`w-5 h-5 transition-transform duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Preparing Checkout...
+              </>
+            ) : (
+              <>
+                Upgrade Now - 14 Days Free
+                <ArrowRight className={`w-5 h-5 transition-transform duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
+              </>
+            )}
           </button>
           <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
             <Shield className="w-4 h-4" /> Secure payment via Stripe
