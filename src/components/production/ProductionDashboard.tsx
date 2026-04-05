@@ -216,11 +216,19 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id);
+                  const state = { 
+                    productionTab: tab.id, 
+                    quoteView: 'list', 
+                    workOrderView: 'list',
+                    poView: 'list'
+                  };
                   window.history.pushState(
-                    { productionTab: tab.id },
+                    state,
                     '',
                     `#production/${tab.id}`
                   );
+                  // Fire popstate manually so child components reset to list view
+                  window.dispatchEvent(new PopStateEvent('popstate', { state }));
                 }}
                 className={`p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
                   isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''
