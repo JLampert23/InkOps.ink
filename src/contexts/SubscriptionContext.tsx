@@ -7,6 +7,7 @@ interface SubscriptionContextType {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   loading: boolean;
+  requiresSubscription: boolean;
   canAccess: (feature: keyof typeof TIER_FEATURES) => boolean;
   refreshSubscription: () => Promise<void>;
 }
@@ -18,11 +19,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [tier, setTier] = useState<SubscriptionTier>('starter');
   const [status, setStatus] = useState<SubscriptionStatus>('trialing');
   const [loading, setLoading] = useState(true);
+  const [requiresSubscription, setRequiresSubscription] = useState(false);
 
   const fetchSubscription = async () => {
     if (!user) {
       setTier('starter');
       setStatus('trialing');
+      setRequiresSubscription(false);
       setLoading(false);
       return;
     }
@@ -40,13 +43,23 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         // Then get subscription info from company_settings
         const { data: settings } = await supabase
           .from('company_settings')
-          .select('subscription_tier, subscription_status')
+          .select('subscription_tier, subscription_status, stripe_subscription_id')
           .eq('id', profile.company_id)
           .maybeSingle();
 
         if (settings) {
           setTier((settings.subscription_tier as SubscriptionTier) || 'starter');
           setStatus((settings.subscription_status as SubscriptionStatus) || 'trialing');
+
+          // Hard Paywall logic: if they have no stripe_subscription_id, they must pick a plan.
+          // Option B requested by user: everyone must have a stripe_subscription_id to enter.
+          if (!settings.stripe_subscription_id) {
+            setRequiresSubscription(true);
+          } else {
+            setRequiresSubscription(false);
+          }
+        } else {
+          setRequiresSubscription(true);
         }
       }
     } catch (error) {
@@ -78,6 +91,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       tier,
       status,
       loading,
+      requiresSubscription,
       canAccess,
       refreshSubscription: fetchSubscription
     }}>

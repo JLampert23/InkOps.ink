@@ -52,14 +52,18 @@ Deno.serve(async (req: Request) => {
       case 'checkout.session.completed': {
         const session = event.data.object;
         const companyId = session.metadata?.company_id;
+        const tier = session.metadata?.tier || 'professional';
+        const subscriptionId = session.subscription as string;
 
         if (companyId) {
-          console.log(`Upgrading company ${companyId} due to successful checkout session.`);
+          console.log(`Upgrading company ${companyId} to ${tier} tier due to successful checkout session.`);
           
           await supabase
             .from('company_settings')
             .update({
-              subscription_tier: 'professional',
+              subscription_tier: tier,
+              stripe_subscription_id: subscriptionId || null,
+              subscription_status: 'active',
             })
             .eq('id', companyId);
         }

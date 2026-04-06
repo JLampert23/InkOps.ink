@@ -81,6 +81,7 @@ Deno.serve(async (req: Request) => {
       metadata: {
         company_id: companyId,
         user_id: user.id,
+        tier: productId === 'prod_UAfSjOXHcF7qpk' ? 'professional' : 'starter',
       },
     });
 
