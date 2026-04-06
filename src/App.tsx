@@ -5,8 +5,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { ConfirmationProvider } from './contexts/ConfirmationContext';
-import { SubscriptionProvider } from './contexts/SubscriptionContext';
-import { ConfirmationProvider } from './contexts/ConfirmationContext';
+import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
+import { HardPaywall } from './components/billing/HardPaywall';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { FeaturesPage } from './components/FeaturesPage';
@@ -928,6 +928,7 @@ function App() {
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
+  const { requiresSubscription, loading: subscriptionLoading } = useSubscription();
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
@@ -938,18 +939,20 @@ function AuthenticatedApp() {
   }, []);
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !subscriptionLoading) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           hideInitialLoader();
         });
       });
     }
-  }, [loading]);
+  }, [loading, subscriptionLoading]);
 
-  if (loading) {
+  if (loading || (user && subscriptionLoading)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      </div>
     );
   }
 
@@ -958,6 +961,10 @@ function AuthenticatedApp() {
       return <EnhancedAuthScreen onBackClick={() => setShowLogin(false)} />;
     }
     return <LandingPage onLoginClick={() => setShowLogin(true)} />;
+  }
+
+  if (requiresSubscription) {
+    return <HardPaywall />;
   }
 
   return <AppContent />;
