@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase-client';
 
 export function HardPaywall() {
-  const { userProfile } = useAuth();
+  const { userProfile } = useAuth(); 
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
   const handleSubscribe = async (tier: string) => {

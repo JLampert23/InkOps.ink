@@ -332,16 +332,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
     );
   }
 
-  if (workflowSteps.length === 0) {
-    return (
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
-        <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workflow Steps</h3>
-        <p className="text-gray-600 dark:text-gray-400">Configure workflow steps for {typeOfWork} in Settings to use the scheduler</p>
-      </div>
-    );
-  }
-
   if (!canAccess('production_scheduler')) {
     return (
       <UpgradeWall 
@@ -349,6 +339,16 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         description="Get full spreadsheet-style scheduling, station assignments, custom workflows, and deep filters." 
         icon={CalendarDays} 
       />
+    );
+  }
+
+  if (workflowSteps.length === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
+        <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workflow Steps</h3>
+        <p className="text-gray-600 dark:text-gray-400">Configure workflow steps for {typeOfWork} in Settings to use the scheduler</p>
+      </div>
     );
   }
 
