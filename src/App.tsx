@@ -6,7 +6,6 @@ import { NotificationProvider, useNotification } from './contexts/NotificationCo
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { ConfirmationProvider } from './contexts/ConfirmationContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
-import { ConfirmationProvider } from './contexts/ConfirmationContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { FeaturesPage } from './components/FeaturesPage';
