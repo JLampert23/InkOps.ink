@@ -12,6 +12,19 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const masterStripeKey = Deno.env.get('STRIPE_SECRET_KEY') || '';
 
+const TIER_CONFIG = {
+  starter: {
+    name: 'InkOps Starter',
+    description: 'Core quoting, invoicing, and production tracking for growing print shops.',
+    amount: 19900, // $199.00
+  },
+  professional: {
+    name: 'InkOps Professional',
+    description: 'Advanced automation, purchase orders, scheduling, and integrations for high-volume shops.',
+    amount: 29900, // $299.00
+  },
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -22,15 +35,21 @@ Deno.serve(async (req: Request) => {
       throw new Error('Master Stripe key is not configured.');
     }
 
-    const { productId, companyId } = await req.json();
+    const body = await req.json();
+    const tier = body.tier || (body.productId === 'prod_UAfSjOXHcF7qpk' ? 'professional' : 'starter');
+    const companyId = body.companyId;
 
-    if (!productId || !companyId) {
-      throw new Error('Missing required fields: productId, companyId');
+    if (!tier || !companyId) {
+      throw new Error('Missing required fields: tier, companyId');
     }
 
-    const origin = req.headers.get('origin') || 'http://localhost:5173';
+    const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG];
+    if (!config) {
+      throw new Error('Invalid tier. Must be "starter" or "professional".');
+    }
 
-    // Verify user authorization before allowing checkout creation
+    const origin = req.headers.get('origin') || 'https://www.inkops.ink';
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
@@ -45,9 +64,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    // User is authenticated. Use their email from auth and the companyId from the request.
-    const userEmail = user.email || '';
-
     const stripe = new Stripe(masterStripeKey, {
       apiVersion: '2023-10-16',
       httpClient: Stripe.createFetchHttpClient(),
@@ -55,15 +71,18 @@ Deno.serve(async (req: Request) => {
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      customer_email: userEmail || undefined,
+      customer_email: user.email || undefined,
       line_items: [{
         price_data: {
           currency: 'usd',
-          product: productId,
+          product_data: {
+            name: config.name,
+            description: config.description,
+          },
           recurring: {
             interval: 'month',
           },
-          unit_amount: productId === 'prod_UAfSjOXHcF7qpk' ? 29900 : 19900,
+          unit_amount: config.amount,
         },
         quantity: 1,
       }],
@@ -73,7 +92,7 @@ Deno.serve(async (req: Request) => {
       metadata: {
         company_id: companyId,
         user_id: user.id,
-        tier: productId === 'prod_UAfSjOXHcF7qpk' ? 'professional' : 'starter',
+        tier: tier,
       },
     });
 
@@ -82,7 +101,7 @@ Deno.serve(async (req: Request) => {
     });
   } catch (error) {
     console.error('Error creating checkout:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

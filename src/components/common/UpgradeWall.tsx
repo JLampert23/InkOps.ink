@@ -79,7 +79,7 @@ export function UpgradeWall({ title, description, icon: Icon = Lock }: UpgradeWa
                 if (!userProfile?.company_id) return;
                 setIsLoading(true);
                 // InkOps Pro Test Product ID that the user provided
-                const checkoutUrl = await stripeService.createSubscriptionCheckout('prod_UAfSjOXHcF7qpk', userProfile.company_id);
+                const checkoutUrl = await stripeService.createSubscriptionCheckout('professional', userProfile.company_id);
                 window.location.href = checkoutUrl;
               } catch (error) {
                 console.error(error);

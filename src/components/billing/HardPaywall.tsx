@@ -8,15 +8,15 @@ export function HardPaywall() {
   const { userProfile } = useAuth();
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
-  const handleSubscribe = async (productId: string) => {
+  const handleSubscribe = async (tier: string) => {
     try {
       if (!userProfile?.company_id) {
         console.error("Missing company ID inside user profile. Ensure user is fully loaded.");
         alert("Missing company ID. Please wait or reload.");
         return;
       }
-      setIsLoading(productId);
-      const checkoutUrl = await stripeService.createSubscriptionCheckout(productId, userProfile.company_id);
+      setIsLoading(tier);
+      const checkoutUrl = await stripeService.createSubscriptionCheckout(tier, userProfile.company_id);
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error(error);
@@ -86,10 +86,10 @@ export function HardPaywall() {
 
             <button
               disabled={isLoading !== null}
-              onClick={() => handleSubscribe('prod_UAfQcVY09Z7zT6')}
+              onClick={() => handleSubscribe('starter')}
               className="w-full relative group inline-flex items-center justify-center gap-2 px-8 py-4 bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500 text-white rounded-xl font-bold text-lg transition-all disabled:opacity-70"
             >
-              {isLoading === 'prod_UAfQcVY09Z7zT6' ? (
+              {isLoading === 'starter' ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
               ) : (
                 <>Get Started <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
@@ -136,10 +136,10 @@ export function HardPaywall() {
 
             <button
               disabled={isLoading !== null}
-              onClick={() => handleSubscribe('prod_UAfSjOXHcF7qpk')}
+              onClick={() => handleSubscribe('professional')}
               className="w-full relative group inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-70"
             >
-              {isLoading === 'prod_UAfSjOXHcF7qpk' ? (
+              {isLoading === 'professional' ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
               ) : (
                 <>Unlock Professional <Zap className="w-5 h-5" /></>

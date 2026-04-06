@@ -681,7 +681,7 @@ export const stripeService = {
     }
   },
 
-  async createSubscriptionCheckout(productId: string, companyId: string): Promise<string> {
+  async createSubscriptionCheckout(tier: string, companyId: string): Promise<string> {
     try {
       const session = await getValidSession();
 
@@ -693,7 +693,7 @@ export const stripeService = {
           'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
-          productId,
+          tier,
           companyId,
         }),
       });
