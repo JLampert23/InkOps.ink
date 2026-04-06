@@ -5,14 +5,18 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase-client';
 
 export function HardPaywall() {
-  const { profile } = useAuth();
+  const { userProfile } = useAuth();
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
   const handleSubscribe = async (productId: string) => {
     try {
-      if (!profile?.company_id) return;
+      if (!userProfile?.company_id) {
+        console.error("Missing company ID inside user profile. Ensure user is fully loaded.");
+        alert("Missing company ID. Please wait or reload.");
+        return;
+      }
       setIsLoading(productId);
-      const checkoutUrl = await stripeService.createSubscriptionCheckout(productId, profile.company_id);
+      const checkoutUrl = await stripeService.createSubscriptionCheckout(productId, userProfile.company_id);
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error(error);

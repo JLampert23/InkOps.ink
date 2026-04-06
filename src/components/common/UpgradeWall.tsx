@@ -12,7 +12,7 @@ interface UpgradeWallProps {
 
 export function UpgradeWall({ title, description, icon: Icon = Lock }: UpgradeWallProps) {
   const { tier } = useSubscription();
-  const { profile } = useAuth();
+  const { userProfile } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -73,13 +73,13 @@ export function UpgradeWall({ title, description, icon: Icon = Lock }: UpgradeWa
           <button
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            disabled={isLoading || !profile?.company_id}
+            disabled={isLoading || !userProfile?.company_id}
             onClick={async () => {
               try {
-                if (!profile?.company_id) return;
+                if (!userProfile?.company_id) return;
                 setIsLoading(true);
                 // InkOps Pro Test Product ID that the user provided
-                const checkoutUrl = await stripeService.createSubscriptionCheckout('prod_UAfSjOXHcF7qpk', profile.company_id);
+                const checkoutUrl = await stripeService.createSubscriptionCheckout('prod_UAfSjOXHcF7qpk', userProfile.company_id);
                 window.location.href = checkoutUrl;
               } catch (error) {
                 console.error(error);
