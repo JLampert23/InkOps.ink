@@ -1,7 +1,7 @@
 
 [functions.create-subscription-checkout]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/create-subscription-checkout/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -12,7 +12,7 @@ entrypoint = "./functions/create-subscription-checkout/index.ts"
 
 [functions.inkops-stripe-webhook]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/inkops-stripe-webhook/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
