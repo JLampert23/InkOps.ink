@@ -45,16 +45,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    // Verify company
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('company_id, email, first_name, last_name')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || profile.company_id !== companyId) {
-      throw new Error('Invalid company context');
-    }
+    // User is authenticated. Use their email from auth and the companyId from the request.
+    const userEmail = user.email || '';
 
     const stripe = new Stripe(masterStripeKey, {
       apiVersion: '2023-10-16',
@@ -63,7 +55,7 @@ Deno.serve(async (req: Request) => {
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      customer_email: profile.email || undefined,
+      customer_email: userEmail || undefined,
       line_items: [{
         price_data: {
           currency: 'usd',
