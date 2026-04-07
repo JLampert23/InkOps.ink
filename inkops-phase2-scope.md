@@ -29,16 +29,24 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 ## 📊 PHASE 2 PROGRESS TRACKER
 
-### Feature 1: Subscription Tiers — ⏸️ BLOCKED (waiting on Stripe Price IDs)
-**Status:** Client shared tier breakdown! Still need Stripe Price IDs to wire up checkout.
+### Feature 1: Subscription Tiers — ✅ DONE
+**Status:** Fully deployed and tested.
 
-**Tier Breakdown (from client spreadsheet):**
+**What was built:**
+- [x] Hard Paywall — blocks all non-paying users from accessing the dashboard
+- [x] Tier selection page with Starter ($199/mo) and Professional ($299/mo)
+- [x] Stripe Checkout using inline product creation (no pre-configured Stripe products needed)
+- [x] Stripe Webhook (`inkops-stripe-webhook`) — auto-stamps `company_settings` on successful payment
+- [x] Feature gating via UpgradeWall for Pro-only features (Kanban, Scheduler, Purchase Orders, ShipStation)
+- [x] Webhook uses `constructEventAsync` for Deno Edge Runtime compatibility
+- [x] Both branches synced (`main` + `InkOps-Production`)
 
-| Feature | Starter ($159/mo) | Professional ($299/mo) |
+**Tier Breakdown:**
+
+| Feature | Starter ($199/mo) | Professional ($299/mo) |
 |---|---|---|
 | Quote Management | ✅ | ✅ |
 | Product Catalog Integration | ✅ | ✅ |
-| Pricing Matrices | Basic (3) | Unlimited |
 | Work Order Management | ✅ | ✅ |
 | Production Kanban | ❌ | ✅ |
 | Production Scheduler | ❌ | ✅ |
@@ -51,22 +59,11 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 | Stripe Payments | ✅ | ✅ |
 | Partial Payments | ❌ | ✅ |
 | Customer Portal | ❌ | ✅ |
-| Custom Domain | ❌ | ✅ |
 | ShipStation Integration | ❌ | ✅ |
-| Email Templates | Basic | ✅ |
 | Workflow Automation | ❌ | Unlimited |
 | Reports & Analytics | Basic | ✅ |
-| Automated Reports | ❌ | ✅ |
-| Chipply Integration | ❌ | ✅ |
-| User Seats | 2 users | 25 |
-| Support | Email | Priority + Phone |
-| API Access | ❌ | Full Access |
 
-**⚠️ Additional requirement:** Client said subscriptions must charge tax (Stripe Tax).
-
-**Payment Method chosen by client:** 🛡️ Stripe Checkout (Redirect)
-
-*Note: We have Stripe access and will retrieve the Price IDs ourselves.*
+**Payment Method:** 🛡️ Stripe Checkout (Redirect) with inline product creation
 
 ---
 
@@ -88,18 +85,35 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 ---
 
-### Feature 3: Notifications → Central Email — 🔲 NOT STARTED
-No blockers. Can start when ready.
+### Feature 3: Notifications / Automations → Central Email — 🔧 IN PROGRESS
+**Status:** Automation UI framework already exists (AutomationBuilder, TriggerSelector, ActionBuilder). The `work_step_status_changed` trigger is already defined.
+
+**Client request (Apr 7):** Wants the automation trigger "If a type of work step status is changed to _____" to have TWO dropdowns:
+1. **Type of Production** (Screen Print, Embroidery, HeatPress-DTF) — pulled from Account Settings
+2. **Status** — pulled dynamically from that production type's workflow statuses
+
+When a status changes, it should send an email and/or text to a configured address.
+
+**What exists:**
+- [x] `automation-config.ts` — trigger and action definitions
+- [x] `TriggerSelector.tsx` — UI for selecting triggers
+- [x] `ActionBuilder.tsx` — UI for configuring email/SMS actions
+- [ ] Fix dropdown: rename "Work Step Status" → "Type of Production", load dynamic production types
+- [ ] Add second dropdown for workflow statuses per production type
+- [ ] Wire the automation engine to actually fire emails/texts on status change
 
 ---
 
-### Feature 3: Notifications → Central Email — 🔲 NOT STARTED
-No blockers. Can start when ready.
+### Feature 4: Dual Email Setup — 🔧 PARTIALLY DONE
+**Status:** Database migration exists (`20260405110000_add_dual_sender_email.sql`). Columns `secondary_email_from_address` and `quote_email_sender` added to `company_settings`.
 
----
+**Client request (Apr 7):**
+- Invoices from: `invoices@toddssportinggoods.com`
+- Proofs, quotes, correspondence from: `sales@toddssportinggoods.com`
 
-### Feature 4: Separate Email Setup — 🔲 NOT STARTED
-**Status:** Client confirmed they want emails coming from 2 sender addresses. We told them it's easy to configure. Ready to build when prioritized.
+**What remains:**
+- [ ] Frontend UI in Account Settings to configure the two sender addresses
+- [ ] Update Edge Functions (send-email, forward-notification-email) to route emails through the correct sender based on email type
 
 ---
 
@@ -115,6 +129,28 @@ Fixed the endpoint. The frontend now correctly calls the `stripe-refund` edge fu
 
 ### Feature 7: Quote Follow-up Verification — 🔲 NOT STARTED
 No blockers. Can start when ready.
+
+---
+
+### Feature 8: Links & Redirects — 🔲 NOT STARTED (NEW from client Apr 7)
+**Status:** Client mentioned this but did not provide details. Need clarification on what links/redirects he wants fixed or changed.
+
+---
+
+### Feature 9: Full Debug — 🔲 NOT STARTED (NEW from client Apr 7)
+**Status:** General QA pass requested by client. Will address after feature work is complete.
+
+---
+
+## 📌 OFF-SCOPE — Things to Do Later (Post Phase 2)
+
+1. **Manage Subscription Portal** — "Cancel, downgrade, change payment method" button for subscribers (Stripe Customer Portal integration)
+2. **Beta/Free Access System** — Allow Jamie to grant free access to beta testers without them paying
+3. **Admin Panel for Subscribers** — Back-office view for Jamie to see all companies/subscribers and manage their access
+4. _(reserved)_
+5. _(reserved)_
+6. _(reserved)_
+7. _(reserved)_
 
 ---
 

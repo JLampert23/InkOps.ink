@@ -48,15 +48,27 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           .maybeSingle();
 
         if (settings) {
-          setTier((settings.subscription_tier as SubscriptionTier) || 'starter');
-          setStatus((settings.subscription_status as SubscriptionStatus) || 'trialing');
+          // Owner Whitelist (Bypass)
+          const isOwner = [
+            'jamie@inkops.ink',
+            'jamie@toddssportinggoods.com',
+            'todd@toddssportinggoods.com'
+          ].includes(user.email || '');
 
-          // Hard Paywall logic: if they have no stripe_subscription_id, they must pick a plan.
-          // Option B requested by user: everyone must have a stripe_subscription_id to enter.
-          if (!settings.stripe_subscription_id) {
-            setRequiresSubscription(true);
-          } else {
+          if (isOwner) {
+            setTier('professional');
+            setStatus('active');
             setRequiresSubscription(false);
+          } else {
+            setTier((settings.subscription_tier as SubscriptionTier) || 'starter');
+            setStatus((settings.subscription_status as SubscriptionStatus) || 'trialing');
+
+            // Hard Paywall logic: if they have no stripe_subscription_id, they must pick a plan.
+            if (!settings.stripe_subscription_id) {
+              setRequiresSubscription(true);
+            } else {
+              setRequiresSubscription(false);
+            }
           }
         } else {
           setRequiresSubscription(true);
