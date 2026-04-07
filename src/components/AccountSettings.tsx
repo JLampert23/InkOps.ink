@@ -8,6 +8,7 @@ import { domainVerificationService } from '../services/domain-verification-servi
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
 import ShortCodeReference from './email/ShortCodeReference';
+import { UpgradeWall } from './common/UpgradeWall';
 
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
@@ -5530,13 +5531,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'automations' && (
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
-              </div>
-            }>
-              <AutomationsDashboard />
-            </Suspense>
+            <UpgradeWall feature="workflow_automation">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
+                </div>
+              }>
+                <AutomationsDashboard />
+              </Suspense>
+            </UpgradeWall>
           )}
 
           {activeTab === 'kanban-settings' && companySettings?.id && (
