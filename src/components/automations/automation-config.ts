@@ -345,14 +345,8 @@ export const TRIGGER_CONDITION_OPTIONS: Record<string, { label: string; options:
     ],
   },
   work_step_status_changed: {
-    label: 'Work Step Status',
-    options: [
-      { value: 'not_started', label: 'Not Started' },
-      { value: 'in_progress', label: 'In Progress' },
-      { value: 'completed', label: 'Completed' },
-      { value: 'on_hold', label: 'On Hold' },
-      { value: 'cancelled', label: 'Cancelled' },
-    ],
+    label: 'Type of Production',
+    options: [], // Loaded dynamically in TriggerSelector from type_of_work_settings + work_type_workflows
   },
   work_order_invoice_status_changed: {
     label: 'Work Order Status',
