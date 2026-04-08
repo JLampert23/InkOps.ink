@@ -106,8 +106,12 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 ---
 
-### Feature 5: Activity Tracking / Timestamps — 🔲 NOT STARTED
-No blockers. Can start when ready.
+### Feature 5: Activity Tracking / Timestamps — ✅ DONE
+**Status:** Core activity tracking events (Quote opened, Quote edited, Quote sent, Email sent, Payment applied) are now fully implemented.
+- [x] ActivityLogger service added for consistency.
+- [x] Frontend components (`QuoteBuilder`, `SendQuoteModal`) updated to log events.
+- [x] Edge functions (`send-email`, `stripe-webhook`) updated to log automated backend events.
+- [x] UI added to `QuoteDetail` to display the "Activity History" log.
 
 ---
 
