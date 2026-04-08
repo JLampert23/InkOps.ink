@@ -113,6 +113,7 @@ interface LineItem {
   qty_2xl: number | null;
   qty_3xl: number | null;
   qty_4xl: number | null;
+  qty_5xl: number | null;
 }
 
 interface QuoteImprint {
@@ -580,7 +581,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const totalQty = items.reduce((sum, item) => {
     return sum + (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
-           (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0);
+           (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) + (item.qty_5xl || 0);
   }, 0);
 
   const feesTotal = fees.reduce((sum, fee) => sum + fee.total_price, 0);
@@ -857,6 +858,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">2XL</th>
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">5XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
@@ -902,6 +904,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">2XL</th>
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">5XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
                       <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
@@ -914,7 +917,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                                    (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                                   (item.qty_4xl || 0);
+                                   (item.qty_4xl || 0) + (item.qty_5xl || 0);
                     const totalItems = sizeQty > 0 ? sizeQty : ((item as any).quantity || 0);
 
                     return (
@@ -970,6 +973,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                       </td>
                       <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_4xl || ''}
+                      </td>
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
+                        {item.qty_5xl || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
                         {sizeQty === 0 ? ((item as any).quantity || '') : ''}

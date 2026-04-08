@@ -56,6 +56,7 @@ export interface WorkOrderPDFData {
     qty_2xl: number | null;
     qty_3xl: number | null;
     qty_4xl: number | null;
+    qty_5xl: number | null;
   }>;
   imprints: Array<{
     id?: string;
@@ -138,13 +139,13 @@ async function imageToBase64(url: string): Promise<string | null> {
   return result ? result.base64 : null;
 }
 
-const SIZE_LABELS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+const SIZE_LABELS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 
 function getSizeValues(item: WorkOrderPDFData['line_items'][0]): (number | null)[] {
   return [
     item.qty_yxs, item.qty_ys, item.qty_ym, item.qty_yl, item.qty_yxl,
     item.qty_xs, item.qty_s, item.qty_m, item.qty_l, item.qty_xl,
-    item.qty_2xl, item.qty_3xl, item.qty_4xl,
+    item.qty_2xl, item.qty_3xl, item.qty_4xl, item.qty_5xl,
   ];
 }
 
@@ -152,7 +153,7 @@ function getItemQty(item: WorkOrderPDFData['line_items'][0]): number {
   return (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
          (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
          (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-         (item.qty_4xl || 0);
+         (item.qty_4xl || 0) + (item.qty_5xl || 0);
 }
 
 export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void> {

@@ -201,7 +201,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                        (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                        (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                        (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                       (item.qty_4xl || 0);
+                       (item.qty_4xl || 0) + (item.qty_5xl || 0);
         const totalItems = sizeQty + (item.quantity || 0);
 
         return [
@@ -221,6 +221,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
           item.qty_2xl || '',
           item.qty_3xl || '',
           item.qty_4xl || '',
+          item.qty_5xl || '',
           item.quantity || '',
           totalItems,
           `$${(item.unit_price || 0).toFixed(2)}`,
@@ -230,7 +231,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Item #', 'Color', 'Description', 'YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'Qty', 'Items', 'Price', 'Total']],
+        head: [['Item #', 'Color', 'Description', 'YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'Qty', 'Items', 'Price', 'Total']],
         body: itemRows,
         theme: 'grid',
         styles: { fontSize: 6, cellPadding: 0.5 },
@@ -538,6 +539,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                       <th style={{ border: '2px solid #000', padding: '2px', textAlign: 'center', fontWeight: '600', width: '24px' }}>2XL</th>
                       <th style={{ border: '2px solid #000', padding: '2px', textAlign: 'center', fontWeight: '600', width: '24px' }}>3XL</th>
                       <th style={{ border: '2px solid #000', padding: '2px', textAlign: 'center', fontWeight: '600', width: '24px' }}>4XL</th>
+                      <th style={{ border: '2px solid #000', padding: '2px', textAlign: 'center', fontWeight: '600', width: '24px' }}>5XL</th>
                       <th style={{ border: '2px solid #000', padding: '2px 4px', textAlign: 'center', fontWeight: '600' }}>Qty</th>
                       <th style={{ border: '2px solid #000', padding: '2px 4px', textAlign: 'center', fontWeight: '600' }}>Items</th>
                       <th style={{ border: '2px solid #000', padding: '2px 4px', textAlign: 'right', fontWeight: '600' }}>Unit Price</th>
@@ -571,7 +573,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                                             (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                             (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                             (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                                            (item.qty_4xl || 0);
+                                            (item.qty_4xl || 0) + (item.qty_5xl || 0);
                             const totalItems = sizeQty + (item.quantity || 0);
                             return (
                               <tr key={`${groupIdx}-${idx}`}>
@@ -591,6 +593,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                                 <td style={{ border: '2px solid #000', padding: '2px', textAlign: 'center' }}>{item.qty_2xl || ''}</td>
                                 <td style={{ border: '2px solid #000', padding: '2px', textAlign: 'center' }}>{item.qty_3xl || ''}</td>
                                 <td style={{ border: '2px solid #000', padding: '2px', textAlign: 'center' }}>{item.qty_4xl || ''}</td>
+                                <td style={{ border: '2px solid #000', padding: '2px', textAlign: 'center' }}>{item.qty_5xl || ''}</td>
                                 <td style={{ border: '2px solid #000', padding: '2px 4px', textAlign: 'center' }}>{item.quantity || ''}</td>
                                 <td style={{ border: '2px solid #000', padding: '2px 4px', textAlign: 'center', fontWeight: '600', color: '#2563eb' }}>{totalItems}</td>
                                 <td style={{ border: '2px solid #000', padding: '2px 4px', textAlign: 'right' }}>${(item.unit_price || 0).toFixed(2)}</td>
@@ -689,7 +692,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                              (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                              (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                              (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                             (item.qty_4xl || 0);
+                             (item.qty_4xl || 0) + (item.qty_5xl || 0);
                     }, 0)}
                   </span>
                 </div>

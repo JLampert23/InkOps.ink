@@ -95,6 +95,7 @@ interface QuoteLineItem {
   qty_2xl: number | null;
   qty_3xl: number | null;
   qty_4xl: number | null;
+  qty_5xl: number | null;
 }
 
 interface QuoteImprint {
@@ -125,18 +126,18 @@ interface WorkOrderRecord {
   created_at: string;
 }
 
-const SIZE_LABELS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-const COL_SPAN = 18;
+const SIZE_LABELS = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+const COL_SPAN = 19;
 
 const getItemQty = (item: QuoteLineItem) =>
   (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
   (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
-  (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0);
+  (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) + (item.qty_5xl || 0);
 
 const getSizeValues = (item: QuoteLineItem) => [
   item.qty_yxs, item.qty_ys, item.qty_ym, item.qty_yl, item.qty_yxl,
   item.qty_xs, item.qty_s, item.qty_m, item.qty_l, item.qty_xl,
-  item.qty_2xl, item.qty_3xl, item.qty_4xl,
+  item.qty_2xl, item.qty_3xl, item.qty_4xl, item.qty_5xl,
 ];
 
 export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
@@ -628,6 +629,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             qty_2xl: item.qty_2xl,
             qty_3xl: item.qty_3xl,
             qty_4xl: item.qty_4xl,
+            qty_5xl: item.qty_5xl,
           })),
         imprints: quoteImprints.map(imp => ({
           id: imp.id,

@@ -221,7 +221,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       { key: 'qty_2xl', label: '2XL', order: 10 },
       { key: 'qty_3xl', label: '3XL', order: 11 },
       { key: 'qty_4xl', label: '4XL', order: 12 },
-      { key: 'qty_sm', label: 'S/M', order: 13 },
+      { key: 'qty_5xl', label: '5XL', order: 13 },
+      { key: 'qty_sm', label: 'S/M', order: 14 },
       { key: 'qty_lxl', label: 'L/XL', order: 14 },
       { key: 'qty_ysym', label: 'YS/YM', order: 15 },
       { key: 'qty_ylyxl', label: 'YL/YXL', order: 16 },
@@ -231,7 +232,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
     switch (sizeMode) {
       case 'regular':
-        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
         break;
       case 'double':
         visibleSizeLabels = ['S/M', 'L/XL', 'YS/YM', 'YL/YXL'];
@@ -240,10 +241,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL'];
         break;
       case 'adult':
-        visibleSizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        visibleSizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
         break;
       default:
-        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
     }
 
     // Include custom sizes if selected for this group (only for regular mode)
@@ -3451,14 +3452,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                     <option value="regular">Regular Sizes (Youth + Adult)</option>
                     <option value="double">Double Sizes (S/M, L/XL, YS/YM, YL/YXL)</option>
                     <option value="youth">Youth-Only Sizes (YXS, YS, YM, YL, YXL)</option>
-                    <option value="adult">Adult-Only Sizes (XS - 4XL)</option>
+                    <option value="adult">Adult-Only Sizes (XS - 5XL)</option>
                   </select>
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
                     <p className="text-xs text-blue-800 dark:text-blue-200">
-                      {editingGroup.sizeMode === 'regular' && 'Displays: YXS, YS, YM, YL, YXL, XS, S, M, L, XL, 2XL, 3XL, 4XL'}
+                      {editingGroup.sizeMode === 'regular' && 'Displays: YXS, YS, YM, YL, YXL, XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL'}
                       {editingGroup.sizeMode === 'double' && 'Displays: S/M, L/XL, YS/YM, YL/YXL'}
                       {editingGroup.sizeMode === 'youth' && 'Displays: YXS, YS, YM, YL, YXL'}
-                      {editingGroup.sizeMode === 'adult' && 'Displays: XS, S, M, L, XL, 2XL, 3XL, 4XL'}
+                      {editingGroup.sizeMode === 'adult' && 'Displays: XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL'}
                     </p>
                   </div>
                 </div>

@@ -509,7 +509,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   const itemGroups = Object.entries(groupedItems);
 
-  const sizeColumns = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+  const sizeColumns = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 
   const totalTableWidth = contentWidth;
   const styleWidth = 12;
@@ -553,7 +553,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
                      (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                      (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                      (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                     (item.qty_4xl || 0);
+                     (item.qty_4xl || 0) + (item.qty_5xl || 0);
       const totalItems = sizeQty + (item.quantity || 0);
 
       const row = [
@@ -573,6 +573,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
         item.qty_2xl || '',
         item.qty_3xl || '',
         item.qty_4xl || '',
+        item.qty_5xl || '',
         item.quantity || '',
         totalItems.toString(),
         formatCurrency(item.unit_price),
@@ -847,7 +848,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   const totalQty = items.reduce((sum, item) => {
     return sum + (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
-           (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0);
+           (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) + (item.qty_5xl || 0);
   }, 0);
 
   const feesTotal = fees.reduce((sum, fee) => sum + fee.total_price, 0);

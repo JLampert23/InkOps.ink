@@ -35,6 +35,7 @@ const SIZE_COLS = [
   { key: 'qty_2xl', label: '2XL' },
   { key: 'qty_3xl', label: '3XL' },
   { key: 'qty_4xl', label: '4XL' },
+  { key: 'qty_5xl', label: '5XL' },
 ] as const;
 
 function calcTotalQty(item: Record<string, any>): number {
