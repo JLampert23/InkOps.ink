@@ -7,6 +7,7 @@ import { ShortCodeEngine } from '../../services/shortcode-service';
 import DOMPurify from 'dompurify';
 import { getQuoteApprovalUrl } from '../../utils/portal-url';
 import type { CommunicationChannel } from '../../types/communication-template';
+import { activityLogger } from '../../services/activity-logger';
 
 interface SendQuoteModalProps {
   quoteId: string;
@@ -59,6 +60,7 @@ export function SendQuoteModal({
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('email');
   const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone || '');
   const [twilioEnabled, setTwilioEnabled] = useState(false);
+  const [companyId, setCompanyId] = useState<string>('');
 
   useEffect(() => {
     loadTemplates();
@@ -114,6 +116,7 @@ export function SendQuoteModal({
       if (data && data.length > 0) {
         setSelectedTemplateId(data[0].id);
       }
+      setCompanyId(profile.company_id);
     } catch (error) {
       console.error('Error loading templates:', error);
     } finally {
@@ -252,6 +255,13 @@ export function SendQuoteModal({
           ? `Quote sent via SMS to ${customerPhone}`
           : `Quote sent to ${customerEmail}`;
       showNotification('success', 'Quote Sent', successMessage);
+      
+      activityLogger.logQuoteActivity({
+        quoteId,
+        companyId,
+        action: 'Quote sent'
+      });
+
       onSuccess();
       onClose();
     } catch (error) {

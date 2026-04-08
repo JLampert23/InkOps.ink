@@ -222,6 +222,24 @@ Deno.serve(async (req: Request) => {
           },
         }]);
         
+        // Log payment applied to quote activity
+        if (metadata.printavo_invoice_id) {
+          try {
+            await supabase.from('quote_activity_log').insert([{
+              quote_id: metadata.printavo_invoice_id,
+              company_id: companyId,
+              action: 'Payment applied',
+              details: {
+                amount: paymentIntent.amount / 100,
+                method: paymentIntent.payment_method_types?.[0] || 'card',
+                source: 'stripe'
+              }
+            }]);
+          } catch (e) {
+            console.error('Failed to log payment activity:', e);
+          }
+        }
+
         if (metadata.printavo_invoice_id) {
           await supabase
             .from('stripe_payment_links')

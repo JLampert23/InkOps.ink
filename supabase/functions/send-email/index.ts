@@ -299,6 +299,26 @@ Deno.serve(async (req: Request) => {
 
     const result: ResendResponse = await response.json();
 
+    // Log the "Email sent" event if quote context exists in the data payload
+    const targetQuoteId = data?.quote_id || data?.quoteId || (emailRequest.shortCodeData as any)?.quote_id;
+    if (targetQuoteId) {
+      try {
+        await supabase.from('quote_activity_log').insert({
+          quote_id: targetQuoteId,
+          company_id: companyId,
+          action: 'Email sent',
+          details: {
+             subject: finalSubject,
+             to: emailPayload.to,
+             template_used: template
+          }
+        });
+        console.log(`Successfully logged 'Email sent' for quote ${targetQuoteId}`);
+      } catch (logError) {
+        console.error('Failed to log email sent activity:', logError);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, data: result }),
       {

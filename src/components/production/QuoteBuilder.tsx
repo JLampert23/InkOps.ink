@@ -11,6 +11,7 @@ import { SendQuoteModal } from './SendQuoteModal';
 import { getUnifiedProductData, fetchLiveSSActivewearPricing, fetchLiveSanMarPricing } from '../../services/ssactivewear-promostandards-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 import { recalculateImprintPricesForGroup } from '../../utils/price-matrix-utils';
+import { activityLogger } from '../../services/activity-logger';
 
 interface PriceMatrixData {
   id: string;
@@ -792,6 +793,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           setPriceMatrixCache(matrixMap);
         }
       }
+    }
+
+    if (quote) {
+      activityLogger.logQuoteActivity({
+        quoteId: quote.id,
+        companyId: quote.company_id,
+        action: 'Quote opened for editing'
+      });
     }
 
     setLoading(false);
@@ -2188,6 +2197,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
       if (!isAutoSave) {
         showNotification('success', 'Quote Saved', 'Quote has been saved successfully');
+        activityLogger.logQuoteActivity({
+          quoteId: currentQuoteId,
+          companyId: userProfile.company_id,
+          action: 'Quote edited'
+        });
       }
 
       return true;

@@ -165,6 +165,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const [reopening, setReopening] = useState(false);
   const [approving, setApproving] = useState(false);
   const [sendingFollowup, setSendingFollowup] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [showActivity, setShowActivity] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -297,6 +299,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
         setCompanySettings(settings);
       } else {
         console.log('QuoteDetail: No company_id found on quote');
+      }
+
+      const { data: logData, error: logError } = await supabase
+        .from('quote_activity_log')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .order('performed_at', { ascending: false });
+
+      if (!logError && logData) {
+        setActivityLogs(logData);
+      } else if (logError) {
+        console.error('QuoteDetail: Error fetching activity logs:', logError);
       }
     } catch (error) {
       console.error('Error loading quote:', error);
@@ -1269,6 +1283,55 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
               {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
             </span>
           </div>
+        </div>
+
+        {/* Activity History */}
+        <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
+          <button 
+            onClick={() => setShowActivity(!showActivity)}
+            className="flex items-center gap-2 font-bold text-gray-900 dark:text-white mb-4 hover:text-blue-600 transition-colors"
+          >
+            <Clock className="w-5 h-5" />
+            Activity History
+            <span className="text-sm font-normal text-gray-500 bg-gray-200 dark:bg-slate-600 px-2 py-0.5 rounded-full ml-2">
+              {activityLogs.length} events
+            </span>
+          </button>
+          
+          {showActivity && (
+            <div className="space-y-4">
+              {activityLogs.length > 0 ? (
+                activityLogs.map((log) => (
+                  <div key={log.id} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
+                      <div className="w-px h-full bg-gray-300 dark:bg-slate-600 my-1 pb-4"></div>
+                    </div>
+                    <div className="flex-1 pb-4">
+                      <div className="flex items-baseline justify-between">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {log.action}
+                        </p>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {format(new Date(log.performed_at), 'MMM d, h:mm a')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                        by {log.performed_by_name || 'System'}
+                      </p>
+                      {log.meta && Object.keys(log.meta).length > 0 && (
+                        <pre className="mt-2 text-xs bg-gray-100 dark:bg-slate-700/50 p-2 rounded text-gray-600 dark:text-gray-400 overflow-x-auto">
+                          {JSON.stringify(log.meta, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 italic">No activity recorded yet.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
