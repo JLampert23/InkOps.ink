@@ -151,10 +151,13 @@ interface AccountSettingsProps {
   canAccessIntegrations?: boolean;
 }
 
+import { useSubscription } from '../contexts/SubscriptionContext';
+
 export function AccountSettings({ initialTab, canAccessIntegrations = true }: AccountSettingsProps = {}) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { confirm, prompt } = useConfirmation();
+  const { canAccess } = useSubscription();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'company-info');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
@@ -5531,7 +5534,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'automations' && (
-            <UpgradeWall feature="workflow_automation">
+            canAccess('workflow_automation') ? (
               <Suspense fallback={
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
@@ -5539,7 +5542,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               }>
                 <AutomationsDashboard />
               </Suspense>
-            </UpgradeWall>
+            ) : (
+              <UpgradeWall 
+                title="Workflow Automations" 
+                description="Create powerful custom automations that trigger emails and SMS messages based on workflow status changes." 
+                icon={Zap} 
+              />
+            )
           )}
 
           {activeTab === 'kanban-settings' && companySettings?.id && (
