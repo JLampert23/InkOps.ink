@@ -85,35 +85,24 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 ---
 
-### Feature 3: Notifications / Automations → Central Email — 🔧 IN PROGRESS
-**Status:** Automation UI framework already exists (AutomationBuilder, TriggerSelector, ActionBuilder). The `work_step_status_changed` trigger is already defined.
+### Feature 3: Notifications / Automations → Central Email — ✅ DONE
+**Status:** Feature has been completely refactored with full dynamic workflow selector UI and edge function integration.
 
-**Client request (Apr 7):** Wants the automation trigger "If a type of work step status is changed to _____" to have TWO dropdowns:
-1. **Type of Production** (Screen Print, Embroidery, HeatPress-DTF) — pulled from Account Settings
-2. **Status** — pulled dynamically from that production type's workflow statuses
-
-When a status changes, it should send an email and/or text to a configured address.
-
-**What exists:**
-- [x] `automation-config.ts` — trigger and action definitions
-- [x] `TriggerSelector.tsx` — UI for selecting triggers
-- [x] `ActionBuilder.tsx` — UI for configuring email/SMS actions
-- [ ] Fix dropdown: rename "Work Step Status" → "Type of Production", load dynamic production types
-- [ ] Add second dropdown for workflow statuses per production type
-- [ ] Wire the automation engine to actually fire emails/texts on status change
+**What was built:**
+- [x] Automation Builder: Replaced the static dropdown with a dynamic dual-dropdown selector for "Type of Production" and "Status".
+- [x] Automation Engine: Parses the complex object config for status triggers.
+- [x] `send-email` Edge Function automatically fetches the saved central email structure.
+- [x] Added `UpgradeWall` gating to ensure automations are only available on the Professional Tier.
 
 ---
 
-### Feature 4: Dual Email Setup — 🔧 PARTIALLY DONE
-**Status:** Database migration exists (`20260405110000_add_dual_sender_email.sql`). Columns `secondary_email_from_address` and `quote_email_sender` added to `company_settings`.
+### Feature 4: Dual Email Setup — ✅ DONE
+**Status:** Both backend routing and UI integration are fully implemented out-of-the-box.
 
-**Client request (Apr 7):**
-- Invoices from: `invoices@toddssportinggoods.com`
-- Proofs, quotes, correspondence from: `sales@toddssportinggoods.com`
-
-**What remains:**
-- [ ] Frontend UI in Account Settings to configure the two sender addresses
-- [ ] Update Edge Functions (send-email, forward-notification-email) to route emails through the correct sender based on email type
+**What was built:**
+- [x] New DB Column: `secondary_email_from_address` and `quote_email_sender` in `company_settings` (via Migration).
+- [x] Backend Edge Function: The `send-email` webhook now defaults non-invoice traffic to the secondary sender.
+- [x] Frontend Config UI: Available today in `AccountSettings -> Resend Integration` with selector dropdown.
 
 ---
 
