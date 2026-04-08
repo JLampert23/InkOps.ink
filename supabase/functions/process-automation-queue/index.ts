@@ -882,11 +882,22 @@ async function processQuoteFollowup(supabase: any, queueItem: any) {
       throw new Error('No customer email found for quote follow-up');
     }
 
-    // Get template
-    const template = settings.communication_templates;
-    if (!template) {
-      throw new Error('No follow-up template configured');
-    }
+    // Get template or use fallback
+    const customTemplate = settings.communication_templates;
+    
+    // Default fallback values if no custom template exists
+    const subjectTemplate = customTemplate?.subject_template || `Following up on Quote #${quote.quote_number}`;
+    const bodyTemplate = customTemplate?.body_template || `
+      <p>Hi {{customer.name}},</p>
+      <p>We are reaching out to follow up on your recent quote: <strong>Quote #${quote.quote_number}</strong>.</p>
+      <p>Total amount: $${quote.total}</p>
+      <p>Please click the link below to review and approve your quote.</p>
+      <p>Thank you,<br>{{company.name}}</p>
+    `;
+    const autoAttachQuoteLink = customTemplate ? customTemplate.auto_attach_quote_link : true; // Default true if no custom template
+    const autoAttachPdf = customTemplate ? customTemplate.auto_attach_pdf : false;
+    const autoAttachMockups = customTemplate ? customTemplate.auto_attach_mockups : false;
+    const templateNameUsed = customTemplate ? customTemplate.template_name : 'default_fallback';
 
     // Send follow-up email
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -901,12 +912,12 @@ async function processQuoteFollowup(supabase: any, queueItem: any) {
       body: JSON.stringify({
         company_id: queueItem.company_id,
         to: customerEmail,
-        subject: template.subject_template,
-        html: template.body_template,
+        subject: subjectTemplate,
+        html: bodyTemplate,
         template: 'quote_followup',
-        auto_attach_quote_link: template.auto_attach_quote_link,
-        auto_attach_pdf: template.auto_attach_pdf,
-        auto_attach_mockups: template.auto_attach_mockups,
+        auto_attach_quote_link: autoAttachQuoteLink,
+        auto_attach_pdf: autoAttachPdf,
+        auto_attach_mockups: autoAttachMockups,
         shortCodeData: {
           quote: {
             id: quote.id,
@@ -955,7 +966,7 @@ async function processQuoteFollowup(supabase: any, queueItem: any) {
         meta: {
           followup_number: followup_number,
           recipient_email: customerEmail,
-          template_used: template.template_name,
+          template_used: templateNameUsed,
         },
         performed_at: new Date().toISOString(),
       });
