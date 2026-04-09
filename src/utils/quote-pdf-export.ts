@@ -508,6 +508,39 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   const itemGroups = Object.entries(groupedItems);
 
+  if (quote.production_notes && quote.production_notes.trim()) {
+    const notesPadding = 3.5;
+    const notesLabelHeight = 6;
+    const notesTextWrapped = doc.splitTextToSize(quote.production_notes.trim(), contentWidth - notesPadding * 2);
+    const notesTextHeight = notesTextWrapped.length * 4;
+    const notesBgHeight = notesPadding + notesLabelHeight + notesTextHeight + notesPadding;
+
+    if (yPosition + notesBgHeight > pageHeight - marginBottom) {
+      doc.addPage();
+      yPosition = marginTop;
+    }
+
+    doc.setFillColor(254, 243, 199);
+    doc.setDrawColor(217, 119, 6);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(marginLeft, yPosition, contentWidth, notesBgHeight, 2, 2, 'FD');
+
+    doc.setFillColor(217, 119, 6);
+    doc.rect(marginLeft, yPosition, contentWidth, notesLabelHeight + notesPadding, 'F');
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('PRODUCTION NOTES', marginLeft + notesPadding, yPosition + notesPadding + 4);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(92, 51, 0);
+    doc.text(notesTextWrapped, marginLeft + notesPadding, yPosition + notesPadding + notesLabelHeight + 4.5);
+
+    yPosition += notesBgHeight + 5;
+  }
+
   const sizeColumns = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
 
   const totalTableWidth = contentWidth;
@@ -665,7 +698,6 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
       for (let i = 0; i < groupImprints.length; i++) {
         const imprint = groupImprints[i];
 
-        let estimatedHeight = 28;
         const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
           ? imprint.artwork_images
           : imprint.artwork_url
@@ -674,9 +706,13 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
         const mockupImages = (imprint.mockups || [])
           .map((m: any) => typeof m === 'string' ? m : m?.url)
           .filter(Boolean);
-        if (artworkImages.length > 0 || mockupImages.length > 0) {
-          estimatedHeight += 22;
-        }
+        const allImages = [...artworkImages, ...mockupImages];
+
+        const imgSize = 12;
+        const imgGap = 2;
+        const infoLineHeight = 10;
+        const imgRowHeight = allImages.length > 0 ? imgSize + 3 : 0;
+        const estimatedHeight = infoLineHeight + imgRowHeight + 3;
 
         if (imprintY + estimatedHeight > pageHeight - marginBottom) {
           doc.addPage();
@@ -692,53 +728,60 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
         let textY = imprintY + 4;
 
-        doc.setFontSize(7);
+        doc.setFontSize(6.5);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(17, 24, 39);
         doc.text(`${quote.quote_number}-${String(i + 1).padStart(2, '0')}`, imprintX + 2, textY);
 
+        doc.setFontSize(6);
+        doc.setFont('helvetica', 'normal');
+        let inlineX = imprintX + 2 + doc.getTextWidth(`${quote.quote_number}-${String(i + 1).padStart(2, '0')}`) + 2;
+
         doc.setFillColor(219, 234, 254);
         doc.setDrawColor(191, 219, 254);
         const typeText = imprint.type_of_work;
-        const typeWidth = doc.getTextWidth(typeText) + 3;
-        doc.roundedRect(imprintX + 18, textY - 2.5, typeWidth, 4, 0.8, 0.8, 'FD');
         doc.setFontSize(6);
+        const typeWidth = doc.getTextWidth(typeText) + 3;
+        doc.roundedRect(inlineX, textY - 2.5, typeWidth, 4, 0.8, 0.8, 'FD');
         doc.setTextColor(30, 64, 175);
-        doc.text(typeText, imprintX + 19.5, textY);
+        doc.text(typeText, inlineX + 1.5, textY);
+        inlineX += typeWidth + 2;
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
+        doc.setFontSize(6.5);
         doc.setTextColor(17, 24, 39);
-        doc.text(imprint.location, imprintX + 20 + typeWidth + 1, textY);
+        doc.text(imprint.location, inlineX, textY);
+        inlineX += doc.getTextWidth(imprint.location) + 3;
 
-        textY += 4.5;
+        if (imprint.thread_ink_color) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(100, 116, 139);
+          const colorLabel = `Colors: ${imprint.thread_ink_color}`;
+          const colorLabelTruncated = doc.getTextWidth(colorLabel) + inlineX < imprintX + imprintWidth - 4
+            ? colorLabel
+            : `Colors: ${imprint.thread_ink_color.split(',').slice(0, 2).join(',').trim()}...`;
+          doc.text(colorLabelTruncated, inlineX, textY);
+          inlineX += doc.getTextWidth(colorLabelTruncated) + 3;
+        }
 
         if (imprint.details || imprint.description) {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6);
           doc.setTextColor(100, 116, 139);
           const details = imprint.details || imprint.description || '';
-          const lines = doc.splitTextToSize(details, imprintWidth - 8);
-          doc.text(lines.slice(0, 2), imprintX + 2, textY);
-          textY += Math.min(lines.length, 2) * 2.8;
+          const maxDetailWidth = imprintWidth - (inlineX - imprintX) - 4;
+          if (maxDetailWidth > 10) {
+            const detailTruncated = doc.splitTextToSize(details, maxDetailWidth)[0];
+            doc.text(detailTruncated, inlineX, textY);
+          }
         }
 
-        if (imprint.thread_ink_color) {
-          doc.setFontSize(6);
-          doc.setTextColor(100, 116, 139);
-          doc.text(`Colors: ${imprint.thread_ink_color}`, imprintX + 2, textY);
-          textY += 3;
-        }
-
-        const allImages = [...artworkImages, ...mockupImages];
+        textY += infoLineHeight;
 
         if (allImages.length > 0) {
-          textY += 1;
-          const imgSize = 18;
-          const imgGap = 3;
           let imgX = imprintX + 2;
-
-          for (let j = 0; j < Math.min(allImages.length, 4); j++) {
+          for (let j = 0; j < Math.min(allImages.length, 6); j++) {
             const imgUrl = allImages[j];
             try {
               const imgBase64 = await imageToBase64(imgUrl);
@@ -777,18 +820,18 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   }
 
   if (fees.length > 0) {
-    yPosition += 4;
+    yPosition += 2;
 
-    if (yPosition + 30 > pageHeight - marginBottom) {
+    if (yPosition + 20 > pageHeight - marginBottom) {
       doc.addPage();
       yPosition = marginTop;
     }
 
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
     doc.text('Additional Fees', marginLeft + contentWidth / 2, yPosition);
-    yPosition += 4;
+    yPosition += 2;
 
     const feeData = fees.map(fee => {
       const feeName = fee.description.includes(' - ') ? fee.description.split(' - ')[0] : fee.description;
@@ -808,8 +851,8 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
       body: feeData,
       theme: 'plain',
       styles: {
-        fontSize: 7,
-        cellPadding: { top: 1.5, bottom: 1.5, left: 1.5, right: 1.5 },
+        fontSize: 6.5,
+        cellPadding: { top: 0.8, bottom: 0.8, left: 1.5, right: 1.5 },
         textColor: [17, 24, 39],
         lineWidth: 0.1,
         lineColor: [226, 232, 240],
@@ -831,7 +874,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
       margin: { left: marginLeft + contentWidth / 2, right: marginRight },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 4;
+    yPosition = (doc as any).lastAutoTable.finalY + 2;
   }
 
   if (yPosition + 50 > pageHeight - marginBottom) {
