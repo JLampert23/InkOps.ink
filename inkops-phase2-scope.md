@@ -125,8 +125,11 @@ Fixed the endpoint. The frontend now correctly calls the `stripe-refund` edge fu
 
 ---
 
-### Feature 8: Links & Redirects — 🔲 NOT STARTED (NEW from client Apr 7)
-**Status:** Client mentioned this but did not provide details. Need clarification on what links/redirects he wants fixed or changed.
+### Feature 8: Links & Redirects — ✅ DONE
+**Status:** All navigation bugs reported by the client have been resolved.
+- [x] Implemented origin-tracking in `QuotesManager` to ensure the back button correctly pops the browser history state to return to the `Customers` or `Kanban` view.
+- [x] Added an explicit `<— Cancel & Return` escape hatch inside `QuoteBuilder` to prevent users from getting "stuck".
+- [x] Upgraded the `QuoteDetail` back button block for visual clarity.
 
 ---
 
