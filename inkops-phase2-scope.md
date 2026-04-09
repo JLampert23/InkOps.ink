@@ -120,8 +120,8 @@ Fixed the endpoint. The frontend now correctly calls the `stripe-refund` edge fu
 
 ---
 
-### Feature 7: Quote Follow-up Verification — 🔲 NOT STARTED
-No blockers. Can start when ready.
+### Feature 7: Quote Follow-up Verification — ✅ DONE
+**Status:** Stabilized. The backend queue processor now gracefully handles manual follow-up dispatch and will inject a professional fallback HTML template if a customized company template does not exist, rather than throwing a silent error. The frontend button correctly queues this to the backend.
 
 ---
 

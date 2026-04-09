@@ -17,7 +17,7 @@ interface EmailAttachment {
 interface EmailRequest {
   to: string | string[];
   subject: string;
-  template: 'invoice-reminder' | 'payment-received' | 'overdue-notice' | 'welcome' | 'custom';
+  template: 'invoice-reminder' | 'payment-received' | 'overdue-notice' | 'welcome' | 'custom' | 'invoice' | 'payment-request' | 'quote' | 'quote_followup' | 'quote-approval';
   data?: Record<string, any>;
   html?: string;
   attachments?: EmailAttachment[];
@@ -200,24 +200,35 @@ Deno.serve(async (req: Request) => {
     const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
 
     // Determine the correct from email address logic
+    // ROUTING RULE: Invoices/Payments → Primary email, Quotes/Everything else → Secondary email
     let fromEmail = companySettings.email_from_address;
     
-    // Check if this is a quote/invoice email based on the template
-    const isQuoteOrInvoiceEmail = 
+    // Check if this is an invoice/payment email based on the template
+    const isInvoiceOrPaymentEmail = 
       template === 'invoice-reminder' || 
       template === 'payment-received' || 
       template === 'overdue-notice' || 
-      (typeof emailRequest.data?.quote_number !== 'undefined') ||
+      template === 'invoice' ||
+      template === 'payment-request' ||
       (typeof emailRequest.data?.invoiceNumber !== 'undefined');
 
-    // If it's a quote/invoice and they have a secondary email selected for quotes
-    if (isQuoteOrInvoiceEmail && companySettings.quote_email_sender === 'secondary' && companySettings.secondary_email_from_address) {
-      fromEmail = companySettings.secondary_email_from_address;
-    }
-    // Alternatively if this is NOT a quote (e.g. system alert) and they chose secondary for alerts
-    else if (!isQuoteOrInvoiceEmail && companySettings.quote_email_sender === 'primary' && companySettings.secondary_email_from_address) {
-        // If quote sender is primary, maybe secondary is meant for system alerts
+    // Check if this is a quote-related email
+    const isQuoteEmail = 
+      template === 'quote' ||
+      template === 'quote_followup' ||
+      template === 'quote-approval' ||
+      (typeof emailRequest.data?.quote_number !== 'undefined');
+
+    if (companySettings.secondary_email_from_address) {
+      if (isInvoiceOrPaymentEmail) {
+        // Invoices & Payments ALWAYS use Primary email
+        fromEmail = companySettings.email_from_address;
+        console.log('Email routing: Invoice/Payment → Primary email:', fromEmail);
+      } else {
+        // Quotes, proofs, automations, and everything else use Secondary email
         fromEmail = companySettings.secondary_email_from_address;
+        console.log('Email routing: Quote/Other → Secondary email:', fromEmail);
+      }
     }
 
     const rawFromName = companySettings.company_name || '';

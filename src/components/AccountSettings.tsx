@@ -4808,21 +4808,35 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div className="pt-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Default Sender for Quotes & Invoices
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Email Routing
                   </label>
-                  <select
-                    value={quoteEmailSender}
-                    onChange={(e) => setQuoteEmailSender(e.target.value as 'primary' | 'secondary')}
-                    className="w-full max-w-sm px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="primary">Primary Address ({emailFromAddress || 'Unconfigured'})</option>
-                    <option value="secondary" disabled={!secondaryEmailFromAddress}>
-                      Secondary Address ({secondaryEmailFromAddress || 'Unconfigured'})
-                    </option>
-                  </select>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    System notifications & alerts will automatically use the other address.
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center">
+                        <span className="text-green-600 dark:text-green-300 text-sm font-bold">$</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-900 dark:text-green-200">Invoices &amp; Payments</p>
+                        <p className="text-xs text-green-700 dark:text-green-400">
+                          Sent from: <strong>{emailFromAddress || 'Primary (Unconfigured)'}</strong>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 bg-purple-100 dark:bg-purple-800 rounded-full flex items-center justify-center">
+                        <span className="text-purple-600 dark:text-purple-300 text-sm font-bold">&#9993;</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-purple-900 dark:text-purple-200">Quotes, Proofs &amp; Automations</p>
+                        <p className="text-xs text-purple-700 dark:text-purple-400">
+                          Sent from: <strong>{secondaryEmailFromAddress || emailFromAddress || 'Secondary (Unconfigured)'}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Invoices and payment receipts always use your Primary address. All other emails (quotes, proofs, automations) use your Secondary address.
                   </p>
                 </div>
 
