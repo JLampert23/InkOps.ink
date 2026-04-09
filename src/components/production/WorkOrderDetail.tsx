@@ -862,6 +862,29 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           </div>
         )}
 
+        {(workOrder.notes || quote?.production_notes || quote?.notes) && (
+          <div className="p-8 border-t border-gray-300 dark:border-slate-600">
+            {workOrder.notes && (
+              <div className="mb-4">
+                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Production Notes</h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{workOrder.notes}</p>
+              </div>
+            )}
+            {quote?.production_notes && quote.production_notes !== workOrder.notes && (
+              <div className="mb-4">
+                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Production Notes</h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.production_notes}</p>
+              </div>
+            )}
+            {quote?.notes && (
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Customer Notes</h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {hasQuoteData ? (
           <div className="overflow-x-auto">
             <table className="w-full text-base">
@@ -938,29 +961,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             </div>
           </div>
         </div>
-
-        {(workOrder.notes || quote?.production_notes || quote?.notes) && (
-          <div className="p-8 border-t border-gray-300 dark:border-slate-600">
-            {workOrder.notes && (
-              <div className="mb-4">
-                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Production Notes</h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{workOrder.notes}</p>
-              </div>
-            )}
-            {quote?.production_notes && quote.production_notes !== workOrder.notes && (
-              <div className="mb-4">
-                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Production Notes</h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.production_notes}</p>
-              </div>
-            )}
-            {quote?.notes && (
-              <div>
-                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Customer Notes</h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.notes}</p>
-              </div>
-            )}
-          </div>
-        )}
 
         <div className="p-8 border-t border-gray-300 dark:border-slate-600">
           <div className="text-sm text-gray-600 dark:text-gray-400">
