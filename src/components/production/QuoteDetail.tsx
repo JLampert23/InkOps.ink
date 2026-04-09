@@ -593,9 +593,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300"
+            className="flex items-center gap-2 p-2 px-3 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300 shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-slate-600"
+            title="Return safely to your previous workflow"
           >
             <ArrowLeft className="w-5 h-5" />
+            <span className="font-semibold text-sm">Go Back</span>
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{quote.quote_number}</h1>

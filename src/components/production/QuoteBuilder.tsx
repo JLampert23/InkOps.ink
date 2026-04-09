@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw, ArrowLeft } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -2292,9 +2292,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           <button
             onClick={handleCancel}
             className="px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg flex items-center gap-2 shadow-sm transition-all hover:shadow-md"
+            title="Cancel changes and safely return to previous page"
           >
-            <X className="w-4 h-4" />
-            Cancel
+            <ArrowLeft className="w-4 h-4" />
+            <span className="font-medium">Cancel & Return</span>
           </button>
           <button
             onClick={handleSave}

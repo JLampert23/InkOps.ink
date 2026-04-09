@@ -23,10 +23,22 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
       processedQuoteIdRef.current = initialQuoteId;
       setSelectedQuoteId(initialQuoteId);
       setView('detail');
-    } else if (initialCustomerId) {
+      // Fix: Track external origin so Back button accurately pops state
+      window.history.pushState(
+        { quoteView: 'detail', quoteId: initialQuoteId, fromExternal: true },
+        '',
+        `#production/quotes/${initialQuoteId}`
+      );
+    } else if (initialCustomerId && initialCustomerId !== processedQuoteIdRef.current) { // Reusing ref to avoid loop
+      processedQuoteIdRef.current = initialCustomerId;
       setView('create');
       setPreselectedCustomerId(initialCustomerId);
       setPreselectedContactId(initialContactId);
+      window.history.pushState(
+        { quoteView: 'create', fromExternal: true },
+        '',
+        '#production/quotes/create'
+      );
       if (onCustomerIdConsumed) {
         onCustomerIdConsumed();
       }
@@ -87,13 +99,24 @@ export function QuotesManager({ initialCustomerId, initialContactId, initialQuot
   };
 
   const handleBack = () => {
-    setSelectedQuoteId(null);
-    setPreselectedCustomerId(undefined);
-    setPreselectedContactId(undefined);
-    setView('list');
-    // Only go back if we have history to go back to
-    if (window.history.state?.quoteView) {
+    const isExternal = window.history.state?.fromExternal;
+    
+    // Only go back if we have history to go back to (internal or external)
+    if (window.history.state?.quoteView || isExternal) {
+      if (!isExternal) {
+        // Only force the list view flash if we're staying inside the quotes module
+        setSelectedQuoteId(null);
+        setPreselectedCustomerId(undefined);
+        setPreselectedContactId(undefined);
+        setView('list');
+      }
       window.history.back();
+    } else {
+      // Fallback for no-history edge cases
+      setSelectedQuoteId(null);
+      setPreselectedCustomerId(undefined);
+      setPreselectedContactId(undefined);
+      setView('list');
     }
   };
 
