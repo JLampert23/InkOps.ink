@@ -469,6 +469,47 @@ export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void
 
   yPosition = Math.max(billY, shipY, detailY) + 5;
 
+  const hasNotes = data.notes || quote?.production_notes || quote?.notes;
+  if (hasNotes) {
+    const notesPadding = 3.5;
+    const notesLabelHeight = 6;
+
+    const allNotesText = [
+      data.notes,
+      quote?.production_notes && quote.production_notes !== data.notes ? quote.production_notes : null,
+      quote?.notes ? `Customer Notes: ${quote.notes}` : null,
+    ].filter(Boolean).join('\n');
+
+    const notesTextWrapped = doc.splitTextToSize(allNotesText, contentWidth - notesPadding * 2);
+    const notesTextHeight = notesTextWrapped.length * 4;
+    const notesBgHeight = notesPadding + notesLabelHeight + notesTextHeight + notesPadding;
+
+    if (yPosition + notesBgHeight > pageHeight - marginBottom) {
+      doc.addPage();
+      yPosition = marginTop;
+    }
+
+    doc.setFillColor(254, 243, 199);
+    doc.setDrawColor(217, 119, 6);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(marginLeft, yPosition, contentWidth, notesBgHeight, 2, 2, 'FD');
+
+    doc.setFillColor(217, 119, 6);
+    doc.rect(marginLeft, yPosition, contentWidth, notesLabelHeight + notesPadding, 'F');
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('PRODUCTION NOTES', marginLeft + notesPadding, yPosition + notesPadding + 4);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(92, 51, 0);
+    doc.text(notesTextWrapped, marginLeft + notesPadding, yPosition + notesPadding + notesLabelHeight + 4.5);
+
+    yPosition += notesBgHeight + 5;
+  }
+
   const items = data.line_items;
   const groupedItems = items.reduce((acc, item) => {
     const groupLabel = item.group_label || '';
@@ -751,74 +792,6 @@ export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void
   const qtyValueWidth = doc.getTextWidth(qtyValue);
   doc.text(qtyValue, totalsValueX - qtyValueWidth, yPosition);
   yPosition += 8;
-
-  const hasNotes = data.notes || quote?.production_notes || quote?.notes;
-  if (hasNotes) {
-    if (yPosition + 30 > pageHeight - marginBottom) {
-      doc.addPage();
-      yPosition = marginTop;
-    }
-
-    doc.setDrawColor(209, 213, 219);
-    doc.setLineWidth(0.3);
-    doc.line(marginLeft, yPosition, rightEdge, yPosition);
-    yPosition += 6;
-
-    if (data.notes) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(17, 24, 39);
-      doc.text('Production Notes', marginLeft, yPosition);
-      yPosition += 4;
-
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(55, 65, 81);
-      const notesLines = doc.splitTextToSize(data.notes, contentWidth);
-      doc.text(notesLines, marginLeft, yPosition);
-      yPosition += notesLines.length * 3 + 4;
-    }
-
-    if (quote?.production_notes && quote.production_notes !== data.notes) {
-      if (yPosition + 15 > pageHeight - marginBottom) {
-        doc.addPage();
-        yPosition = marginTop;
-      }
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(17, 24, 39);
-      doc.text('Quote Production Notes', marginLeft, yPosition);
-      yPosition += 4;
-
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(55, 65, 81);
-      const notesLines = doc.splitTextToSize(quote.production_notes, contentWidth);
-      doc.text(notesLines, marginLeft, yPosition);
-      yPosition += notesLines.length * 3 + 4;
-    }
-
-    if (quote?.notes) {
-      if (yPosition + 15 > pageHeight - marginBottom) {
-        doc.addPage();
-        yPosition = marginTop;
-      }
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(17, 24, 39);
-      doc.text('Customer Notes', marginLeft, yPosition);
-      yPosition += 4;
-
-      doc.setFontSize(7.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(55, 65, 81);
-      const notesLines = doc.splitTextToSize(quote.notes, contentWidth);
-      doc.text(notesLines, marginLeft, yPosition);
-      yPosition += notesLines.length * 3 + 4;
-    }
-  }
 
   yPosition += 4;
   doc.setTextColor(107, 114, 128);
