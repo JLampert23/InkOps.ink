@@ -1283,6 +1283,23 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
           </div>
         </div>
 
+        {(quote.production_notes || quote.notes) && (
+          <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+            {quote.production_notes && (
+              <div className="mb-4">
+                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Production Notes</h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.production_notes}</p>
+              </div>
+            )}
+            {quote.notes && (
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Customer Notes</h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Invoice Creation Date */}
         <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           <div className="text-sm text-gray-600 dark:text-gray-400">

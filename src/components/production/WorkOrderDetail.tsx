@@ -949,7 +949,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             )}
             {quote?.production_notes && quote.production_notes !== workOrder.notes && (
               <div className="mb-4">
-                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Quote Production Notes</h3>
+                <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-sm">Production Notes</h3>
                 <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.production_notes}</p>
               </div>
             )}
