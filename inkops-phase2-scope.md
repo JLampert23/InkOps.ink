@@ -96,13 +96,13 @@ Built on Bolt.new, GitHub repo (JLampert23/InkOps.ink), Supabase backend, deploy
 
 ---
 
-### Feature 4: Dual Email Setup — ✅ DONE
-**Status:** Both backend routing and UI integration are fully implemented out-of-the-box.
+### Feature 4: Dual Email Setup — ✅ DONE (Updated Apr 9)
+**Status:** Both backend routing and UI integration are fully implemented. Email routing has been hardcoded per client request.
 
 **What was built:**
 - [x] New DB Column: `secondary_email_from_address` and `quote_email_sender` in `company_settings` (via Migration).
-- [x] Backend Edge Function: The `send-email` webhook now defaults non-invoice traffic to the secondary sender.
-- [x] Frontend Config UI: Available today in `AccountSettings -> Resend Integration` with selector dropdown.
+- [x] Backend Edge Function: The `send-email` function now hardcodes the split: **Invoices/Payments → Primary email**, **Quotes/Proofs/Automations → Secondary email**.
+- [x] Frontend Config UI: The old combined dropdown has been replaced with a clear "Email Routing" summary panel showing exactly which email handles what.
 
 ---
 
