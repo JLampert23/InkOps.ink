@@ -550,8 +550,8 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   const sizeWidth = 6;
   const qtyWidth = 7;
   const itemsWidth = 8;
-  const unitWidth = 12;
-  const totalWidth = 12;
+  const unitWidth = 14;
+  const totalWidth = 16;
   const remainingWidth = totalTableWidth - styleWidth - colorWidth - descWidth - (sizeColumns.length * sizeWidth) - qtyWidth - itemsWidth - unitWidth - totalWidth;
   const adjustedDescWidth = descWidth + remainingWidth;
 
@@ -830,7 +830,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
-    doc.text('Additional Fees', marginLeft + contentWidth / 2, yPosition);
+    doc.text('Additional Fees', marginLeft, yPosition);
     yPosition += 2;
 
     const feeData = fees.map(fee => {
@@ -865,13 +865,13 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
         lineColor: [203, 213, 225],
       },
       columnStyles: {
-        0: { cellWidth: 28 },
-        1: { cellWidth: 'auto' },
+        0: { cellWidth: 35 },
+        1: { cellWidth: 'auto', overflow: 'linebreak' },
         2: { cellWidth: 12, halign: 'center' },
-        3: { cellWidth: 20, halign: 'right' },
-        4: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
+        3: { cellWidth: 22, halign: 'right' },
+        4: { cellWidth: 22, halign: 'right', fontStyle: 'bold' },
       },
-      margin: { left: marginLeft + contentWidth / 2, right: marginRight },
+      margin: { left: marginLeft, right: marginRight },
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 2;
