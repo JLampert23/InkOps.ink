@@ -688,9 +688,9 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     }
 
     if (groupImprints && groupImprints.length > 0) {
-      const imprintsPerRow = 2;
-      const imprintGap = 4;
-      const imprintWidth = (contentWidth - imprintGap) / imprintsPerRow;
+      const imprintsPerRow = 3;
+      const imprintGap = 3;
+      const imprintWidth = (contentWidth - imprintGap * (imprintsPerRow - 1)) / imprintsPerRow;
       let imprintX = marginLeft;
       let imprintY = yPosition;
       let maxImprintHeight = 0;
@@ -781,7 +781,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
         if (allImages.length > 0) {
           let imgX = imprintX + 2;
-          for (let j = 0; j < Math.min(allImages.length, 6); j++) {
+          for (let j = 0; j < Math.min(allImages.length, 4); j++) {
             const imgUrl = allImages[j];
             try {
               const imgBase64 = await imageToBase64(imgUrl);
@@ -807,7 +807,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
           imprintY += maxImprintHeight + 2;
           maxImprintHeight = 0;
         } else {
-          imprintX += imprintWidth;
+          imprintX += imprintWidth + imprintGap;
         }
       }
 
