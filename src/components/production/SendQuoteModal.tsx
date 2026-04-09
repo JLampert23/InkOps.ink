@@ -193,24 +193,24 @@ export function SendQuoteModal({
     try {
       console.log('Sending quote via Supabase functions.invoke');
 
-      // Refresh session to ensure we have a valid token
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      // Get current session and ensure it's fresh
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError || !session) {
         throw new Error('No active session. Please log in again.');
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      console.log('Current session:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        expiresAt: session?.expires_at,
+        accessToken: session?.access_token?.substring(0, 20) + '...',
+      });
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/quote-actions/${quoteId}/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': supabaseAnonKey,
-        },
-        body: JSON.stringify({
+      // Use Supabase's built-in functions.invoke which handles auth automatically
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/send`, {
+        body: {
           template_id: selectedTemplateId,
           custom_message: customMessage,
           expires_in_days: expiresInDays,
@@ -219,13 +219,32 @@ export function SendQuoteModal({
           auto_convert_on_approval: false,
           delivery_method: deliveryMethod,
           customer_phone: customerPhone,
-        }),
+        },
       });
 
-      const data = await response.json();
+      if (error) {
+        console.error('Edge function error details:', {
+          error,
+          message: error.message,
+          context: error.context,
+          status: error.context?.status,
+          body: error.context?.body,
+        });
 
-      if (!response.ok) {
-        throw new Error(data?.message || data?.error || 'Failed to send quote');
+        // Try to read the error body
+        if (error.context?.body) {
+          try {
+            const reader = error.context.body.getReader();
+            const { value } = await reader.read();
+            const errorText = new TextDecoder().decode(value);
+            console.error('Error response body:', errorText);
+            throw new Error(errorText || error.message || 'Failed to send quote');
+          } catch (readError) {
+            console.error('Could not read error body:', readError);
+          }
+        }
+
+        throw new Error(error.message || 'Failed to send quote');
       }
 
       console.log('Quote sent successfully:', data);
