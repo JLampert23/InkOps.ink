@@ -193,7 +193,6 @@ Deno.serve(async (req: Request) => {
         discount_percent: original.discount_percent,
         pricing_reference: original.pricing_reference,
         notes: original.notes,
-        customer_notes: original.customer_notes,
         production_notes: original.production_notes,
         terms: original.terms,
         po_number: original.po_number,
@@ -899,7 +898,6 @@ Deno.serve(async (req: Request) => {
             work_order_number: workOrderNumber,
             approved_by: approverName,
             terms: quote.terms,
-            customer_notes: quote.customer_notes,
           },
         }])
         .select()

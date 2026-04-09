@@ -39,7 +39,6 @@ export interface QuotePDFData {
   created_date?: string;
   customer_due_date?: string;
   production_due_date?: string;
-  customer_notes: string | null;
   notes: string | null;
   production_notes?: string | null;
   delivery_method: string | null;

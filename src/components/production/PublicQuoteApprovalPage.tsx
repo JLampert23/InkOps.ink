@@ -350,12 +350,6 @@ export default function PublicQuoteApprovalPage() {
                   {quote.shipping_address?.contact && <p>{quote.shipping_address.contact}</p>}
                 </div>
               </div>
-              <div>
-                <h3 className="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wide">Customer Notes</h3>
-                <div className="text-xs text-gray-700 leading-tight">
-                  {quote.customer_notes && <p className="whitespace-pre-wrap">{quote.customer_notes}</p>}
-                </div>
-              </div>
             </div>
 
             {/* Line Items Table with Size Breakdown */}

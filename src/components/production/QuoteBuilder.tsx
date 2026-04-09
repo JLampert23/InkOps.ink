@@ -268,7 +268,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   const [poNumber, setPoNumber] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
   const [nickname, setNickname] = useState('');
-  const [customerNotes, setCustomerNotes] = useState('');
   const [productionNotes, setProductionNotes] = useState('');
   const [showCustomSizeModal, setShowCustomSizeModal] = useState(false);
 
@@ -672,7 +671,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       setPoNumber(quote.po_number || '');
       setDeliveryMethod(quote.delivery_method || '');
       setNickname(quote.nickname || '');
-      setCustomerNotes(quote.customer_notes || '');
       setProductionNotes(quote.production_notes || '');
       setBillCompany(quote.bill_company || '');
       setBillName(quote.bill_name || '');
@@ -2081,7 +2079,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         po_number: poNumber || null,
         delivery_method: deliveryMethod || null,
         nickname: nickname || null,
-        customer_notes: customerNotes || null,
         production_notes: productionNotes || null,
         bill_company: billCompany || null,
         bill_name: billName || null,
@@ -2246,7 +2243,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     const hasLineItems = itemGroups.some(group => group.items.length > 0);
     const hasFees = fees.length > 0;
     const hasCustomer = !!selectedCustomerId;
-    const hasNotes = !!customerNotes.trim() || !!productionNotes.trim();
+    const hasNotes = !!productionNotes.trim();
     const hasImprints = quoteImprints.length > 0;
 
     const isEmpty = !hasLineItems && !hasFees && !hasCustomer && !hasNotes && !hasImprints;
@@ -2528,15 +2525,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="Invoice nickname"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Customer Notes ?</label>
-                  <textarea
-                    value={customerNotes}
-                    onChange={(e) => setCustomerNotes(e.target.value)}
-                    rows={3}
                     className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>

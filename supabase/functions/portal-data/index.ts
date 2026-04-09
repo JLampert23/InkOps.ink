@@ -569,7 +569,6 @@ async function handleQuoteApproval(
             work_order_number: workOrderNumber,
             approved_by: approver_name,
             terms: quote.terms,
-            customer_notes: quote.customer_notes,
           },
         }]);
 

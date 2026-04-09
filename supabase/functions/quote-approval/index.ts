@@ -161,11 +161,7 @@ function renderQuotePage(
       </div>
     </div>` : '';
 
-  const notesHtml = quote.customer_notes ? `
-    <div class="notes-box">
-      <div class="notes-label">Notes</div>
-      <div class="notes-text">${escapeHtml(quote.customer_notes)}</div>
-    </div>` : '';
+  const notesHtml = '';
 
   const approvalFormHtml = !isExpired ? `
     <div class="card" id="approval-form">
@@ -830,7 +826,6 @@ Deno.serve(async (req: Request) => {
                   work_order_number: workOrderNumber,
                   approved_by: body.approver_name,
                   terms: quote.terms,
-                  customer_notes: quote.customer_notes,
                 },
               }])
               .select()

@@ -12,7 +12,6 @@ interface Quote {
   tax_amount: number;
   total: number;
   valid_until: string | null;
-  customer_notes: string | null;
   status: string;
 }
 
@@ -318,12 +317,6 @@ export default function PublicQuoteApproval() {
             </div>
           </div>
 
-          {quote.customer_notes && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-sm font-medium text-blue-900 mb-2">Notes</h3>
-              <p className="text-blue-800 text-sm whitespace-pre-wrap">{quote.customer_notes}</p>
-            </div>
-          )}
         </div>
 
         {/* Line Items */}

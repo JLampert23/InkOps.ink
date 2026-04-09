@@ -251,7 +251,6 @@ Deno.serve(async (req: Request) => {
         valid_until: body.valid_until || null,
         pricing_reference: body.pricing_reference || null,
         notes: body.notes || null,
-        customer_notes: body.customer_notes || null,
         status: "draft",
         created_by: user.id,
       };
@@ -337,7 +336,6 @@ Deno.serve(async (req: Request) => {
       if (body.valid_until !== undefined) updateData.valid_until = body.valid_until;
       if (body.pricing_reference !== undefined) updateData.pricing_reference = body.pricing_reference;
       if (body.notes !== undefined) updateData.notes = body.notes;
-      if (body.customer_notes !== undefined) updateData.customer_notes = body.customer_notes;
       if (body.status && ["draft", "sent"].includes(body.status)) updateData.status = body.status;
 
       const { data: quote, error: updateError } = await supabase

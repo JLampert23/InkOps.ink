@@ -69,7 +69,6 @@ interface Quote {
   approved_at: string | null;
   rejected_at: string | null;
   converted_at?: string | null;
-  customer_notes: string | null;
   notes: string | null;
   production_notes?: string | null;
   delivery_method: string | null;

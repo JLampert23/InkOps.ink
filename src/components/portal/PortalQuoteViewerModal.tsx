@@ -297,7 +297,6 @@ export function PortalQuoteViewerModal({ quoteId, onClose, onApprovalComplete, c
         created_date: data.quote.created_date,
         customer_due_date: data.quote.customer_due_date,
         production_due_date: data.quote.production_due_date,
-        customer_notes: data.quote.customer_notes,
         notes: data.quote.notes,
         production_notes: data.quote.production_notes,
         delivery_method: data.quote.delivery_method,
@@ -624,12 +623,6 @@ export function PortalQuoteViewerModal({ quoteId, onClose, onApprovalComplete, c
                         {quote.ship_city && (
                           <p>{quote.ship_city}, {quote.ship_state || ''} {quote.ship_zip || ''}</p>
                         )}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wide">Customer Notes</h3>
-                      <div className="text-xs text-gray-700 leading-tight">
-                        {quote.customer_notes && <p className="whitespace-pre-wrap">{quote.customer_notes}</p>}
                       </div>
                     </div>
                   </div>

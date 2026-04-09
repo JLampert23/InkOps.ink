@@ -186,10 +186,6 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
       shippingY += 4;
     }
 
-    if (quote.customer_notes) {
-      doc.text(doc.splitTextToSize(quote.customer_notes, 60), 136, yPos);
-    }
-
     yPos = Math.max(billingY, shippingY, yPos + 20);
 
     const items = lineItems.filter(item => item.line_type === 'item' || !item.line_type);
@@ -509,12 +505,6 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                 </div>
               </div>
 
-              <div>
-                <h3 className="font-bold text-gray-900 mb-1 text-xs">Customer Notes</h3>
-                <div className="text-xs text-gray-700 leading-tight">
-                  {quote.customer_notes && <p>{quote.customer_notes}</p>}
-                </div>
-              </div>
             </div>
 
             {/* Line Items Table */}
