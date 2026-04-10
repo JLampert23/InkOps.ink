@@ -485,14 +485,7 @@ Deno.serve(async (req: Request) => {
 
       if (approvalError) throw approvalError;
 
-      // Update quote status to sent (use admin client to bypass RLS)
-      await supabaseAdmin
-        .from("quotes")
-        .update({
-          status: "sent",
-          sent_at: new Date().toISOString(),
-        })
-        .eq("id", quoteId);
+      // Status update moved below to only trigger on successful sending
 
       // Get company settings to retrieve the inkops subdomain and company info (use admin client to bypass RLS)
       const { data: companySettings } = await supabaseAdmin
@@ -719,6 +712,15 @@ Deno.serve(async (req: Request) => {
           }
         }
       }
+
+      // Update quote status to sent ONLY if we succeeded without throwing an error
+      await supabaseAdmin
+        .from("quotes")
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", quoteId);
 
       const deliveryMessage = deliveryMethod === 'both'
         ? 'Quote sent via email and SMS successfully'
