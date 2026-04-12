@@ -293,11 +293,12 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       try {
         console.log('Queuing automation for work step status change:', { stepId, newStatus });
         
-        // Use trigger_type and trigger_data to match what the process-automation-queue edge function expects
-        await supabase.from('automation_queue').insert({
-          company_id: companyId,
-          trigger_type: 'work_step_status_changed',
-          trigger_data: {
+        // Use the database function to find all matching automations and queue them
+        // This is better than direct insert because it handles the logic of matching rules
+        const { error: rpcError } = await supabase.rpc('queue_matching_automations', {
+          p_company_id: companyId,
+          p_trigger_type: 'work_step_status_changed',
+          p_trigger_data: {
             step_name: stepId,
             status: newStatus,
             quote_id: entry.quote_id,
@@ -308,10 +309,12 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
             station: entry.station,
             imprint_number: entry.imprint_number,
             quantity: entry.quantity,
+            new_status: newStatus, // added for compatibility with standard conditions
             changed_at: new Date().toISOString()
-          },
-          status: 'pending'
+          }
         });
+
+        if (rpcError) throw rpcError;
       } catch (err) {
         console.error('Failed to trigger automation:', err);
       }

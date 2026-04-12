@@ -238,109 +238,77 @@ export default function PublicQuoteApprovalPage() {
         <div className="bg-white shadow-lg rounded-lg overflow-hidden mb-6">
           <div className="p-6" style={{ fontSize: '9pt' }}>
             {/* Header */}
-            <div className="flex items-start justify-between mb-4 pb-3 border-b border-gray-300">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 mb-0.5">{quote.quote_number}</h1>
-                <p className="text-sm text-gray-600 uppercase">{quote.customer_name}</p>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
-                Awaiting Approval
-              </span>
-            </div>
-
-            {/* Company Info + Quote Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
-              <div className="flex gap-3">
-                {logoUrl && (
-                  <img src={logoUrl} alt="Company Logo" className="h-16 w-auto object-contain flex-shrink-0" />
+            <div className="flex flex-col md:flex-row items-center justify-between mb-8 pb-6 border-b-2 border-gray-100">
+              <div className="flex flex-col items-center md:items-start gap-4 mb-4 md:mb-0">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Company Logo" className="h-20 w-auto object-contain" />
+                ) : (
+                  <h1 className="text-2xl font-black text-gray-900 tracking-tighter uppercase italic">
+                    {quote.company_name || company_settings?.company_name || 'INKOPS'}
+                  </h1>
                 )}
-                <div className="text-xs leading-tight">
-                  <h2 className="font-bold text-gray-900 uppercase mb-0.5">
-                    {quote.company_name || company_settings?.company_name || ''}
-                  </h2>
-                  <div className="text-gray-700 space-y-0">
-                    {quote.company_address && <p>{quote.company_address}</p>}
-                    {(quote.company_city || quote.company_state) && (
-                      <p>{quote.company_city}{quote.company_state ? `, ${quote.company_state}` : ''} {quote.company_zip || ''}</p>
-                    )}
-                    {(quote.company_phone || company_settings?.company_phone) && <p>{quote.company_phone || company_settings.company_phone}</p>}
-                    {(quote.company_website || company_settings?.company_website) && (
-                      <p className="text-blue-600">{quote.company_website || company_settings.company_website}</p>
-                    )}
-                    {(quote.company_email || company_settings?.company_email) && (
-                      <p className="text-blue-600">{quote.company_email || company_settings.company_email}</p>
-                    )}
-                  </div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">
+                  Quote Document
                 </div>
               </div>
 
-              <div>
-                <table className="w-full text-xs border-collapse">
-                  <tbody>
-                    <tr className="border-b border-gray-200">
-                      <td className="py-0.5 pr-2 font-semibold text-gray-700">Delivery Method</td>
-                      <td className="py-0.5 text-right">{quote.delivery_method || 'PICK-UP'}</td>
-                    </tr>
-                    {quote.po_number && (
-                      <tr className="border-b border-gray-200">
-                        <td className="py-0.5 pr-2 font-semibold text-gray-700">PO #</td>
-                        <td className="py-0.5 text-right">{quote.po_number}</td>
-                      </tr>
-                    )}
-                    <tr className="border-b border-gray-200">
-                      <td className="py-0.5 pr-2 font-semibold text-gray-700">Created</td>
-                      <td className="py-0.5 text-right">{fmtDate(quote.created_at)}</td>
-                    </tr>
-                    {quote.customer_due_date && (
-                      <tr className="border-b border-gray-200">
-                        <td className="py-0.5 pr-2 font-semibold text-gray-700">Customer Due Date</td>
-                        <td className="py-0.5 text-right">{fmtDate(quote.customer_due_date)}</td>
-                      </tr>
-                    )}
-                    {quote.valid_until && (
-                      <tr className="border-b border-gray-200">
-                        <td className="py-0.5 pr-2 font-semibold text-gray-700">Valid Until</td>
-                        <td className="py-0.5 text-right">{fmtDate(quote.valid_until)}</td>
-                      </tr>
-                    )}
-                    <tr className="border-b border-gray-200">
-                      <td className="py-0.5 pr-2 font-semibold text-gray-700">Terms</td>
-                      <td className="py-0.5 text-right">{quote.terms || 'Net 30'}</td>
-                    </tr>
-                    <tr className="border-b border-gray-200">
-                      <td className="py-0.5 pr-2 font-bold text-gray-900">Total</td>
-                      <td className="py-0.5 text-right font-bold">{fmt(quote.total)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="text-center md:text-right">
+                <h1 className="text-4xl font-black text-gray-900 mb-1 tracking-tight">QUOTE</h1>
+                <div className="flex flex-col gap-1 text-xs">
+                  <p className="font-bold text-gray-900">
+                    Quote #: <span className="font-normal text-gray-600">{quote.quote_number}</span>
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    Date: <span className="font-normal text-gray-600">{fmtDate(quote.created_at)}</span>
+                  </p>
+                  {quote.customer_due_date && (
+                    <p className="font-bold text-gray-900">
+                      Due Date: <span className="font-normal text-gray-600">{fmtDate(quote.customer_due_date)}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Company Info Banner */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-8 flex flex-col md:flex-row justify-between items-center text-[10px] text-gray-600 uppercase tracking-wider font-semibold">
+              <div className="flex flex-wrap justify-center md:justify-start gap-x-6 gap-y-2">
+                {quote.company_address && <span>{quote.company_address}</span>}
+                {(quote.company_city || quote.company_state) && (
+                  <span>{quote.company_city}{quote.company_state ? `, ${quote.company_state}` : ''} {quote.company_zip || ''}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap justify-center md:justify-end gap-x-6 gap-y-2 mt-2 md:mt-0">
+                {(quote.company_phone || company_settings?.company_phone) && <span>{quote.company_phone || company_settings.company_phone}</span>}
+                {(quote.company_email || company_settings?.company_email) && <span className="text-blue-600">{quote.company_email || company_settings.company_email}</span>}
               </div>
             </div>
 
             {/* Customer Info Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-              <div>
-                <h3 className="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wide">Customer Billing</h3>
-                <div className="text-xs text-gray-700 leading-tight space-y-0">
-                  {quote.bill_company && <p className="font-bold text-gray-900">{quote.bill_company}</p>}
+            <div className="flex flex-col md:flex-row gap-8 mb-6 border-t border-gray-200 pt-6">
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-xs uppercase tracking-wider text-blue-600">Customer Billing</h3>
+                <div className="text-xs text-gray-700 leading-relaxed space-y-1">
+                  {quote.bill_company && <p className="font-bold text-sm text-gray-900">{quote.bill_company}</p>}
                   {(quote.bill_first_name || quote.bill_last_name) && (
-                    <p className="font-medium">{quote.bill_first_name} {quote.bill_last_name}</p>
+                    <p className="font-semibold text-gray-800">{quote.bill_first_name} {quote.bill_last_name}</p>
                   )}
                   {!quote.bill_first_name && !quote.bill_last_name && quote.bill_name && (
-                    <p className="font-medium">{quote.bill_name}</p>
+                    <p className="font-semibold text-gray-800">{quote.bill_name}</p>
                   )}
                   {quote.bill_address_1 && <p>{quote.bill_address_1}</p>}
                   {quote.bill_address_2 && <p>{quote.bill_address_2}</p>}
                   {(quote.bill_city || quote.billing_address?.city) && (
                     <p>{quote.bill_city || quote.billing_address?.city}, {quote.bill_state || quote.billing_address?.state || ''} {quote.bill_zip || quote.billing_address?.zip || ''}</p>
                   )}
-                  {(quote.bill_email || quote.customer_email) && <p className="text-blue-600">{quote.bill_email || quote.customer_email}</p>}
+                  {(quote.bill_email || quote.customer_email) && <p className="text-blue-600 font-medium">{quote.bill_email || quote.customer_email}</p>}
                   {(quote.bill_phone || quote.customer_phone) && <p>{quote.bill_phone || quote.customer_phone}</p>}
                 </div>
               </div>
-              <div>
-                <h3 className="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wide">Customer Shipping</h3>
-                <div className="text-xs text-gray-700 leading-tight space-y-0">
-                  {(quote.ship_name || quote.shipping_address?.name) && <p>{quote.ship_name || quote.shipping_address?.name}</p>}
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-2 text-xs uppercase tracking-wider text-blue-600">Customer Shipping</h3>
+                <div className="text-xs text-gray-700 leading-relaxed space-y-1">
+                  {(quote.ship_name || quote.shipping_address?.name) && <p className="font-semibold text-gray-800">{quote.ship_name || quote.shipping_address?.name}</p>}
                   {quote.ship_company && <p>{quote.ship_company}</p>}
                   {quote.ship_address_1 && <p>{quote.ship_address_1}</p>}
                   {quote.ship_address_2 && <p>{quote.ship_address_2}</p>}
@@ -350,7 +318,34 @@ export default function PublicQuoteApprovalPage() {
                   {quote.shipping_address?.contact && <p>{quote.shipping_address.contact}</p>}
                 </div>
               </div>
+              <div className="w-64">
+                <h3 className="font-bold text-gray-900 mb-2 text-xs uppercase tracking-wider text-blue-600">Quote Details</h3>
+                <table className="w-full text-xs">
+                  <tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="py-1 text-gray-500">Terms</td>
+                      <td className="py-1 text-right font-medium">{quote.terms || 'Net 30'}</td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="py-1 text-gray-500">Delivery</td>
+                      <td className="py-1 text-right font-medium">{quote.delivery_method || 'PICK-UP'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* Production Notes Section */}
+            {quote.production_notes && (
+              <div className="mb-6 rounded-lg overflow-hidden border border-orange-200">
+                <div className="bg-orange-500 px-4 py-2 text-white font-bold text-xs uppercase tracking-wider">
+                  Production Notes
+                </div>
+                <div className="bg-white p-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {quote.production_notes}
+                </div>
+              </div>
+            )}
 
             {/* Line Items Table with Size Breakdown */}
             {items.length > 0 && (
@@ -476,17 +471,20 @@ export default function PublicQuoteApprovalPage() {
             </div>
 
             {/* Terms */}
-            <div className="pt-3 border-t border-gray-300 space-y-1" style={{ fontSize: '7pt', lineHeight: '1.3' }}>
-              <p className="text-gray-600">
-                <strong>Payment Terms:</strong> Unless you have a billing account set up or are ordering through a PO system, a 50% down payment is due before blank goods are ordered, and the remaining 50% balance is due at pickup. All orders must be signed for at pickup, and signing off on your order confirms you have received the correct products, quantities, colors and sizes.
-              </p>
-              <p className="text-gray-600">
-                <strong>Artwork Proofs -</strong> All orders must have customer approval on artwork before production can begin. Once final approval has been made, we will proceed with production. No refunds, returns or reprints due to approving artwork with incorrect spelling, placement or colors. Your proof is an approximate representation of location and size, but sizing (appearance) and placement will change across different sizes of shirts.
-              </p>
-              <p className="text-gray-600">
-                <strong>Ink/Thread Colors:</strong> We use standard, stock ink and thread colors. The colors you see on your proof are a close, but not exact representation of these ink or thread colors. If you have specific colors, please provide a Pantone Color, HEX value, or CMYK/RGB value.
-              </p>
-              <p className="text-gray-600 font-semibold">This quote is good for 15 days.</p>
+            <div className="pt-6 border-t border-gray-300 space-y-3">
+              {quote.terms ? (
+                <div className="text-xs text-gray-700 leading-relaxed">
+                  <h4 className="font-bold text-gray-900 uppercase mb-1">Terms & Conditions</h4>
+                  <p className="whitespace-pre-wrap">{quote.terms}</p>
+                </div>
+              ) : (
+                <div className="text-[7pt] text-gray-500 italic">
+                  No specific payment terms provided for this quote.
+                </div>
+              )}
+              {quote.valid_until && (
+                <p className="text-[7pt] text-gray-600 font-semibold">This quote is valid until {fmtDate(quote.valid_until)}.</p>
+              )}
             </div>
           </div>
         </div>
