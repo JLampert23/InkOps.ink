@@ -1,4 +1,4 @@
-﻿4012b0b Merge branch 'InkOps-Production' of https://github.com/JLampert23/InkOps.ink into InkOps-Production
+4012b0b Merge branch 'InkOps-Production' of https://github.com/JLampert23/InkOps.ink into InkOps-Production
 d87b923 Fix QuotesManager popstate for create view.
 495ecf2 Merge pull request #26 from JLampert23/main
 d27ec54 Merge branch 'main' of https://github.com/JLampert23/InkOps.ink

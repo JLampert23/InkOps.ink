@@ -161,11 +161,7 @@ function renderQuotePage(
       </div>
     </div>` : '';
 
-  const notesHtml = quote.production_notes ? `
-    <div class="notes-box">
-      <div class="notes-label">Production Notes</div>
-      <div class="notes-text">${escapeHtml(quote.production_notes)}</div>
-    </div>` : '';
+  const notesHtml = '';
 
   const approvalFormHtml = !isExpired ? `
     <div class="card" id="approval-form">

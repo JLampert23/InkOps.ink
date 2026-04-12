@@ -276,7 +276,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
     }
   };
 
-  const handleStatusChange = async (entryId: string, stepId: string, newStatus: string) => {
+  const handleStatusChange = (entryId: string, stepId: string, newStatus: string) => {
     const entry = entries.find(e => e.id === entryId);
     if (!entry) return;
 
@@ -285,38 +285,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       [stepId]: newStatus,
     };
 
-    // Update the database first
-    await updateEntry(entryId, { step_statuses: updatedStatuses });
-
-    // Trigger automation if companyId exists
-    if (companyId) {
-      try {
-        console.log('Queuing automation for work step status change:', { stepId, newStatus });
-        
-        // Use trigger_type and trigger_data to match what the process-automation-queue edge function expects
-        await supabase.from('automation_queue').insert({
-          company_id: companyId,
-          trigger_type: 'work_step_status_changed',
-          trigger_data: {
-            step_name: stepId,
-            status: newStatus,
-            quote_id: entry.quote_id,
-            work_order_id: entry.work_order_id,
-            quote_number: entry.quote_number,
-            customer_name: entry.customer_name,
-            type_of_work: entry.type_of_work,
-            station: entry.station,
-            imprint_number: entry.imprint_number,
-            quantity: entry.quantity,
-            changed_at: new Date().toISOString()
-          },
-          status: 'pending'
-        });
-      } catch (err) {
-        console.error('Failed to trigger automation:', err);
-      }
-    }
-
+    updateEntry(entryId, { step_statuses: updatedStatuses });
     setEditingCell(null);
   };
 
