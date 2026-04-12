@@ -1,4 +1,4 @@
-806c263 Updated QuoteBuilder.tsx
+﻿806c263 Updated QuoteBuilder.tsx
 diff --git a/src/components/production/QuoteBuilder.tsx b/src/components/production/QuoteBuilder.tsx
 index 9655218..8f4afc8 100644
 --- a/src/components/production/QuoteBuilder.tsx
