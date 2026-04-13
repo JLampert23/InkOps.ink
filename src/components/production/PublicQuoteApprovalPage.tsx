@@ -285,8 +285,8 @@ export default function PublicQuoteApprovalPage() {
             </div>
 
             {/* Customer Info Grid */}
-            <div className="flex flex-col md:flex-row gap-8 mb-6 border-t border-gray-200 pt-6">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-6 border-t border-gray-200 pt-6">
+              <div className="text-left">
                 <h3 className="font-bold text-gray-900 mb-2 text-xs uppercase tracking-wider text-blue-600">Customer Billing</h3>
                 <div className="text-xs text-gray-700 leading-relaxed space-y-1">
                   {quote.bill_company && <p className="font-bold text-sm text-gray-900">{quote.bill_company}</p>}
@@ -305,20 +305,22 @@ export default function PublicQuoteApprovalPage() {
                   {(quote.bill_phone || quote.customer_phone) && <p>{quote.bill_phone || quote.customer_phone}</p>}
                 </div>
               </div>
-              <div className="flex-1">
+              <div className="text-left">
                 <h3 className="font-bold text-gray-900 mb-2 text-xs uppercase tracking-wider text-blue-600">Customer Shipping</h3>
                 <div className="text-xs text-gray-700 leading-relaxed space-y-1">
-                  {(quote.ship_name || quote.shipping_address?.name) && <p className="font-semibold text-gray-800">{quote.ship_name || quote.shipping_address?.name}</p>}
-                  {quote.ship_company && <p>{quote.ship_company}</p>}
+                  {quote.ship_company && <p className="font-bold text-sm text-gray-900">{quote.ship_company}</p>}
+                  {(quote.ship_name || quote.shipping_address?.name) && (
+                    <p className="font-semibold text-gray-800">{quote.ship_name || quote.shipping_address?.name}</p>
+                  )}
                   {quote.ship_address_1 && <p>{quote.ship_address_1}</p>}
                   {quote.ship_address_2 && <p>{quote.ship_address_2}</p>}
                   {(quote.ship_city) && (
                     <p>{quote.ship_city}, {quote.ship_state || ''} {quote.ship_zip || ''}</p>
                   )}
-                  {quote.shipping_address?.contact && <p>{quote.shipping_address.contact}</p>}
+                  {quote.shipping_address?.contact && <p className="text-xs text-gray-500">{quote.shipping_address.contact}</p>}
                 </div>
               </div>
-              <div className="w-64">
+              <div className="text-left border-l border-gray-100 pl-0 md:pl-8">
                 <h3 className="font-bold text-gray-900 mb-2 text-xs uppercase tracking-wider text-blue-600">Quote Details</h3>
                 <table className="w-full text-xs">
                   <tbody>
@@ -590,7 +592,7 @@ function GroupRows({
     <>
       {groupLabel && (
         <tr className="bg-gray-200">
-          <td colSpan={19} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">{groupLabel}</td>
+          <td colSpan={20} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">{groupLabel}</td>
         </tr>
       )}
       {groupItems.map((item, idx) => {
@@ -623,7 +625,7 @@ function GroupRows({
       })}
       {groupImprints.length > 0 && (
         <tr>
-          <td colSpan={19} className="border border-gray-400 p-3 bg-gray-50">
+          <td colSpan={20} className="border border-gray-400 p-3 bg-gray-50">
             <ImprintCards imprints={groupImprints} onImageClick={onImageClick} />
           </td>
         </tr>
