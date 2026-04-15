@@ -551,7 +551,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   const qtyWidth = 7;
   const itemsWidth = 8;
   const unitWidth = 16;
-  const totalWidth = 20;
+  const totalWidth = 26;
   const remainingWidth = totalTableWidth - styleWidth - colorWidth - descWidth - (sizeColumns.length * sizeWidth) - qtyWidth - itemsWidth - unitWidth - totalWidth;
   const adjustedDescWidth = descWidth + remainingWidth;
 
