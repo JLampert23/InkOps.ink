@@ -1035,6 +1035,7 @@ export default function MockupGenerator({
   const handleImprintArtworkUpload = async (event: React.ChangeEvent<HTMLInputElement>, imprintId: string, imprintLocation: string) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    if (uploadingImprintId === imprintId) return;
 
     if (!companyId || companyId.trim() === '') {
       await confirm({

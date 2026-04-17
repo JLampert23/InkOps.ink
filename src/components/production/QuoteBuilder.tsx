@@ -928,6 +928,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         }
       }
     }
+
+    if (field.startsWith('qty_') || field === 'total_quantity' || field === 'wholesale_price') {
+      setTimeout(() => {
+        updatePriceFromMatrixWithGroups(newGroups, groupId, itemIndex, true);
+      }, 500);
+    }
   };
 
   const updatePriceFromMatrixWithGroups = async (groups: any[], groupId: string, itemIndex: number, silent = false) => {
@@ -1611,7 +1617,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           // Check if API explicitly said pricing unavailable
           if (unifiedData.pricingAvailable === false && unifiedData.pricingUnavailableReason) {
             console.warn('⚠️ PRICING UNAVAILABLE:', unifiedData.pricingUnavailableReason);
-            showNotification('Pricing unavailable for this product. You can enter the wholesale cost manually in the line item.', 'warning');
+            showNotification('warning', 'Pricing Unavailable', 'Pricing unavailable for this product. You can enter the wholesale cost manually in the line item.');
           }
 
           console.warn('⚠️ Full pricing debug info:', {

@@ -721,8 +721,8 @@ async function executeRequestApproval(supabase: any, config: any, triggerData: a
     .maybeSingle();
 
   // Generate approval URL - always use inkops subdomain format
-  const subdomain = companySettings?.inkops_subdomain || 'app';
-  const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approval.approval_token}`;
+  // Ensure the URL is valid for the current platform configuration without relying on wildcard Netlify setup
+  const approvalUrl = `https://inkops.ink/quote-approval/${approval.approval_token}`;
 
   // Send approval request email
   const supabaseUrl = Deno.env.get('SUPABASE_URL');

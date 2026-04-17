@@ -495,8 +495,8 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       // Generate public approval URL - always use inkops subdomain format
-      const subdomain = companySettings?.inkops_subdomain || 'app';
-      const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
+      // Ensure the URL is valid for the current platform configuration without relying on wildcard Netlify setup
+      const approvalUrl = `https://inkops.ink/quote-approval/${approvalToken}`;
 
       // Send email if delivery method includes email
       if (deliveryMethod === 'email' || deliveryMethod === 'both') {
