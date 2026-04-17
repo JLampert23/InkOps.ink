@@ -1075,22 +1075,19 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             let priceSource = 'existing';
 
             if (itm.supplier_name?.toUpperCase() === 'SSACTIVEWEAR') {
-              if (itm.supplier_partid && priceLookup.has(itm.supplier_partid)) {
-                wholesalePrice = priceLookup.get(itm.supplier_partid)!;
-                priceSource = 'live-partid';
-              } else if (itm.item_number && priceLookup.has(`style:${itm.item_number}`)) {
+              // Always use the style minimum price (base S/M/L cost), NOT the specific partId price.
+              // The supplier_partid may map to a large/premium size variant with inflated cost.
+              if (itm.item_number && priceLookup.has(`style:${itm.item_number}`)) {
                 wholesalePrice = priceLookup.get(`style:${itm.item_number}`)!;
-                priceSource = 'live-style';
+                priceSource = 'live-style-min';
               }
             }
 
             if (itm.supplier_name?.toUpperCase() === 'SANMAR') {
-              if (itm.supplier_partid && priceLookup.has(itm.supplier_partid)) {
-                wholesalePrice = priceLookup.get(itm.supplier_partid)!;
-                priceSource = 'live-partid';
-              } else if (itm.item_number && priceLookup.has(`style:${itm.item_number}`)) {
+              // Always use the style minimum price (base cost), NOT the specific partId price.
+              if (itm.item_number && priceLookup.has(`style:${itm.item_number}`)) {
                 wholesalePrice = priceLookup.get(`style:${itm.item_number}`)!;
-                priceSource = 'live-style';
+                priceSource = 'live-style-min';
               }
             }
 
