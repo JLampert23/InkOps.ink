@@ -1029,9 +1029,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             for (const part of result.parts) {
               priceLookup.set(part.partId, part.price);
             }
-            const firstPrice = result.parts[0].price;
-            priceLookup.set(`style:${style}`, firstPrice);
-            console.log(`[Update Price] ${style}: ${result.parts.length} parts, first price: $${firstPrice}`);
+            const minPrice = Math.min(...result.parts.map((p: any) => p.price));
+            priceLookup.set(`style:${style}`, minPrice);
+            console.log(`[Update Price] ${style}: ${result.parts.length} parts, base price: $${minPrice}`);
           } else {
             failedStyles.push(style as string);
             console.warn(`[Update Price] Failed to fetch pricing for ${style}: ${result.error}`);
@@ -1058,8 +1058,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             for (const part of result.parts) {
               priceLookup.set(part.partId, part.price);
             }
-            priceLookup.set(`style:${style}`, result.parts[0].price);
-            console.log(`[Update Price] SanMar ${style}: ${result.parts.length} parts, first price: $${result.parts[0].price}`);
+            const minSanMarPrice = Math.min(...result.parts.map((p: any) => p.price));
+            priceLookup.set(`style:${style}`, minSanMarPrice);
+            console.log(`[Update Price] SanMar ${style}: ${result.parts.length} parts, base price: $${minSanMarPrice}`);
           } else {
             failedStyles.push(style as string);
             console.warn(`[Update Price] Failed to fetch SanMar pricing for ${style}: ${result.error}`);

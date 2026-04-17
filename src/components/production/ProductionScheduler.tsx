@@ -26,6 +26,7 @@ interface ScheduleEntry {
   quote_number: string | null;
   created_at: string;
   updated_at: string;
+  garment_front_image_url?: string;
 }
 
 interface WorkflowStep {
@@ -169,7 +170,26 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
 
       if (error) throw error;
 
-      setEntries(data || []);
+      let entriesData = data || [];
+      
+      // Fetch garment images mapped to line_item_id
+      const lineItemIds = Array.from(new Set(entriesData.map(e => e.line_item_id).filter(Boolean))) as string[];
+      if (lineItemIds.length > 0) {
+        const { data: lineItems } = await supabase
+          .from('quote_line_items')
+          .select('id, garment_front_image_url')
+          .in('id', lineItemIds);
+          
+        if (lineItems) {
+          const garmentMap = new Map(lineItems.map(li => [li.id, li.garment_front_image_url]));
+          entriesData = entriesData.map(e => ({
+            ...e,
+            garment_front_image_url: e.line_item_id ? garmentMap.get(e.line_item_id) : undefined
+          }));
+        }
+      }
+
+      setEntries(entriesData);
     } catch (error) {
       console.error('Error loading schedule entries:', error);
       setEntries([]);
@@ -636,6 +656,18 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                             src={entry.artwork_thumb_url}
                             alt="Artwork"
                             className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600 cursor-pointer"
+                          />
+                        </button>
+                      ) : entry.garment_front_image_url ? (
+                        <button
+                          onClick={() => setPreviewArtwork(entry.garment_front_image_url!)}
+                          className="block hover:opacity-75 transition-opacity"
+                          title="Click to preview garment"
+                        >
+                          <img
+                            src={entry.garment_front_image_url}
+                            alt="Garment"
+                            className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600 bg-white cursor-pointer"
                           />
                         </button>
                       ) : (
