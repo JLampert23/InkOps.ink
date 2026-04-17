@@ -1095,7 +1095,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             }
 
             const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
-            const unitPrice = totalImprintPrice + garmentCostWithMarkup;
+            const unitPrice = parseFloat((totalImprintPrice + garmentCostWithMarkup).toFixed(2));
 
             console.log(`[Update Price] Item ${itm.item_number}/${itm.color}: wholesale=$${wholesalePrice.toFixed(2)} (${priceSource}), markup=${garmentMarkup}%, imprints=$${totalImprintPrice.toFixed(2)}, unit=$${unitPrice.toFixed(2)}`);
 
@@ -1103,7 +1103,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
               ...itm,
               wholesale_price: wholesalePrice,
               unit_price: unitPrice,
-              total_price: calculateItemsTotal(itm) * unitPrice
+              total_price: parseFloat((calculateItemsTotal(itm) * unitPrice).toFixed(2))
             };
           });
           return { ...g, items: newItems };
@@ -1618,7 +1618,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           // Check if API explicitly said pricing unavailable
           if (unifiedData.pricingAvailable === false && unifiedData.pricingUnavailableReason) {
             console.warn('⚠️ PRICING UNAVAILABLE:', unifiedData.pricingUnavailableReason);
-            showNotification('warning', 'Pricing Unavailable', 'Pricing unavailable for this product. You can enter the wholesale cost manually in the line item.');
+            // showNotification('warning', 'Pricing Unavailable', 'Pricing unavailable for this product. You can enter the wholesale cost manually in the line item.');
           }
 
           console.warn('⚠️ Full pricing debug info:', {
