@@ -103,7 +103,7 @@ export function ManualPaymentModal({
       newErrors.amount = 'Please enter a valid amount';
     } else if (amountNum <= 0) {
       newErrors.amount = 'Amount must be greater than 0';
-    } else if (!allowOverpayment && amountNum > invoiceBalance) {
+    } else if (!allowOverpayment && Math.round(amountNum * 100) > Math.round(invoiceBalance * 100)) {
       newErrors.amount = `Amount cannot exceed invoice balance of $${invoiceBalance.toFixed(2)}`;
     }
 

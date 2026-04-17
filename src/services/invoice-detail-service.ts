@@ -297,7 +297,7 @@ export const invoiceDetailService = {
         customerId: invoice.customer_id || customer.id || null,
 
         lineItems: useInvoiceLineItems
-          ? (invoiceLineItems || []).filter((item: any) => item.item_type !== 'fee').map((item: any) => {
+          ? (invoiceLineItems || []).filter((item: any) => item.item_type !== 'fee' && item.item_type !== 'shipping').map((item: any) => {
               let sizes = '-';
               if (item.sizes && typeof item.sizes === 'object') {
                 const sizeEntries = Object.entries(item.sizes)
@@ -376,7 +376,11 @@ export const invoiceDetailService = {
               .reduce((sum: number, item: any) => sum + (parseFloat(item.total) || parseFloat(item.subtotal) || 0), 0)
           : 0,
 
-        subtotal: parseFloat(invoice.subtotal) || 0,
+        subtotal: (parseFloat(invoice.subtotal) || 0) - (useInvoiceLineItems 
+          ? (invoiceLineItems || [])
+              .filter((item: any) => item.item_type === 'fee' || item.item_type === 'shipping')
+              .reduce((sum: number, item: any) => sum + (parseFloat(item.subtotal) || 0), 0)
+          : this.calculateFeesTotal(rawData)),
         tax: parseFloat(invoice.tax) || 0,
         total: parseFloat(invoice.total) || 0,
         amountPaid: parseFloat(invoice.amount_paid) || 0,
