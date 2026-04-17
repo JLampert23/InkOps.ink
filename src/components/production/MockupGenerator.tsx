@@ -1419,6 +1419,11 @@ export default function MockupGenerator({
                 throw updateError;
               }
               console.log('MockupGenerator: Successfully replaced mockup and updated colors');
+              // Also sync the scheduler thumbnail so it shows the latest mockup
+              await supabase
+                .from('production_schedule_entries')
+                .update({ artwork_thumb_url: compositeImageUrl })
+                .eq('imprint_id', selectedImprintId);
               imprintsUpdated = true;
             } else {
               // Creating a new mockup - add to the array
@@ -1447,6 +1452,11 @@ export default function MockupGenerator({
                 throw updateError;
               }
               console.log('MockupGenerator: Successfully added new mockup and updated colors');
+              // Also sync the scheduler thumbnail so it shows the latest mockup
+              await supabase
+                .from('production_schedule_entries')
+                .update({ artwork_thumb_url: compositeImageUrl })
+                .eq('imprint_id', selectedImprintId);
               imprintsUpdated = true;
             }
           } else {
@@ -1547,6 +1557,11 @@ export default function MockupGenerator({
                 throw updateError;
               }
               console.log('MockupGenerator: Successfully updated imprint:', imprint.id);
+              // Also sync the scheduler thumbnail so it shows the latest mockup
+              await supabase
+                .from('production_schedule_entries')
+                .update({ artwork_thumb_url: compositeImageUrl })
+                .eq('imprint_id', imprint.id);
               imprintsUpdated = true;
             }
             console.log('MockupGenerator: All group imprints updated successfully');
