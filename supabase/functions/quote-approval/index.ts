@@ -451,7 +451,7 @@ Deno.serve(async (req: Request) => {
         .from("quote_line_items")
         .select("*")
         .eq("quote_id", approval.quote_id)
-        .order("line_number");
+        .order("sort_order", { ascending: true });
 
       const { data: imprints } = await supabase
         .from("quote_imprints")
@@ -651,7 +651,7 @@ Deno.serve(async (req: Request) => {
               .from("quote_line_items")
               .select("*")
               .eq("quote_id", approval.quote_id)
-              .order("line_number");
+              .order("sort_order", { ascending: true });
 
             const { data: imprints } = await supabase
               .from("quote_imprints")

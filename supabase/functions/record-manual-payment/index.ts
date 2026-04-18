@@ -138,11 +138,13 @@ Deno.serve(async (req: Request) => {
       isNewInvoice = false;
     }
 
-    if (amount > invoice.balance_remaining) {
+    const roundedAmount = Math.round(amount * 100) / 100;
+    const roundedBalance = Math.round((invoice.balance_remaining || 0) * 100) / 100;
+    if (roundedAmount > roundedBalance) {
       return new Response(
         JSON.stringify({
           error: "Payment amount exceeds invoice balance",
-          balance: invoice.balance_remaining
+          balance: roundedBalance
         }),
         {
           status: 400,
@@ -298,8 +300,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const newAmountPaid = (invoice.amount_paid || 0) + amount;
-    const newBalance = invoice.total - newAmountPaid;
+    const newAmountPaid = Math.round(((invoice.amount_paid || 0) + amount) * 100) / 100;
+    const newBalance = Math.round((invoice.total - newAmountPaid) * 100) / 100;
     const isFullyPaid = newBalance <= 0;
 
     // Update the appropriate invoice table
@@ -347,7 +349,7 @@ Deno.serve(async (req: Request) => {
       };
 
       if (isFullyPaid) {
-        invoiceUpdate.status = 'PAID';
+        invoiceUpdate.status_stage = 'paid';
         invoiceUpdate.is_financially_locked = true;
         invoiceUpdate.locked_at = new Date().toISOString();
         invoiceUpdate.locked_by = user.email;
