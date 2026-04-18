@@ -34,17 +34,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create client with anon key and auth header to get user
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    });
+    // Use service role client with explicit token to support ES256 JWT algorithm
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const token = authHeader.replace('Bearer ', '');
 
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    // Get the authenticated user (admin getUser supports all JWT algorithms)
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
     console.log('User lookup result:', { userId: user?.id, error: userError?.message });
 
@@ -62,8 +57,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Now use service role for database operations
-    const supabaseAuth = createClient(supabaseUrl, supabaseServiceRoleKey);
+    // Use same service role client for database operations
+    const supabaseAuth = supabaseAdmin;
 
     const { invoiceId, paymentType, amount, checkNumber, notes, paymentDate, customerId } = await req.json();
 
