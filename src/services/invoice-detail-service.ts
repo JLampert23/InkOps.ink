@@ -554,7 +554,7 @@ export const invoiceDetailService = {
     const currentAmountPaid = parseFloat(invoice.amount_paid || '0');
     const currentAmountOutstanding = parseFloat(invoice.amount_outstanding || '0');
     const newAmountPaid = currentAmountPaid + amount;
-    const newAmountOutstanding = Math.max(0, currentAmountOutstanding - amount);
+    const newAmountOutstanding = Math.round(Math.max(0, currentAmountOutstanding - amount) * 100) / 100;
 
     const updateData: any = {
       amount_paid: newAmountPaid.toString(),

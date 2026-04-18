@@ -702,13 +702,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         .select('*')
         .eq('quote_id', targetId)
         .or('line_type.is.null,line_type.eq.item')
-        .order('sort_order');
+        .order('sort_order', { ascending: true });
 
-      // Group items by group_label
+      // Group items by group_label — sort by sort_order ascending within each group as safety fallback
       if (lineItems && lineItems.length > 0) {
         const groupMap = new Map<string, QuoteItem[]>();
 
-        lineItems.forEach(item => {
+        // Ensure items are sorted by sort_order ascending before grouping
+        const sortedItems = [...lineItems].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+        sortedItems.forEach(item => {
           const groupLabel = item.group_label || '';
           if (!groupMap.has(groupLabel)) {
             groupMap.set(groupLabel, []);

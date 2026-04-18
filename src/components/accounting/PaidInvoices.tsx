@@ -66,7 +66,7 @@ export default function PaidInvoices() {
         .from('printavo_invoices')
         .select(`
           *,
-          stripe_invoices!inner (
+          stripe_invoices (
             stripe_invoice_id,
             stripe_payments (
               id,
