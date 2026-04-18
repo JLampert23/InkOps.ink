@@ -407,7 +407,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
     const confirmed = await confirm({
       title: 'Cancel Invoice?',
-      message: `Cancel invoice ${invoice.invoiceNumber}?\n\nThis will:\n- Mark the invoice as "Cancelled"\n- Cancel any associated work orders\n- Remove from billing queue\n\nThis action cannot be easily undone.`,
+      message: `Cancel invoice ${invoice.visualId}?\n\nThis will:\n- Mark the invoice as "Cancelled"\n- Cancel any associated work orders\n- Remove from billing queue\n\nThis action cannot be easily undone.`,
       confirmLabel: 'Cancel Invoice',
       cancelLabel: 'Keep Invoice',
       variant: 'danger',
@@ -419,7 +419,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     try {
       const { error: invError } = await supabase
         .from('printavo_invoices')
-        .update({ status: 'Cancelled', status_stage: 'cancelled' })
+        .update({ status_stage: 'cancelled' })
         .eq('id', invoice.id);
 
       if (invError) throw invError;
