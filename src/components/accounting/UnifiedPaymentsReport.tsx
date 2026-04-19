@@ -252,13 +252,15 @@ export default function UnifiedPaymentsReport({ onNavigateToCustomer }: UnifiedP
       const { error: recalcError } = await supabase.rpc('recalculate_invoice_balances');
       if (recalcError) throw recalcError;
 
-      // Unlock the invoice (status_stage is handled by recalculation function)
+      // Unlock the invoice and move it back to Accounts Receivable
+      // so it reappears in the AR tab for the client to re-action or cancel
       const { error: invoiceError } = await supabase
         .from('printavo_invoices')
         .update({
           is_financially_locked: false,
           locked_at: null,
-          locked_by: null
+          locked_by: null,
+          status_stage: 'accounts_receivable'
         })
         .eq('id', payment.invoice_id);
 
