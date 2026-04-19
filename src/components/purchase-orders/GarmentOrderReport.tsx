@@ -845,9 +845,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Color
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                  Work Order
-                </th>
+
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Vendor
                 </th>
@@ -902,7 +900,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                 groupedData.map(([groupKey, items]) => (
                   <React.Fragment key={groupKey}>
                     <tr className="bg-gray-100 dark:bg-slate-900">
-                      <td colSpan={activeSizes.length + 8} className="px-4 py-2">
+                      <td colSpan={activeSizes.length + 7} className="px-4 py-2">
                         <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
                           {groupBy === 'style' && <Layers className="w-4 h-4" />}
                           {groupBy === 'vendor' && <ShoppingCart className="w-4 h-4" />}
@@ -960,18 +958,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-sm whitespace-nowrap">
-                            {garment.jobs.length > 0 && garment.jobs[0].work_order_number ? (
-                              <button
-                                onClick={() => onNavigate?.('work-orders', 'detail', garment.jobs[0].work_order_id)}
-                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
-                              >
-                                {garment.jobs[0].work_order_number}
-                              </button>
-                            ) : (
-                              <span className="text-gray-400 dark:text-gray-500">-</span>
-                            )}
-                          </td>
+
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
                             {garment.supplier}
                           </td>

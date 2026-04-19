@@ -792,7 +792,15 @@ Deno.serve(async (req: Request) => {
                   colors: imp.thread_ink_color || null,
                   step_statuses: {},
                   priority_order: idx,
-                  artwork_thumb_url: imp.artwork_url || null,
+                  artwork_thumb_url: (() => {
+                    const mocks = Array.isArray(imp.mockups) ? imp.mockups : [];
+                    if (!mocks.length) return null;
+                    const first = mocks[0];
+                    // file_url = from mockup generator, url = from proof uploads
+                    return (first?.file_url && first.file_url !== '') ? first.file_url
+                         : (first?.url && first.url !== '') ? first.url
+                         : null;
+                  })(),
                 }));
 
                 const { error: schedError } = await supabase.from("production_schedule_entries").insert(scheduleEntries);

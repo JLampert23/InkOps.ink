@@ -1,0 +1,46 @@
+issue with the images in the scheduler 
+Found it. The bug is crystal clear. Here is the diagnosis:
+
+Root Cause: Key Name Mismatch
+
+The get_first_mockup_url SQL function (used by the approval trigger to populate artwork_thumb_url) looks for the key file_url inside each mockup object:
+
+
+mockups_array->0->>'file_url'   >'url' instead of ->>'file_url' so it correctly extracts the image URL from each mockup object
+2. Backfill Existing Scheduler Entries
+
+Run a SQL update to repopulate artwork_thumb_url on all existing production_schedule_entries rows by joining with quote_imprints and reading mockups->0->>'url'
+This fixes entries already created before the function correction (like QTE-0051-01 and QTE-0051-02 visible in your screenshot)
+Questions before proceeding:
+
+Is the mockup key always url, or are there older imprint records that may have used file_url? If both exist, the function should check url first and fall back to file_url.
+This is a very safe and small fix - just a SQL function correction and a one-time backfill. Switch to Build mode using the "Implement this plan" button to apply it.
+
+
+This is why invoices are not displaying on the customer profile invoice tab
+
+
+Root Cause: customer_id is NULL on all invoice records
+
+The query in CustomerProfiles.tsx filters invoices using:
+
+
+.eq('customer_id', customer.id)
+But looking at the actual data in printavo_invoices, the customer_id column is NULL on every single invoice row. The invoices do have customer_name stored, but no UUID link back to the customers table was ever populated.
+
+This means the query returns zero rows every time, resulting in the "No invoices found" empty state.
+
+Plan: Fix Invoice Display in Customer Profile
+
+1. Fix the Invoice Query (Short-term)
+
+Update the loadCustomerInvoices function to query invoices by matching customer_name (from printavo_invoices) against the customer's company_name (from the customers table), instead of the broken customer_id match
+This gets invoices displaying immediately using data that is already populated
+2. Backfill customer_id on Existing Invoices (Long-term data fix)
+
+Run a SQL update that joins printavo_invoices with customers on customer_name = company_name to backfill the missing customer_id values on all existing invoice rows
+This makes the proper UUID-based foreign key relationship work going forward
+3. Fix the Invoice Creation/Sync Logic
+
+Find where invoices are created or synced into the printavo_invoices table and ensure the customer_id UUID is correctly written at creation time, so future invoices do not have this same problem
+This is a straightforward two-part fix: an immediate query change to unblock the UI, plus a data backfill and source fix to set up the correct relationship long term.
