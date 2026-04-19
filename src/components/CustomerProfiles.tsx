@@ -302,6 +302,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
   const [fundraisingCredits, setFundraisingCredits] = useState<FundraisingCredit[]>([]);
   const [contacts, setContacts] = useState<CustomerContact[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [dbInvoices, setDbInvoices] = useState<any[]>([]);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [isAddingCredit, setIsAddingCredit] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -360,6 +361,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       loadFundraisingCredits();
       loadContacts();
       loadQuotes();
+      loadCustomerInvoices();
     }
   }, [customer.id, companyId]);
 
@@ -433,6 +435,20 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       console.error('Error fetching quotes:', error);
     } else {
       setQuotes(data || []);
+    }
+  };
+
+  const loadCustomerInvoices = async () => {
+    const { data, error } = await supabase
+      .from('printavo_invoices')
+      .select('id, invoice_number, customer_name, total, amount_paid, invoice_date, status_stage, updated_at')
+      .eq('customer_id', customer.id)
+      .order('invoice_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching customer invoices:', error);
+    } else {
+      setDbInvoices(data || []);
     }
   };
 
@@ -1226,7 +1242,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
               >
                 <div className="flex items-center justify-center gap-2">
                   <FileText className="w-4 h-4" />
-                  Invoice History ({customer.invoices.length})
+                  Invoice History ({dbInvoices.length})
                 </div>
               </button>
               <button
@@ -1248,42 +1264,34 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
           {/* Tab Content */}
           <div className="divide-y divide-gray-200 dark:divide-slate-700 max-h-[400px] overflow-y-auto">
             {activeTab === 'invoices' ? (
-              customer.invoices.length > 0 ? (
-                customer.invoices.map(invoice => {
-                  const totalPaid = invoice.payments?.edges.reduce((sum, edge) => sum + edge.node.amount, 0) || 0;
-                  const balance = invoice.total - totalPaid;
-
+              dbInvoices.length > 0 ? (
+                dbInvoices.map(invoice => {
+                  const statusColors: Record<string, string> = {
+                    paid: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400',
+                    cancelled: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+                    billing_queue: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+                    accounts_receivable: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+                  };
                   return (
                     <div key={invoice.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700">
-                      <div className="flex justify-between items-start mb-2">
+                      <div className="flex justify-between items-start">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={getPrintavoInvoiceUrl(invoice.id)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {invoice.visualId || invoice.id}
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                            {invoice.contact?.fullName && (
-                              <span className="text-sm text-gray-600 dark:text-gray-400">
-                                - {invoice.contact.fullName}
-                              </span>
-                            )}
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-gray-900 dark:text-white">{invoice.invoice_number}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[invoice.status_stage] || 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
+                              {(invoice.status_stage || '').replace('_', ' ')}
+                            </span>
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {format(parseISO(invoice.createdAt), 'MMM d, yyyy')}
+                            {invoice.invoice_date ? format(parseISO(invoice.invoice_date), 'MMM d, yyyy') : 'N/A'}
                           </div>
                         </div>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-500 dark:text-gray-400">Total: {formatCurrency(invoice.total)}</span>
-                        {balance > 0.01 && (
-                          <span className="text-orange-600 dark:text-orange-400">Balance: {formatCurrency(balance)}</span>
-                        )}
+                        <div className="text-right">
+                          <div className="font-medium text-gray-900 dark:text-white">{formatCurrency(parseFloat(invoice.total || 0))}</div>
+                          {parseFloat(invoice.amount_paid || 0) > 0 && (
+                            <div className="text-sm text-green-600 dark:text-green-400">Paid: {formatCurrency(parseFloat(invoice.amount_paid))}</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

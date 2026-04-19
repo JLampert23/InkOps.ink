@@ -35,6 +35,8 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
   const [creatingStripeInvoices, setCreatingStripeInvoices] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [cancelledInvoices, setCancelledInvoices] = useState<any[]>([]);
+  const [loadingCancelled, setLoadingCancelled] = useState(false);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
@@ -303,13 +305,32 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
 
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  setStatusFilter(val);
+                  if (val === 'cancelled') {
+                    setLoadingCancelled(true);
+                    try {
+                      const { data } = await supabase
+                        .from('printavo_invoices')
+                        .select('id, invoice_number, customer_name, customer_email, total, invoice_date, updated_at')
+                        .eq('status_stage', 'cancelled')
+                        .order('updated_at', { ascending: false });
+                      setCancelledInvoices(data || []);
+                    } catch (err) {
+                      console.error('Error loading cancelled invoices:', err);
+                    } finally {
+                      setLoadingCancelled(false);
+                    }
+                  }
+                }}
                 className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-600"
               >
                 <option value="all">All Invoices</option>
                 <option value="ready">Ready to Send</option>
                 <option value="link-created">Links Created</option>
                 <option value="sent">Already Sent</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
 
@@ -355,7 +376,63 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
       </div>
 
       {/* Invoices Table */}
-      {filteredItems.length === 0 ? (
+      {statusFilter === 'cancelled' ? (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center gap-2">
+            <XCircle className="w-5 h-5 text-red-500" />
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Cancelled Invoices</h3>
+            <span className="ml-auto text-sm text-gray-500 dark:text-gray-400">{cancelledInvoices.length} invoices</span>
+          </div>
+          {loadingCancelled ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+            </div>
+          ) : cancelledInvoices.length === 0 ? (
+            <div className="p-12 text-center">
+              <Package className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No cancelled invoices</h3>
+              <p className="text-gray-600 dark:text-gray-400">No invoices have been cancelled</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                  {cancelledInvoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{inv.invoice_number}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">{inv.customer_name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{inv.customer_email}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                        {inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        ${parseFloat(inv.total || 0).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
+                          <XCircle className="w-3 h-3" />
+                          Cancelled
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : filteredItems.length === 0 ? (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-12 text-center">
           <Package className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No invoices in queue</h3>
