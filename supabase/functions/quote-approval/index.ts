@@ -684,9 +684,9 @@ Deno.serve(async (req: Request) => {
             let workOrderNumber: string;
             if (existingWOs && existingWOs.length > 0) {
               const match = existingWOs[0].work_order_number.match(/WO-(\d+)/);
-              workOrderNumber = `WO-${String((match ? parseInt(match[1]) : 0) + 1).padStart(6, '0')}`;
+              workOrderNumber = `WO-${String((match ? parseInt(match[1]) : 0) + 1).padStart(5, '0')}`;
             } else {
-              workOrderNumber = "WO-000001";
+              workOrderNumber = "WO-00001";
             }
 
             const { data: existingInvoices } = await supabase
@@ -700,9 +700,9 @@ Deno.serve(async (req: Request) => {
             let invoiceNumber: string;
             if (existingInvoices && existingInvoices.length > 0 && existingInvoices[0].invoice_number) {
               const match = existingInvoices[0].invoice_number.match(/INV-(\d+)/);
-              invoiceNumber = `INV-${String((match ? parseInt(match[1]) : 0) + 1).padStart(6, '0')}`;
+              invoiceNumber = `INV-${String((match ? parseInt(match[1]) : 0) + 1).padStart(5, '0')}`;
             } else {
-              invoiceNumber = "INV-000001";
+              invoiceNumber = "INV-00001";
             }
 
             const { data: workOrder, error: woError } = await supabase
@@ -769,11 +769,19 @@ Deno.serve(async (req: Request) => {
 
               if (imprints && imprints.length > 0) {
                 const dueDate = quote.production_due_date || quote.customer_due_date || new Date().toISOString().split('T')[0];
+
+                // Get the first garment line item ID so the scheduler can join to quote_line_items
+                // and display the garment front image on each scheduler card
+                const firstGarmentLineItemId = lineItems
+                  ?.find((item: any) => item.line_type === "item" || !item.line_type)
+                  ?.id || null;
+
                 const scheduleEntries = imprints.map((imp: any, idx: number) => ({
                   company_id: approval.company_id,
                   quote_id: approval.quote_id,
                   work_order_id: workOrder.id,
                   imprint_id: imp.id,
+                  line_item_id: firstGarmentLineItemId,
                   type_of_work: imp.type_of_work || "Screen Print",
                   imprint_number: imp.imprint_number || `IMP-${idx + 1}`,
                   production_due_date: dueDate,
