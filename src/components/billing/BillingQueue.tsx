@@ -206,6 +206,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
       processing: { label: 'Processing', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400', icon: RefreshCw },
       paid: { label: 'Paid', color: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400', icon: CheckCircle },
       failed: { label: 'Failed', color: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400', icon: XCircle },
+      cancelled: { label: 'Cancelled', color: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400', icon: XCircle },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.unpaid;

@@ -254,7 +254,6 @@ export const billingService = {
         .select('*')
         .is('sent_at', null)
         .neq('payment_status', 'paid')
-        .neq('payment_status', 'cancelled')
         .order('created_at', { ascending: false });
 
       if (queueError) throw queueError;
