@@ -810,6 +810,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     );
   }
 
+  const isCancelled = invoice.billingQueueStatus === 'cancelled' || invoice.rawData?.status_stage === 'cancelled';
+
   return (
     <div className="space-y-4 lg:space-y-6">
       {/* Sticky Header */}
@@ -1447,13 +1449,20 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
           {/* Actions Panel */}
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions</h2>
+            {isCancelled && (
+              <div className="flex items-center gap-2 px-4 py-3 mb-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg">
+                <Ban className="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">This invoice has been cancelled. Actions are disabled.</p>
+              </div>
+            )}
             <div className="space-y-3">
               {invoice.billingQueueId && (
                 <>
                   <button
                     onClick={handleGenerateLink}
-                    disabled={generatingLink || !!invoice.stripePaymentLink}
+                    disabled={generatingLink || !!invoice.stripePaymentLink || isCancelled}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isCancelled ? 'Invoice is cancelled' : undefined}
                   >
                     {generatingLink ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1465,8 +1474,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
                   <button
                     onClick={handleCreateStripeInvoice}
-                    disabled={creatingStripeInvoice || !!invoice.stripeInvoice}
+                    disabled={creatingStripeInvoice || !!invoice.stripeInvoice || isCancelled}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isCancelled ? 'Invoice is cancelled' : undefined}
                   >
                     {creatingStripeInvoice ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1478,8 +1488,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
                   <button
                     onClick={() => setShowSendModal(true)}
-                    disabled={sendingInvoice || invoice.billingQueueStatus === 'paid'}
+                    disabled={sendingInvoice || invoice.billingQueueStatus === 'paid' || isCancelled}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isCancelled ? 'Invoice is cancelled' : undefined}
                   >
                     <Send className="w-4 h-4" />
                     Send Invoice to Customer
@@ -1487,8 +1498,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
                   <button
                     onClick={handleMarkAsPaid}
-                    disabled={invoice.billingQueueStatus === 'paid' || invoice.amountOutstanding <= 0}
+                    disabled={invoice.billingQueueStatus === 'paid' || invoice.amountOutstanding <= 0 || isCancelled}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={isCancelled ? 'Invoice is cancelled' : undefined}
                   >
                     <CheckCircle className="w-4 h-4" />
                     Record Manual Payment
@@ -1510,7 +1522,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                     </button>
                   )}
 
-                  {invoice.status !== 'Cancelled' && (
+                  {invoice.status !== 'Cancelled' && !isCancelled && (
                     <button
                       onClick={handleCancelInvoice}
                       disabled={cancellingInvoice}
