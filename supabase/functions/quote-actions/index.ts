@@ -970,11 +970,12 @@ Deno.serve(async (req: Request) => {
             artworkThumbUrl = imp.artwork_url;
           } else if (imp.artwork_images && Array.isArray(imp.artwork_images) && imp.artwork_images.length > 0) {
             artworkThumbUrl = imp.artwork_images[0];
-          } else if (imp.mockups && typeof imp.mockups === 'object') {
-            const mockupValues = Object.values(imp.mockups);
-            if (mockupValues.length > 0 && typeof mockupValues[0] === 'string') {
-              artworkThumbUrl = mockupValues[0];
-            }
+          } else if (imp.mockups && Array.isArray(imp.mockups) && imp.mockups.length > 0) {
+            // mockups is a JSONB array: [{file_url: "...", url: "..."}, ...]
+            const first = imp.mockups[0];
+            artworkThumbUrl = (first?.file_url && first.file_url !== '') ? first.file_url
+                           : (first?.url && first.url !== '') ? first.url
+                           : null;
           }
 
           return {
