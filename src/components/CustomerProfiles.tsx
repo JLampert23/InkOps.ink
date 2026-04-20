@@ -439,12 +439,14 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
   };
 
   const loadCustomerInvoices = async () => {
-    // customer_id is NULL on all existing invoice records — match by name as primary fallback
+    // customer_id is NULL on all invoice records — match by customer_name (case-insensitive)
     const customerName = (customer as any).company_name || (customer as any).name || '';
+    if (!customerName) return;
+
     const { data, error } = await supabase
       .from('printavo_invoices')
       .select('id, invoice_number, customer_name, total, amount_paid, invoice_date, status_stage, updated_at')
-      .or(`customer_id.eq.${customer.id},customer_name.ilike.${encodeURIComponent(customerName)}`)
+      .ilike('customer_name', customerName)
       .order('invoice_date', { ascending: false });
 
     if (error) {
@@ -453,6 +455,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       setDbInvoices(data || []);
     }
   };
+
 
   const totalFundraisingCredits = useMemo(() => {
     return fundraisingCredits.reduce((sum, credit) => sum + parseFloat(credit.amount.toString()), 0);
