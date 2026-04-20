@@ -439,16 +439,20 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
   };
 
   const loadCustomerInvoices = async () => {
-    // customer_id is NULL on all invoice records — match by customer_name (case-insensitive)
-    const customerName = (customer as any).company_name || (customer as any).name || '';
-    if (!customerName) return;
+    // prefer databaseCustomer.company_name since it comes straight from the customers table
+    const nameToMatch = databaseCustomer?.company_name || customer.name || '';
+    if (!nameToMatch || !companyId) return;
+
+    console.log('[InvoiceHistory] querying for:', nameToMatch, 'company:', companyId);
 
     const { data, error } = await supabase
       .from('printavo_invoices')
       .select('id, invoice_number, customer_name, total, amount_paid, invoice_date, status_stage, updated_at')
-      .ilike('customer_name', customerName)
+      .eq('company_id', companyId)
+      .ilike('customer_name', nameToMatch)
       .order('invoice_date', { ascending: false });
 
+    console.log('[InvoiceHistory] result:', data?.length, 'rows, error:', error);
     if (error) {
       console.error('Error fetching customer invoices:', error);
     } else {
