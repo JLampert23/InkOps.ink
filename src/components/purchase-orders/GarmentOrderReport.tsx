@@ -49,6 +49,8 @@ interface GarmentRow {
   change_reason?: string;
   original_data?: any;
   is_po_created?: boolean;
+  is_ordered?: boolean;
+  ordered_at?: string | null;
   jobs: Array<{
     quote_id: string;
     quote_number: string;
@@ -208,6 +210,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       .from('garment_requirements_staging')
       .select(`
         style_number, color, supplier_name, requires_review, change_reason, original_data, is_po_created,
+        is_ordered, ordered_at,
         po_id, work_order_id,
         work_orders!garment_requirements_staging_work_order_id_fkey (
           work_order_number
@@ -217,14 +220,18 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
     if (stagingError) console.error('Error loading staging data:', stagingError);
 
-    const stagingMap = new Map<string, { requires_review: boolean; change_reason: string; original_data: any; is_po_created: boolean }>();
+    const stagingMap = new Map<string, { requires_review: boolean; change_reason: string; original_data: any; is_po_created: boolean; is_ordered: boolean; ordered_at: string | null }>();
     stagingData?.forEach((item: any) => {
       const key = `${item.style_number || 'N/A'}||${item.color || 'N/A'}||${item.supplier_name || 'Unknown'}`;
+      const existing = stagingMap.get(key);
       stagingMap.set(key, {
-        requires_review: item.requires_review || false,
-        change_reason: item.change_reason,
-        original_data: item.original_data,
-        is_po_created: item.is_po_created || false,
+        requires_review: item.requires_review || existing?.requires_review || false,
+        change_reason: item.change_reason || existing?.change_reason,
+        original_data: item.original_data || existing?.original_data,
+        is_po_created: item.is_po_created || existing?.is_po_created || false,
+        // is_ordered = true if ANY staging row for this style is marked ordered
+        is_ordered: item.is_ordered || existing?.is_ordered || false,
+        ordered_at: item.ordered_at || existing?.ordered_at || null,
       });
     });
 
@@ -271,6 +278,8 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
           change_reason: stagingInfo?.change_reason,
           original_data: stagingInfo?.original_data,
           is_po_created: stagingInfo?.is_po_created || false,
+          is_ordered: stagingInfo?.is_ordered || false,
+          ordered_at: stagingInfo?.ordered_at || null,
           jobs: [],
           pos: [],
         });
@@ -447,6 +456,34 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     showToast(`Added to ${poNumber}`);
     if (companyId) {
       await loadGarmentNeeds(companyId);
+    }
+  };
+
+  const handleMarkOrdered = async (garment: GarmentRow) => {
+    if (!companyId) return;
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('garment_requirements_staging')
+        .update({ is_ordered: true, ordered_at: now })
+        .eq('company_id', companyId)
+        .eq('style_number', garment.style_number)
+        .eq('color', garment.color);
+
+      if (error) throw error;
+
+      // Optimistically update local state so UI reflects immediately
+      setGarments(prev =>
+        prev.map(g =>
+          g.style_number === garment.style_number && g.color === garment.color
+            ? { ...g, is_ordered: true, ordered_at: now }
+            : g
+        )
+      );
+      showToast(`✓ ${garment.style_number} ${garment.color} marked as ordered`);
+    } catch (err) {
+      console.error('Error marking as ordered:', err);
+      showToast('Failed to update — please try again.');
     }
   };
 
@@ -921,6 +958,8 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${
                             garment.requires_review
                               ? 'bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500'
+                              : garment.is_ordered
+                              ? 'bg-emerald-50 dark:bg-emerald-900/10 border-l-4 border-emerald-500'
                               : garment.is_po_created
                               ? 'bg-green-50 dark:bg-green-900/10 border-l-4 border-green-500'
                               : hasRemaining
@@ -996,8 +1035,23 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center gap-1">
-                              {hasRemaining && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {garment.is_ordered ? (
+                                <span className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded font-semibold">
+                                  <CheckCircle className="w-4 h-4" />
+                                  Ordered
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleMarkOrdered(garment)}
+                                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-700 rounded transition-colors font-medium"
+                                  title="Mark this item as ordered from supplier"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  Mark Ordered
+                                </button>
+                              )}
+                              {hasRemaining && !garment.is_ordered && (
                                 <button
                                   onClick={() => handleAddToPO(garment)}
                                   className="flex items-center gap-1 px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors font-medium"
