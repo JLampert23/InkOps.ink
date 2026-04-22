@@ -7,6 +7,7 @@ import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { AttachmentsSection } from '../shared/AttachmentsSection';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -1358,6 +1359,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
           )}
         </div>
       </div>
+
+      {/* Attachments */}
+      {quote?.company_id && (
+        <AttachmentsSection
+          referenceType="quote"
+          referenceId={quoteId}
+          companyId={quote.company_id}
+        />
+      )}
 
       {/* Send Quote Modal */}
       {showSendModal && quote && (

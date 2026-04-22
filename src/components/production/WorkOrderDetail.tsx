@@ -26,6 +26,7 @@ import { useConfirmation } from '../../contexts/ConfirmationContext';
 import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
 import { useNotification } from '../../contexts/NotificationContext';
 import { HoldReasonModal } from './HoldReasonModal';
+import { AttachmentsSection } from '../shared/AttachmentsSection';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -968,6 +969,15 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           </div>
         </div>
       </div>
+
+      {/* Attachments */}
+      {workOrder.company_id && (
+        <AttachmentsSection
+          referenceType="work_order"
+          referenceId={workOrder.id}
+          companyId={workOrder.company_id}
+        />
+      )}
 
       {showProofModal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setShowProofModal(false)}>
