@@ -67,8 +67,20 @@ Deno.serve(async (req: Request) => {
     // Get company settings for sender info
     const { data: companySettings } = await supabase
       .from("company_settings")
-      .select("company_name, company_email, email_from_address, resend_api_key")
+      .select("company_name, company_email, email_from_address, resend_api_key, invoice_terms, company_logo_primary_url")
       .maybeSingle();
+
+    // Fetch contact name if invoice has a contact_id
+    let contactName: string | null = null;
+    if (invoice.contact_id) {
+      const { data: contact } = await supabase
+        .from("customer_contacts")
+        .select("full_name")
+        .eq("id", invoice.contact_id)
+        .maybeSingle();
+      contactName = contact?.full_name || null;
+    }
+    const greetingName = contactName || invoice.customer_name || "Customer";
 
     if (!companySettings?.resend_api_key) {
       return new Response(
@@ -120,7 +132,7 @@ Deno.serve(async (req: Request) => {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1f2937;">Invoice ${invoice.invoice_number}</h2>
 
-        <p>Dear ${invoice.customer_name || "Customer"},</p>
+        <p>Dear ${greetingName},</p>
 
         <p>Please find your invoice details below:</p>
 
@@ -168,6 +180,14 @@ Deno.serve(async (req: Request) => {
         <strong>${companySettings.company_name || "Your Company"}</strong></p>
 
         ${companySettings.company_email ? `<p style="color: #6b7280; font-size: 14px;">${companySettings.company_email}</p>` : ""}
+
+        ${companySettings?.invoice_terms && companySettings.invoice_terms.trim() && companySettings.invoice_terms !== '<p><br></p>'
+          ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+               <p style="font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px;">Terms &amp; Conditions</p>
+               <div style="font-size: 12px; color: #9ca3af; line-height: 1.5;">${companySettings.invoice_terms}</div>
+             </div>`
+          : ""
+        }
       </div>
     `;
 

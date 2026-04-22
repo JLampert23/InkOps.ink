@@ -359,24 +359,35 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
     return status?.status_color || '#6B7280';
   };
 
+  // Quick week range helper
+  const setWeekRange = (offset: -1 | 0 | 1) => {
+    const today = new Date();
+    const day = today.getDay(); // 0=Sun
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    setStartDate(monday.toISOString().split('T')[0]);
+    setEndDate(sunday.toISOString().split('T')[0]);
+  };
+
   // Apply column filters to entries
+  // Uses the same status-resolution logic as the display (step_statuses || default || 'Not Started')
+  // so filtering by 'Not Started' correctly catches entries whose status was never explicitly set.
   const filteredEntries = useMemo(() => {
-    if (Object.keys(stepStatusFilters).length === 0) {
-      return entries;
-    }
+    const activeFilters = Object.entries(stepStatusFilters).filter(([_, v]) => v.length > 0);
+    if (activeFilters.length === 0) return entries;
 
     return entries.filter(entry => {
-      for (const [stepId, statuses] of Object.entries(stepStatusFilters)) {
-        if (statuses.length > 0) {
-          const entryStatus = entry.step_statuses[stepId];
-          if (!statuses.includes(entryStatus)) {
-            return false;
-          }
-        }
+      for (const [stepId, statuses] of activeFilters) {
+        const step = workflowSteps.find(s => s.id === stepId);
+        const defaultStatus = step?.statuses.find(s => s.is_default)?.status_name || 'Not Started';
+        const entryStatus = entry.step_statuses[stepId] || defaultStatus;
+        if (!statuses.includes(entryStatus)) return false;
       }
       return true;
     });
-  }, [entries, stepStatusFilters]);
+  }, [entries, stepStatusFilters, workflowSteps]);
 
   if (loading && workflowSteps.length === 0) {
     return (
@@ -423,11 +434,32 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       )}
 
       {/* Header and Filters */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           {typeOfWork} Schedule
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Week quick-filters */}
+          <div className="flex items-center gap-1 border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setWeekRange(-1)}
+              className="px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 border-r border-gray-300 dark:border-slate-600"
+            >
+              Last Week
+            </button>
+            <button
+              onClick={() => setWeekRange(0)}
+              className="px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 border-r border-gray-300 dark:border-slate-600"
+            >
+              This Week
+            </button>
+            <button
+              onClick={() => setWeekRange(1)}
+              className="px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700"
+            >
+              Next Week
+            </button>
+          </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2"
@@ -792,7 +824,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
 
       {/* Entry Count */}
       <div className="text-sm text-gray-600 dark:text-gray-400">
-        Showing {entries.length} scheduled {entries.length === 1 ? 'job' : 'jobs'}
+        Showing {filteredEntries.length}{filteredEntries.length !== entries.length ? ` of ${entries.length}` : ''} scheduled {entries.length === 1 ? 'job' : 'jobs'}
       </div>
 
       {/* Artwork Preview Modal */}

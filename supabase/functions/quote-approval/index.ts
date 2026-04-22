@@ -269,6 +269,12 @@ function renderQuotePage(
     </div>
 
     ${approvalFormHtml}
+
+    ${companySettings?.quote_terms && companySettings.quote_terms.trim() && companySettings.quote_terms !== '<p><br></p>' ? `
+    <div class="card" style="margin-top:20px;">
+      <h3 style="font-size:14px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 12px;">Terms &amp; Conditions</h3>
+      <div style="font-size:13px;color:#6b7280;line-height:1.6;">${companySettings.quote_terms}</div>
+    </div>` : ''}
   </div>
 
   <div class="success-page" id="success-page" style="display:none;">
@@ -461,7 +467,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: companySettings } = await supabase
         .from("company_settings")
-        .select("company_name, logo_url, company_logo_primary_url, company_email, company_phone, company_website")
+        .select("company_name, logo_url, company_logo_primary_url, company_email, company_phone, company_website, quote_terms")
         .eq("id", approval.company_id)
         .maybeSingle();
 
