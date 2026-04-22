@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Filter, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu } from 'lucide-react';
+import { Calendar, Filter, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu, CheckCircle, Clock, Palette } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 import SchedulerTabManager from './SchedulerTabManager';
@@ -27,6 +27,10 @@ interface ScheduleEntry {
   created_at: string;
   updated_at: string;
   garment_front_image_url?: string;
+  // Computed status columns
+  goods_ordered?: boolean;
+  goods_received?: boolean;
+  art_approved?: boolean;
 }
 
 interface WorkflowStep {
@@ -190,6 +194,80 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       }
 
       setEntries(entriesData);
+
+      // ── Enrich with computed status columns ──────────────────────────────
+      const uniqueQuoteIds = [...new Set(entriesData.map((e: any) => e.quote_id).filter(Boolean))] as string[];
+      if (uniqueQuoteIds.length > 0) {
+        // Stock Ordered: check garment_requirements_staging
+        const { data: stagingRows } = await supabase
+          .from('garment_requirements_staging')
+          .select('quote_id, is_ordered, total_quantity')
+          .in('quote_id', uniqueQuoteIds);
+
+        const orderedMap = new Map<string, boolean>();
+        const receivedQtyMap = new Map<string, number>(); // total_quantity per quote
+        if (stagingRows) {
+          const byQuote = new Map<string, { ordered: boolean[]; total: number }>();
+          stagingRows.forEach((s: any) => {
+            if (!byQuote.has(s.quote_id)) byQuote.set(s.quote_id, { ordered: [], total: 0 });
+            const q = byQuote.get(s.quote_id)!;
+            q.ordered.push(!!s.is_ordered);
+            q.total += s.total_quantity || 0;
+          });
+          byQuote.forEach((val, qid) => {
+            orderedMap.set(qid, val.ordered.length > 0 && val.ordered.every(v => v));
+            receivedQtyMap.set(qid, val.total);
+          });
+        }
+
+        // Stock Received: check purchase_order_line_items received qty vs needed
+        const { data: poItems } = await supabase
+          .from('garment_requirements_staging')
+          .select('quote_id, total_quantity')
+          .in('quote_id', uniqueQuoteIds);
+
+        // Check PO received vs needed using the same staging total
+        const { data: poReceived } = await supabase
+          .from('purchase_order_line_items')
+          .select(`
+            quantity_received,
+            purchase_orders!inner(quote_id)
+          `)
+          .not('purchase_orders.quote_id', 'is', null)
+          .in('purchase_orders.quote_id', uniqueQuoteIds);
+
+        const receivedMap = new Map<string, boolean>();
+        if (poReceived) {
+          const receivedByQuote = new Map<string, number>();
+          poReceived.forEach((r: any) => {
+            const qid = r.purchase_orders?.quote_id;
+            if (qid) receivedByQuote.set(qid, (receivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
+          });
+          receivedByQuote.forEach((received, qid) => {
+            const needed = receivedQtyMap.get(qid) || 0;
+            receivedMap.set(qid, needed > 0 && received >= needed);
+          });
+        }
+
+        // Art Approved: check quotes.artwork_approval_status
+        const { data: quotesData } = await supabase
+          .from('quotes')
+          .select('id, artwork_approval_status')
+          .in('id', uniqueQuoteIds);
+
+        const artMap = new Map<string, boolean>();
+        quotesData?.forEach((q: any) => {
+          artMap.set(q.id, q.artwork_approval_status === 'approved');
+        });
+
+        const enriched = entriesData.map((e: any) => ({
+          ...e,
+          goods_ordered: e.quote_id ? (orderedMap.get(e.quote_id) ?? false) : false,
+          goods_received: e.quote_id ? (receivedMap.get(e.quote_id) ?? false) : false,
+          art_approved: e.quote_id ? (artMap.get(e.quote_id) ?? false) : false,
+        }));
+        setEntries(enriched);
+      }
     } catch (error) {
       console.error('Error loading schedule entries:', error);
       setEntries([]);
@@ -653,12 +731,22 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     </div>
                   </th>
                 ))}
+                {/* Hard-coded status columns */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  Stock Ordered
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  Stock Received
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  Art Approved
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={7 + workflowSteps.length} className="px-6 py-12 text-center">
+                  <td colSpan={10 + workflowSteps.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
                       <span className="text-sm text-gray-500 dark:text-gray-400">Loading schedule...</span>
@@ -667,7 +755,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={7 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={10 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs matching filters
                   </td>
                 </tr>
@@ -814,6 +902,48 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                         </td>
                       );
                     })}
+                    {/* Stock Ordered */}
+                    <td className="px-3 py-3 text-center">
+                      {entry.goods_ordered ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />
+                          Ordered
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                    {/* Stock Received */}
+                    <td className="px-3 py-3 text-center">
+                      {entry.goods_received ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />
+                          Received
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                    {/* Art Approved */}
+                    <td className="px-3 py-3 text-center">
+                      {entry.art_approved ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 rounded-full whitespace-nowrap">
+                          <Palette className="w-3 h-3" />
+                          Approved
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />
+                          Pending
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
