@@ -807,8 +807,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                 />
               </div>
 
-              </div>
-
               {/* MF-4: Image upload to imprint box */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">
