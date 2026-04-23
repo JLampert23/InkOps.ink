@@ -635,12 +635,14 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Qty
                 </th>
-                {/* 2 hard-coded status columns — right after Qty, before workflow steps */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-blue-50/50 dark:bg-blue-900/10">
-                  Stock Status
-                </th>
+                {/* 2 hard-coded status columns — Proof Status then Garment Status, after Qty */}
                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-purple-50/50 dark:bg-purple-900/10">
-                  Art Status
+                  <div>Proof Status</div>
+                  <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Approved / Rejected</div>
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-blue-50/50 dark:bg-blue-900/10">
+                  <div>Garment Status</div>
+                  <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Ordered / Partial / Received</div>
                 </th>
                 {workflowSteps.map(step => (
                   <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider relative">
@@ -859,27 +861,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quantity}
                     </td>
-                    {/* Stock Status — after Qty, before workflow steps */}
-                    <td className="px-3 py-3 text-center bg-blue-50/30 dark:bg-blue-900/5">
-                      {entry.stock_status === 'received' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />Received
-                        </span>
-                      ) : entry.stock_status === 'ordered' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />Ordered
-                        </span>
-                      ) : entry.stock_status === 'partial' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />Partial
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />—
-                        </span>
-                      )}
-                    </td>
-                    {/* Art Status — after Qty, before workflow steps */}
+                    {/* Proof Status (art/proof) — FIRST hard-coded status column */}
                     <td className="px-3 py-3 text-center bg-purple-50/30 dark:bg-purple-900/5">
                       {entry.art_status === 'approved' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
@@ -896,6 +878,26 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
                           —
+                        </span>
+                      )}
+                    </td>
+                    {/* Garment Status (stock) — SECOND hard-coded status column */}
+                    <td className="px-3 py-3 text-center bg-blue-50/30 dark:bg-blue-900/5">
+                      {entry.stock_status === 'received' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Received
+                        </span>
+                      ) : entry.stock_status === 'ordered' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Ordered
+                        </span>
+                      ) : entry.stock_status === 'partial' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />Partial
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />—
                         </span>
                       )}
                     </td>
