@@ -455,10 +455,6 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
       showNotification('Please enter a valid email address', 'error');
       return false;
     }
-    if (!billingAddress1.trim()) {
-      showNotification('Billing address is required', 'error');
-      return false;
-    }
     return true;
   };
 
@@ -769,7 +765,7 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Address Line 1 <span className="text-red-500">*</span>
+                      Address Line 1
                     </label>
                     <input
                       type="text"

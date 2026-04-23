@@ -116,6 +116,11 @@ interface LineItem {
   qty_3xl: number | null;
   qty_4xl: number | null;
   qty_5xl: number | null;
+  // Additional size modes saved by QuoteBuilder
+  qty_sm: number | null;
+  qty_lxl: number | null;
+  qty_ysym: number | null;
+  qty_ylyxl: number | null;
 }
 
 interface QuoteImprint {
@@ -583,7 +588,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const totalQty = items.reduce((sum, item) => {
     const sizeSum = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
-           (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) + (item.qty_5xl || 0);
+           (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+           (item.qty_4xl || 0) + (item.qty_5xl || 0) +
+           (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
     // For CS/non-sized items, fall back to total_quantity
     return sum + (sizeSum > 0 ? sizeSum : (item.total_quantity || 0));
   }, 0);
@@ -940,7 +947,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                                    (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                                   (item.qty_4xl || 0) + (item.qty_5xl || 0);
+                                   (item.qty_4xl || 0) + (item.qty_5xl || 0) +
+                                   (item.qty_sm || 0) + (item.qty_lxl || 0) +
+                                   (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
                     // For CS/non-sized items, fall back to total_quantity
                     const totalItems = sizeQty > 0 ? sizeQty : (item.total_quantity || 0);
 
