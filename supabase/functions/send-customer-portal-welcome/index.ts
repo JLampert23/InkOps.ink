@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
     // Get company settings for branding
     const { data: companySettings } = await supabase
       .from("company_settings")
-      .select("company_name, inkops_subdomain, customer_url, email_from_address, resend_api_key, company_logo_primary_url")
+      .select("company_name, inkops_subdomain, customer_url, email_from_address, resend_api_key, company_logo_primary_url, email_signature")
       .eq("id", customer.company_id)
       .maybeSingle();
 
@@ -166,6 +166,8 @@ Deno.serve(async (req: Request) => {
         <p style="color: #9ca3af; font-size: 12px; margin: 0;">
           ${companySettings.company_name}
         </p>
+        ${companySettings.email_signature ? `
+        <pre style="color: #6b7280; font-size: 12px; margin: 8px 0 0; white-space: pre-wrap; font-family: inherit;">${companySettings.email_signature}</pre>` : ''}
       </div>
     `;
 

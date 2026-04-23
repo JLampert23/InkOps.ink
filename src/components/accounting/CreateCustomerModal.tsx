@@ -3,6 +3,15 @@ import { X, Plus, Trash2, Copy, Upload, Building2, User, Mail, Phone, MapPin, Cr
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'DC','PR','GU','VI','AS','MP'
+];
+
 interface Contact {
   firstName: string;
   lastName: string;
@@ -434,6 +443,7 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
                     type="text"
                     value={billingAddress1}
                     onChange={(e) => setBillingAddress1(e.target.value)}
+                    autoComplete="billing street-address"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Street address"
                   />
@@ -445,6 +455,7 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
                     type="text"
                     value={billingAddress2}
                     onChange={(e) => setBillingAddress2(e.target.value)}
+                    autoComplete="billing address-line2"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Apartment, suite, etc."
                   />
@@ -456,6 +467,7 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
                     type="text"
                     value={billingCity}
                     onChange={(e) => setBillingCity(e.target.value)}
+                    autoComplete="billing address-level2"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="City"
                   />
@@ -463,13 +475,15 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
-                  <input
-                    type="text"
+                  <select
                     value={billingState}
                     onChange={(e) => setBillingState(e.target.value)}
+                    autoComplete="billing address-level1"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="State"
-                  />
+                  >
+                    <option value="">Select state</option>
+                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
 
                 <div>
@@ -520,6 +534,7 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
                     type="text"
                     value={shippingAddress1}
                     onChange={(e) => setShippingAddress1(e.target.value)}
+                    autoComplete="shipping street-address"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Street address"
                   />
@@ -549,13 +564,15 @@ export default function CreateCustomerModal({ isOpen, onClose, onSuccess }: Crea
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
-                  <input
-                    type="text"
+                  <select
                     value={shippingState}
                     onChange={(e) => setShippingState(e.target.value)}
+                    autoComplete="shipping address-level1"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="State"
-                  />
+                  >
+                    <option value="">Select state</option>
+                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
 
                 <div>

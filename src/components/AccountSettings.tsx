@@ -204,6 +204,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [showResendKey, setShowResendKey] = useState(false);
   const [emailFromAddress, setEmailFromAddress] = useState('');
   const [secondaryEmailFromAddress, setSecondaryEmailFromAddress] = useState('');
+  const [emailSignature, setEmailSignature] = useState('');
   const [quoteEmailSender, setQuoteEmailSender] = useState<'primary' | 'secondary'>('primary');
   const [savingResend, setSavingResend] = useState(false);
   const [testingResend, setTestingResend] = useState(false);
@@ -522,6 +523,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSquareLocationId(data.square_location_id || '');
         setEmailFromAddress(data.email_from_address || '');
         setSecondaryEmailFromAddress(data.secondary_email_from_address || '');
+        setEmailSignature(data.email_signature || '');
         setQuoteEmailSender(data.quote_email_sender || 'primary');
         setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
         setCustomerUrl(data.customer_url || '');
@@ -1139,6 +1141,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       settingsData.secondary_email_from_address = secondaryEmailFromAddress.trim() || null;
       settingsData.quote_email_sender = quoteEmailSender;
+      settingsData.email_signature = emailSignature.trim() || null;
 
       if (!companySettings?.id) {
         showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
@@ -4838,6 +4841,29 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     Invoices and payment receipts always use your Primary address. All other emails (quotes, proofs, automations) use your Secondary address.
                   </p>
+                </div>
+
+                {/* MF-5: Email Signature */}
+                <div className="pt-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Email Signature
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    This plain-text block will appear at the bottom of all outgoing emails (quotes, invoices, portal welcome, etc.)
+                  </p>
+                  <textarea
+                    value={emailSignature}
+                    onChange={(e) => setEmailSignature(e.target.value)}
+                    rows={5}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                    placeholder={`Todd's Sporting Goods\nsales@toddssportinggoods.com\n(555) 123-4567\nwww.toddssportinggoods.com`}
+                  />
+                  {emailSignature && (
+                    <div className="mt-2 p-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-lg">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Preview:</p>
+                      <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans">{emailSignature}</pre>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">

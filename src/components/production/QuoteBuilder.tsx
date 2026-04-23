@@ -2935,15 +2935,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                   <Plus className="w-4 h-4" />
                                   Imprint(s)
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    setShowMockupForGroup(group.label);
-                                  }}
-                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                  Mockup
-                                </button>
+                                {/* Mockup builder removed per 4/22 client request */}
                                 <button
                                   onClick={() => updatePriceFromMatrix(group.id, 0)}
                                   disabled={updatingPriceForGroup === group.id}

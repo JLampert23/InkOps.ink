@@ -472,7 +472,6 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
       if (error) throw error;
 
-      // Optimistically update local state so UI reflects immediately
       setGarments(prev =>
         prev.map(g =>
           g.style_number === garment.style_number && g.color === garment.color
@@ -483,6 +482,33 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       showToast(`✓ ${garment.style_number} ${garment.color} marked as ordered`);
     } catch (err) {
       console.error('Error marking as ordered:', err);
+      showToast('Failed to update — please try again.');
+    }
+  };
+
+  // MF-8: Undo mark as ordered
+  const handleUnmarkOrdered = async (garment: GarmentRow) => {
+    if (!companyId) return;
+    try {
+      const { error } = await supabase
+        .from('garment_requirements_staging')
+        .update({ is_ordered: false, ordered_at: null })
+        .eq('company_id', companyId)
+        .eq('style_number', garment.style_number)
+        .eq('color', garment.color);
+
+      if (error) throw error;
+
+      setGarments(prev =>
+        prev.map(g =>
+          g.style_number === garment.style_number && g.color === garment.color
+            ? { ...g, is_ordered: false, ordered_at: undefined }
+            : g
+        )
+      );
+      showToast(`↩ ${garment.style_number} ${garment.color} unmarked`);
+    } catch (err) {
+      console.error('Error unmarking as ordered:', err);
       showToast('Failed to update — please try again.');
     }
   };
@@ -1037,10 +1063,19 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center gap-1 flex-wrap">
                               {garment.is_ordered ? (
-                                <span className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded font-semibold">
-                                  <CheckCircle className="w-4 h-4" />
-                                  Ordered
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded font-semibold">
+                                    <CheckCircle className="w-4 h-4" />
+                                    Ordered
+                                  </span>
+                                  <button
+                                    onClick={() => handleUnmarkOrdered(garment)}
+                                    className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded transition-colors"
+                                    title="Undo mark as ordered"
+                                  >
+                                    Undo
+                                  </button>
+                                </div>
                               ) : (
                                 <button
                                   onClick={() => handleMarkOrdered(garment)}

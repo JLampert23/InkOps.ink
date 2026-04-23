@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
     // Get company settings for sender info
     const { data: companySettings } = await supabase
       .from("company_settings")
-      .select("company_name, company_email, email_from_address, resend_api_key, invoice_terms, company_logo_primary_url")
+      .select("company_name, company_email, email_from_address, resend_api_key, invoice_terms, company_logo_primary_url, email_signature")
       .maybeSingle();
 
     // Fetch contact name if invoice has a contact_id
@@ -130,6 +130,10 @@ Deno.serve(async (req: Request) => {
       message ||
       `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        ${companySettings.company_logo_primary_url ? `
+        <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+          <img src="${companySettings.company_logo_primary_url}" alt="${companySettings.company_name || ''}" style="max-width: 180px; height: auto;">
+        </div>` : ''}
         <h2 style="color: #1f2937;">Invoice ${invoice.invoice_number}</h2>
 
         <p>Dear ${greetingName},</p>
@@ -180,6 +184,8 @@ Deno.serve(async (req: Request) => {
         <strong>${companySettings.company_name || "Your Company"}</strong></p>
 
         ${companySettings.company_email ? `<p style="color: #6b7280; font-size: 14px;">${companySettings.company_email}</p>` : ""}
+
+        ${companySettings.email_signature ? `<pre style="color: #6b7280; font-size: 12px; white-space: pre-wrap; font-family: inherit; margin-top: 4px;">${companySettings.email_signature}</pre>` : ''}
 
         ${companySettings?.invoice_terms && companySettings.invoice_terms.trim() && companySettings.invoice_terms !== '<p><br></p>'
           ? `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
