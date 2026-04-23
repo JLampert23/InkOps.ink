@@ -424,15 +424,16 @@ BUGS (Fix now → push to prod)
 └── [BUG-3] Customer form: make address not required
 
 4/22 MINOR FIXES (Billable — after bugs)
-├── [MF-1] Portal email from sales@toddssportinggoods.com
-├── [MF-2] Box label printing fix (need client details)
-├── [MF-3] Remove mockup builder button from imprints
-├── [MF-4] Image upload directly to imprint box
-├── [MF-5] Company logo in email headers + email signature setting
-├── [MF-6] State dropdown in customer profile
-├── [MF-7] Address autofill
-├── [MF-8] Undo "Mark as Ordered"
-└── [MF-9] Box label refinement (awaiting client details)
+├── [MF-1] Portal email from sales@toddssportinggoods.com → ⚙️ Config: set email_from_address in Settings → Resend
+├── [MF-2] Box label printing fix → ⏳ Awaiting client details
+├── [MF-3] Remove mockup builder button from imprints → ✅ Done (commit efc0b6b)
+├── [MF-4] Image upload directly to imprint box → ✅ Done (commit efc0b6b)
+├── [MF-5] Company logo in email headers + email signature setting → ✅ Done (commit efc0b6b)
+├── [MF-6] State dropdown in customer profile → ✅ Done (commit efc0b6b)
+├── [MF-7] Address autofill (autocomplete attrs) → ✅ Done (commit efc0b6b)
+├── [MF-8] Undo "Mark as Ordered" → ✅ Done (commit efc0b6b)
+└── [MF-9] Box label refinement → ⏳ Awaiting client details
+
 
 TIER 2 (dev branch → dev.inkops.ink staging)
 ├── [T2-B] Custom unsaved changes modal in QuoteBuilder
