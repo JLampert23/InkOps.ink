@@ -756,6 +756,14 @@ Deno.serve(async (req: Request) => {
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
 
+      // Guard: only sent quotes can be approved
+      if (quote.status === 'draft') {
+        throw new Error("Cannot approve a draft quote. Send it to the customer first.");
+      }
+      if (quote.status === 'approved' || quote.status === 'converted') {
+        throw new Error("This quote has already been approved.");
+      }
+
       const body = await req.json();
       const approverName = body.approver_name || profile.full_name || profile.email;
 
