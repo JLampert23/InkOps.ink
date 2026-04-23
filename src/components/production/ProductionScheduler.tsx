@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Filter, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu, CheckCircle, Clock, Palette } from 'lucide-react';
+import { Calendar, Filter, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 import SchedulerTabManager from './SchedulerTabManager';
@@ -27,10 +27,9 @@ interface ScheduleEntry {
   created_at: string;
   updated_at: string;
   garment_front_image_url?: string;
-  // Computed status columns
-  goods_ordered?: boolean;
-  goods_received?: boolean;
-  art_approved?: boolean;
+  // Two hard-coded scheduler status columns
+  stock_status?: 'none' | 'ordered' | 'partial' | 'received';
+  art_status?: 'pending' | 'approved' | 'rejected' | 'none';
 }
 
 interface WorkflowStep {
@@ -195,76 +194,74 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
 
       setEntries(entriesData);
 
-      // ── Enrich with computed status columns ──────────────────────────────
+      // ── Enrich: Stock Status + Art Status ────────────────────────────────
       const uniqueQuoteIds = [...new Set(entriesData.map((e: any) => e.quote_id).filter(Boolean))] as string[];
       if (uniqueQuoteIds.length > 0) {
-        // Stock Ordered: check garment_requirements_staging
+        // Staging: determine if garments are ordered / partially ordered
         const { data: stagingRows } = await supabase
           .from('garment_requirements_staging')
           .select('quote_id, is_ordered, total_quantity')
           .in('quote_id', uniqueQuoteIds);
 
-        const orderedMap = new Map<string, boolean>();
-        const receivedQtyMap = new Map<string, number>(); // total_quantity per quote
-        if (stagingRows) {
-          const byQuote = new Map<string, { ordered: boolean[]; total: number }>();
-          stagingRows.forEach((s: any) => {
-            if (!byQuote.has(s.quote_id)) byQuote.set(s.quote_id, { ordered: [], total: 0 });
-            const q = byQuote.get(s.quote_id)!;
-            q.ordered.push(!!s.is_ordered);
-            q.total += s.total_quantity || 0;
-          });
-          byQuote.forEach((val, qid) => {
-            orderedMap.set(qid, val.ordered.length > 0 && val.ordered.every(v => v));
-            receivedQtyMap.set(qid, val.total);
-          });
-        }
-
-        // Stock Received: check purchase_order_line_items received qty vs needed
-        const { data: poItems } = await supabase
-          .from('garment_requirements_staging')
-          .select('quote_id, total_quantity')
-          .in('quote_id', uniqueQuoteIds);
-
-        // Check PO received vs needed using the same staging total
+        // PO receiving: check how many units received per quote
         const { data: poReceived } = await supabase
           .from('purchase_order_line_items')
-          .select(`
-            quantity_received,
-            purchase_orders!inner(quote_id)
-          `)
+          .select('quantity_received, purchase_orders!inner(quote_id)')
           .not('purchase_orders.quote_id', 'is', null)
           .in('purchase_orders.quote_id', uniqueQuoteIds);
 
-        const receivedMap = new Map<string, boolean>();
-        if (poReceived) {
-          const receivedByQuote = new Map<string, number>();
-          poReceived.forEach((r: any) => {
-            const qid = r.purchase_orders?.quote_id;
-            if (qid) receivedByQuote.set(qid, (receivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
-          });
-          receivedByQuote.forEach((received, qid) => {
-            const needed = receivedQtyMap.get(qid) || 0;
-            receivedMap.set(qid, needed > 0 && received >= needed);
-          });
-        }
-
-        // Art Approved: check quotes.artwork_approval_status
+        // Art status: from quote approval
         const { data: quotesData } = await supabase
           .from('quotes')
           .select('id, artwork_approval_status')
           .in('id', uniqueQuoteIds);
 
-        const artMap = new Map<string, boolean>();
+        // Build stock_status per quote
+        const stockMap = new Map<string, 'none' | 'ordered' | 'partial' | 'received'>();
+        if (stagingRows && stagingRows.length > 0) {
+          const byQuote = new Map<string, { ordered: number; total: number; needed: number }>();
+          stagingRows.forEach((s: any) => {
+            if (!byQuote.has(s.quote_id)) byQuote.set(s.quote_id, { ordered: 0, total: 0, needed: 0 });
+            const q = byQuote.get(s.quote_id)!;
+            if (s.is_ordered) q.ordered += 1;
+            q.total += 1;
+            q.needed += s.total_quantity || 0;
+          });
+
+          // Add received quantities
+          const receivedByQuote = new Map<string, number>();
+          poReceived?.forEach((r: any) => {
+            const qid = r.purchase_orders?.quote_id;
+            if (qid) receivedByQuote.set(qid, (receivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
+          });
+
+          byQuote.forEach((val, qid) => {
+            const received = receivedByQuote.get(qid) || 0;
+            if (val.needed > 0 && received >= val.needed) {
+              stockMap.set(qid, 'received');
+            } else if (val.ordered === val.total && val.total > 0) {
+              stockMap.set(qid, 'ordered');
+            } else if (val.ordered > 0) {
+              stockMap.set(qid, 'partial');
+            } else {
+              stockMap.set(qid, 'none');
+            }
+          });
+        }
+
+        // Build art_status per quote
+        const artMap = new Map<string, 'pending' | 'approved' | 'rejected' | 'none'>();
         quotesData?.forEach((q: any) => {
-          artMap.set(q.id, q.artwork_approval_status === 'approved');
+          if (q.artwork_approval_status === 'approved') artMap.set(q.id, 'approved');
+          else if (q.artwork_approval_status === 'declined') artMap.set(q.id, 'rejected');
+          else if (q.artwork_approval_status === 'not_applicable' || !q.artwork_approval_status) artMap.set(q.id, 'none');
+          else artMap.set(q.id, 'pending');
         });
 
         const enriched = entriesData.map((e: any) => ({
           ...e,
-          goods_ordered: e.quote_id ? (orderedMap.get(e.quote_id) ?? false) : false,
-          goods_received: e.quote_id ? (receivedMap.get(e.quote_id) ?? false) : false,
-          art_approved: e.quote_id ? (artMap.get(e.quote_id) ?? false) : false,
+          stock_status: e.quote_id ? (stockMap.get(e.quote_id) ?? 'none') : 'none',
+          art_status: e.quote_id ? (artMap.get(e.quote_id) ?? 'none') : 'none',
         }));
         setEntries(enriched);
       }
@@ -638,6 +635,13 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Qty
                 </th>
+                {/* 2 hard-coded status columns — right after Qty, before workflow steps */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-blue-50/50 dark:bg-blue-900/10">
+                  Stock Status
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-purple-50/50 dark:bg-purple-900/10">
+                  Art Status
+                </th>
                 {workflowSteps.map(step => (
                   <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider relative">
                     <div className="flex items-center justify-between gap-2">
@@ -731,22 +735,12 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     </div>
                   </th>
                 ))}
-                {/* Hard-coded status columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                  Stock Ordered
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                  Stock Received
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                  Art Approved
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={10 + workflowSteps.length} className="px-6 py-12 text-center">
+                  <td colSpan={9 + workflowSteps.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
                       <span className="text-sm text-gray-500 dark:text-gray-400">Loading schedule...</span>
@@ -755,7 +749,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={10 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={9 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs matching filters
                   </td>
                 </tr>
@@ -865,6 +859,46 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quantity}
                     </td>
+                    {/* Stock Status — after Qty, before workflow steps */}
+                    <td className="px-3 py-3 text-center bg-blue-50/30 dark:bg-blue-900/5">
+                      {entry.stock_status === 'received' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Received
+                        </span>
+                      ) : entry.stock_status === 'ordered' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Ordered
+                        </span>
+                      ) : entry.stock_status === 'partial' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />Partial
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />—
+                        </span>
+                      )}
+                    </td>
+                    {/* Art Status — after Qty, before workflow steps */}
+                    <td className="px-3 py-3 text-center bg-purple-50/30 dark:bg-purple-900/5">
+                      {entry.art_status === 'approved' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Approved
+                        </span>
+                      ) : entry.art_status === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
+                          <X className="w-3 h-3" />Rejected
+                        </span>
+                      ) : entry.art_status === 'pending' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />Pending
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          —
+                        </span>
+                      )}
+                    </td>
                     {workflowSteps.map(step => {
                       const currentStatus = entry.step_statuses[step.id] || step.statuses.find(s => s.is_default)?.status_name || 'Not Started';
                       const statusColor = getStatusColor(step.id, currentStatus);
@@ -902,48 +936,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                         </td>
                       );
                     })}
-                    {/* Stock Ordered */}
-                    <td className="px-3 py-3 text-center">
-                      {entry.goods_ordered ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />
-                          Ordered
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />
-                          Pending
-                        </span>
-                      )}
-                    </td>
-                    {/* Stock Received */}
-                    <td className="px-3 py-3 text-center">
-                      {entry.goods_received ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />
-                          Received
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />
-                          Pending
-                        </span>
-                      )}
-                    </td>
-                    {/* Art Approved */}
-                    <td className="px-3 py-3 text-center">
-                      {entry.art_approved ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 rounded-full whitespace-nowrap">
-                          <Palette className="w-3 h-3" />
-                          Approved
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />
-                          Pending
-                        </span>
-                      )}
-                    </td>
                   </tr>
                 ))
               )}

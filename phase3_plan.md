@@ -1,8 +1,9 @@
 # InkOps Phase 3.1 + 3.2 — Technical Execution Plan
-> Last Updated: 2026-04-22
+> Last Updated: 2026-04-23
 > Stack: React + TypeScript + Vite | Supabase (Postgres + Edge Functions + Auth) | Stripe | Resend (email) | Deno edge runtime
 > Repo root: `c:\CODE_26\InkOps.ink`
 > Production URL pattern: `https://{subdomain}.inkops.ink`
+> Branch strategy: `main` (dev) → `InkOps-Production` (live/Netlify) | `dev` branch → `dev.inkops.ink` (staging for Phase 3.1 main features)
 
 ---
 
@@ -16,6 +17,7 @@ src/
                       MockupGenerator.tsx, WorkOrderDetail.tsx, WorkOrdersList.tsx,
                       PublicQuoteApproval.tsx, PublicQuoteApprovalPage.tsx
     purchase-orders/  GarmentOrderReport.tsx
+    shared/           AttachmentsSection.tsx  ← NEW (file uploads)
     accounting/       PaidInvoices.tsx
   services/           billing-service.ts, invoice-detail-service.ts, scheduler-service.ts, ...
   utils/              invoice-pdf-export.ts, quote-pdf-export.ts
@@ -33,211 +35,266 @@ supabase/
 ---
 
 ## Strategy
-Small things (Tier 1) → Medium features (Tier 2) → Heavy features (Tier 3) → Phase 3.2
+Bugs → Minor Fixes (4/22 billable) → Tier 2 → Tier 3 → Phase 3.2
+
+> **Dev workflow:** Bugs + minor fixes push to `main` → `InkOps-Production` (prod).
+> Phase 3.1 heavy features build on `dev` branch → test on `dev.inkops.ink` → merge to prod when ready.
 
 ---
 
-# 🟢 TIER 1 — Small Things (Do First)
+# ✅ TIER 1 — Small Things (ALL COMPLETE — 2026-04-22)
 
----
+All items completed and deployed to `InkOps-Production`.
 
-## [T1-A] Fix Broken Scheduler Column Filters
-**Status:** ⬜ Not started | **Priority:** 1st
+| Task | Status |
+|------|--------|
+| [T1-A] Fix broken scheduler column filters | ✅ Done |
+| [T1-B] Add contact name to customer-facing invoice email | ✅ Done |
+| [T1-C] Quote terms + invoice terms in customer emails | ✅ Done |
+| [T1-D] InkOps branded password reset email (manual — Supabase Dashboard) | ✅ Done |
+| [T1-E] Mark garment purchase report items as ordered | ✅ Done |
+| [T1-F] File upload section on quotes and work orders | ✅ Done |
+| BONUS: This/Next/Last week quick filters on scheduler | ✅ Done |
+| BONUS: 3 status columns on scheduler (revised — see BUG-2) | ⚠️ Needs fix |
 
-### What's broken
-The ≡ filter icon buttons on workflow step columns in the Production Scheduler open a dropdown but selecting filter options does NOT visually filter the rows displayed.
-
-### Root cause (verified)
-The filter pipeline is fully wired:
-- `openColumnMenu` state toggles the dropdown ✅
-- `e.stopPropagation()` is already on the button ✅
-- `stepStatusFilters: Record<string, string[]>` state is updated when checkboxes are clicked ✅
-- `filteredEntries = useMemo(...)` at line 363 reads `stepStatusFilters` ✅
-- Line 371: `const entryStatus = entry.step_statuses[stepId]` — each entry has `step_statuses: Record<string, string>` ✅
-- Table renders `filteredEntries.map(...)` at line 643 ✅
-
-**The likely bug:** When `stepStatusFilters` has a key with an **empty array** (after user clicks "Clear"), the useMemo check at line 364 only returns early if `Object.keys(stepStatusFilters).length === 0` — but after Clear the key still exists with `[]`. This means the filter tries to match against an empty array and hides ALL rows. Also check: if a step column has no status set for an entry (`entry.step_statuses[stepId]` is `undefined`), those entries get incorrectly hidden.
-
-### File
-`src/components/production/ProductionScheduler.tsx`
-
-### Fix
-In the `filteredEntries` useMemo (around line 363-379), update the logic to:
-1. Skip filter for any step where `stepStatusFilters[stepId].length === 0` (empty = no filter)
-2. When comparing, if `entryStatus` is undefined/null and the filter is active, decide whether to include or exclude (recommend: exclude — entry has no status set for that step)
-
-```typescript
-// Corrected filteredEntries logic
-const filteredEntries = useMemo(() => {
-  const activeFilters = Object.entries(stepStatusFilters).filter(([_, v]) => v.length > 0);
-  if (activeFilters.length === 0) return entries;
-  return entries.filter(entry => {
-    for (const [stepId, statuses] of activeFilters) {
-      const entryStatus = entry.step_statuses?.[stepId];
-      if (!entryStatus || !statuses.includes(entryStatus)) return false;
-    }
-    return true;
-  });
-}, [entries, stepStatusFilters]);
-```
-
----
-
-## [T1-B] Add Contact Name to Customer-Facing Invoice Email
-**Status:** ⬜ Not started | **Priority:** 2nd
-
-### Current state
-- `invoice.contact.name` is shown on the InvoiceDetail UI screen ✅
-- `invoice.contact.name` renders in the downloadable PDF ✅
-- **MISSING:** The customer-facing invoice email HTML sent by `supabase/functions/send-invoice/index.ts` — unknown if contact name is included
-
-### Fix
-Open `supabase/functions/send-invoice/index.ts`, find the email HTML template, locate the "Bill To" section, and add `contact_name` above the company name. The data should already be available in the function's payload — check what fields are passed to the function from `billing-service.ts → sendInvoiceEmail()`.
-
----
-
-## [T1-C] Quote Terms + Invoice Terms in Customer Emails
-**Status:** ⬜ Not started | **Priority:** 3rd
-
-### Current state (verified)
-
-**Invoice PDF** (`src/utils/invoice-pdf-export.ts`):
-- `invoiceTerms` option declared, `hasInvoiceTerms` block renders at bottom of PDF ✅
-- `InvoiceDetail.tsx` passes `invoiceTerms: companySettings?.invoice_terms` to PDF call ✅
-- **ALREADY WORKING — just needs live testing to confirm**
-
-**Quote PDF** (`src/utils/quote-pdf-export.ts`):
-- `quote.quote_terms` renders at bottom via `hasQuoteTerms` block ✅
-- **ALREADY WORKING — just needs live testing to confirm**
-
-**Quote approval email** (`supabase/functions/quote-approval/index.ts`):
-- Line ~463 fetches company_settings but only selects: `company_name, logo_url, company_logo_primary_url, company_email, company_phone, company_website`
-- `quote_terms` is NOT in the SELECT — **MISSING**
-- Line 236: email shows `quote.terms` (short per-quote payment terms) but NOT the full company T&C
-
-**Invoice email** (`supabase/functions/send-invoice/index.ts`):
-- Unknown if `invoice_terms` from company_settings is appended — **needs investigation**
-
-### Fix
-
-**Step 1 — Quote approval email:** In `quote-approval/index.ts`, change the company_settings SELECT to include `quote_terms`:
-```typescript
-// Around line 463 — ADD quote_terms to the select
-const { data: companySettings } = await supabase
-  .from("company_settings")
-  .select("company_name, logo_url, company_logo_primary_url, company_email, company_phone, company_website, quote_terms")
-  .eq("id", approval.company_id)
-  .maybeSingle();
-```
-Then in the email HTML body, before the closing `</body>`, append:
-```typescript
-${companySettings?.quote_terms ? `
-  <div style="margin-top:40px; padding-top:20px; border-top:1px solid #e5e7eb;">
-    <p style="font-size:12px; color:#6b7280; font-weight:600;">TERMS &amp; CONDITIONS</p>
-    <div style="font-size:12px; color:#6b7280;">${companySettings.quote_terms}</div>
-  </div>` : ''}
-```
-
-**Step 2 — Invoice email:** Open `send-invoice/index.ts`, add `invoice_terms` to company_settings fetch, append same pattern to bottom of email HTML.
-
-**Step 3 — Test:** Download a quote PDF and invoice PDF on the live site to confirm terms already render (they should based on code).
-
----
-
-## [T1-D] InkOps Branded Password Reset Email (Admin Users)
-**Status:** ⬜ Not started | **Priority:** 4th
-
-### Important context
-There are TWO separate password reset flows in this system:
-
-1. **Customer portal reset** (`supabase/functions/request-password-reset/index.ts`) — already branded, uses Resend API, sends link to `${subdomain}.inkops.ink/portal/reset-password?token=...` ✅ **This one works.**
-
-2. **Admin user reset** (via Supabase Auth built-in) — this is what the client (Todd) uses to log in to the InkOps admin panel. Supabase sends its own default reset email. The redirect URL currently points to `inkopsink.bolt.host` (old URL) → **This is broken.**
-
-### Fix
-The admin reset email is controlled by Supabase Auth settings — NOT by code in the repo.
-
-**Fix in Supabase Dashboard (not in code):**
-1. Go to Supabase Dashboard → Authentication → Email Templates → "Reset Password"
-2. Update the HTML template with InkOps branding (logo, colors)
-3. The `{{ .ConfirmationURL }}` token in the template is the reset link — ensure it redirects to the correct production domain
-4. Go to Authentication → URL Configuration:
-   - Set **Site URL** to `https://inkops.ink` (or the admin's specific domain)
-   - Add production domain to **Additional Redirect URLs**
-5. If `supabase/config.toml` has a `[auth]` → `site_url` field, update it to production domain too
-
-**Also check:** `src/components/auth/` — find where the admin password reset form is. When calling `supabase.auth.resetPasswordForEmail(email, { redirectTo: '...' })`, make sure the `redirectTo` URL is the production domain, not bolt.host.
-
----
-
-## [T1-E] Mark Items on Garment Purchase Report as Ordered
-**Status:** ⬜ Not started | **Priority:** 5th
-
-### Current state
-- **File:** `src/components/purchase-orders/GarmentOrderReport.tsx`
-- `quantity_ordered` field tracks how many units are on a PO (already exists)
-- Checkboxes at lines 789–816 are for **size selection** (which sizes to include), NOT for marking as ordered
-- No `is_ordered` boolean per line item exists
-
-### Fix
-
-**Step 1 — DB migration:**
+### DB migrations applied (Supabase Dashboard — run manually)
 ```sql
--- Check first: SELECT column_name FROM information_schema.columns WHERE table_name = 'purchase_order_items';
-ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS is_ordered boolean DEFAULT false;
-ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS ordered_at timestamptz;
-ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS ordered_by text;
-```
+-- T1-E: is_ordered on garment_requirements_staging
+ALTER TABLE garment_requirements_staging
+  ADD COLUMN IF NOT EXISTS is_ordered boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS ordered_at timestamptz,
+  ADD COLUMN IF NOT EXISTS ordered_by text;
 
-**Step 2 — UI in GarmentOrderReport.tsx:**
-Add a checkbox column to each row. On check:
-```typescript
-await supabase
-  .from('purchase_order_items')
-  .update({ is_ordered: true, ordered_at: new Date().toISOString() })
-  .eq('id', item.id);
-```
-
-**Step 3 — Visual feedback:** When `is_ordered = true`, show a green "Ordered" badge on the row. When all items on a PO are ordered, show a green "Fully Ordered" badge on the PO header.
-
----
-
-## [T1-F] File Upload Button on Work Orders and Quotes
-**Status:** ⬜ Not started | **Priority:** 6th
-
-### Current state
-- `src/components/production/QuoteDetail.tsx` — NO file upload ❌
-- `src/components/production/WorkOrderDetail.tsx` — NO file upload ❌
-- No attachments table exists in DB
-
-### Fix
-
-**Step 1 — DB migration:**
-```sql
+-- T1-F: attachments table
 CREATE TABLE IF NOT EXISTS attachments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id uuid REFERENCES company_settings(id),
-  reference_type text NOT NULL, -- 'quote' | 'work_order'
+  company_id uuid NOT NULL,
+  reference_type text NOT NULL CHECK (reference_type IN ('quote','work_order')),
   reference_id uuid NOT NULL,
   file_name text NOT NULL,
-  file_url text NOT NULL,
-  file_size integer,
+  file_path text NOT NULL,
+  file_size bigint,
   mime_type text,
   uploaded_by text,
   created_at timestamptz DEFAULT now()
 );
-CREATE INDEX ON attachments(reference_type, reference_id);
+CREATE INDEX IF NOT EXISTS attachments_reference_idx ON attachments(reference_type, reference_id);
+ALTER TABLE attachments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Company members can manage their own attachments"
+  ON attachments FOR ALL
+  USING (company_id IN (SELECT company_id FROM user_profiles WHERE id = auth.uid()));
 ```
 
-**Step 2 — Supabase Storage:** Create bucket `attachments` (private, with signed URL access).
+### Edge functions redeployed
+```bash
+npx supabase functions deploy quote-approval --project-ref cuaukcvccxvfpuxaciac --no-verify-jwt
+npx supabase functions deploy send-invoice --project-ref cuaukcvccxvfpuxaciac
+```
 
-**Step 3 — Reusable component:** Create `src/components/shared/AttachmentsSection.tsx`:
-- Props: `referenceType: 'quote' | 'work_order'`, `referenceId: string`, `companyId: string`
-- Upload: `supabase.storage.from('attachments').upload(path, file)`
-- List: fetch from `attachments` table filtered by `reference_type` + `reference_id`
-- Download: generate signed URL via `supabase.storage.from('attachments').createSignedUrl(path, 3600)`
+---
 
-**Step 4:** Import and render `<AttachmentsSection>` in both `QuoteDetail.tsx` and `WorkOrderDetail.tsx`.
+# 🔴 ACTIVE BUGS — Fix Immediately (Client Found — 2026-04-22)
+> Push target: `main` → `InkOps-Production`
+> No extra charge — these are our issues to fix.
+
+---
+
+## [BUG-1] QuoteBuilder — Qty Shows 0 in Quote View After Save
+**Status:** ⬜ Not started | **Priority:** 1st
+
+### What's broken
+- In **QuoteBuilder** (editing mode): Qty column shows the correct value entered (e.g. `2`)
+- After saving and opening **Quote View** (QuoteDetail.tsx): Qty and Items columns show `0` or blank
+- **Unit Price and Line Total are correct** — so the price calculation works, only the qty display is broken
+- Affects "CS" (customer supplied) line items — might affect all items
+
+### Files to investigate
+- `src/components/production/QuoteDetail.tsx` — how it reads and renders the qty columns
+- `src/components/production/QuoteBuilder.tsx` — what field it saves the qty to
+- DB table: `quote_line_items` — check if `quantity` vs size qty fields (`qty_xs`, `qty_s`...) are being mismatched
+
+### Root cause hypothesis
+QuoteDetail reads a `quantity` field but QuoteBuilder saves to individual size fields (`qty_xs`, `qty_s`, `qty_m`, etc.) and doesn't write back to the aggregate `quantity` field. The display reads `quantity` which stays 0.
+
+### Fix approach
+Find where QuoteDetail renders the Qty column and check what field it reads from. Cross-reference with what QuoteBuilder writes. Either:
+- Update QuoteDetail to compute total from sum of size fields
+- Or ensure QuoteBuilder also writes the aggregate `quantity` field on save
+
+---
+
+## [BUG-2] Scheduler — Status Columns Wrong Position and Wrong Count
+**Status:** ⬜ Not started | **Priority:** 2nd
+
+### What's wrong (client feedback)
+- We added 3 columns (Stock Ordered, Stock Received, Art Approved) — client wants **2 only**
+- They are at the **end of the table** — client wants them **right after the Qty column** (before workflow steps)
+- Values need to change
+
+### What client wants exactly
+| Column | Name | Values | Connected to |
+|--------|------|--------|-------------|
+| 1 | **Stock Status** | `Ordered` / `Partial` / `Received` | Garment purchasing (GarmentOrderReport) |
+| 2 | **Art Status** | `Approved` / `Rejected` | Art proof approval/decline |
+
+### Fix approach
+**Step 1 — Remove current 3 columns** from `ProductionScheduler.tsx` (headers + cells + enrichment logic)
+
+**Step 2 — Add 2 DB columns** for manual/computed storage:
+```sql
+ALTER TABLE production_schedule_entries
+  ADD COLUMN IF NOT EXISTS stock_status text DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS art_status text DEFAULT 'pending';
+-- stock_status values: 'pending' | 'ordered' | 'partial' | 'received'
+-- art_status values: 'pending' | 'approved' | 'rejected'
+```
+
+**Step 3 — Compute on load in `loadScheduleEntries`:**
+- `stock_status`: check `garment_requirements_staging.is_ordered` and PO receiving data for the quote
+- `art_status`: check `quotes.artwork_approval_status` for the quote
+
+**Step 4 — Position:** Move the 2 new columns so they render AFTER the Qty `<th>` and BEFORE the `{workflowSteps.map(...)}` block (both in header and row cells)
+
+**Step 5 — Styling:** Use colored badges:
+- Stock: grey = Pending, blue = Ordered, yellow = Partial, green = Received
+- Art: grey = Pending, green = Approved, red = Rejected
+
+---
+
+## [BUG-3] Customer Form — Address Line 1 Required (Should Be Optional)
+**Status:** ⬜ Not started | **Priority:** 3rd
+
+### What's broken
+Address Line 1 field in the new customer creation/editing form is marked as `required`, causing validation errors when creating customers without a full address.
+
+### Files to find
+Search for customer creation form — likely in:
+- `src/components/customers/` or similar
+- Search for `address_1` or `bill_address_1` with `required` attribute
+
+### Fix
+Remove `required` attribute/validation from address fields. Only `company_name` or `customer_name` should be required.
+
+---
+
+# 🟠 4/22 MINOR FIXES — Billable New Scope
+> Client added: 2026-04-22 | **New scope — charge extra**
+> Push target: `main` → `InkOps-Production` (not a 3.1 feature, no dev branch needed)
+
+---
+
+## [MF-1] Portal Welcome Email — Send from sales@toddssportinggoods.com
+**Status:** ⬜ Not started
+
+### What's needed
+The welcome email sent when a customer is created/invited via the portal should come from `sales@toddssportinggoods.com` instead of the current sender address.
+
+### Fix
+Find the welcome email send function (likely in `supabase/functions/send-email/index.ts` or portal invite function). Update the `from` field in the Resend API call.
+
+---
+
+## [MF-2] Box Label Not Printing Properly
+**Status:** ⬜ Not started
+
+### What's needed
+Client says the box label is not printing properly. Need to:
+1. Get client to share exactly what's wrong (size? layout? content missing?)
+2. Find `src/components/production/BoxLabel.tsx` and `LabelPreviewModal.tsx`
+3. Fix layout/print CSS
+
+---
+
+## [MF-3] Remove Blue Mockup Builder Button from Imprints
+**Status:** ⬜ Not started
+
+### What's needed
+In QuoteBuilder → +Imprint(s) → imprint card → there's a blue button on the right that opens the mockup builder. Client wants it removed.
+
+### Fix
+Find the imprint card component (likely inside `QuoteBuilder.tsx` or a child component). Locate and remove the mockup builder button from the imprint row. Keep the mockup builder accessible from elsewhere if needed.
+
+---
+
+## [MF-4] Upload Images Directly to Imprint Box (No Full Mockup Builder)
+**Status:** ⬜ Not started
+
+### What's needed
+In QuoteBuilder → +Imprint(s) → imprint card → add a simple image upload button that lets users upload an artwork image directly to the imprint without opening the full mockup builder.
+
+### Fix
+Add a file input (or drag-drop zone) to the imprint card. On upload:
+- Upload to Supabase storage (`artwork` bucket or similar)
+- Save URL to `quote_imprints.artwork_url` or `mockups` array
+- Display thumbnail on the imprint card
+
+---
+
+## [MF-5] Company Logo Header + Email Signature in All Emails
+**Status:** ⬜ Not started
+
+### What's needed
+1. Add company logo at the top of all outgoing emails as a header
+2. Add a text block in Communication Templates / Settings that allows editing an email signature
+3. Signature appended to all outgoing emails
+
+### Files
+- `supabase/functions/quote-approval/index.ts` — quote email
+- `supabase/functions/send-invoice/index.ts` — invoice email
+- `supabase/functions/send-email/index.ts` — generic emails
+- `src/components/settings/` — add email signature field to company settings
+- DB: `ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS email_signature text;`
+
+### Fix approach
+1. Add `email_signature` and confirm `company_logo_primary_url` to company_settings
+2. Update all email HTML templates to include logo `<img>` header and signature block
+3. Add "Email Signature" textarea in Settings → Communication Templates
+
+---
+
+## [MF-6] State Field in Customer Profile → Dropdown
+**Status:** ⬜ Not started
+
+### What's needed
+The state field in the customer address section should be a dropdown of US states instead of a free-text input.
+
+### Fix
+Find the customer form component. Replace the state `<input>` with a `<select>` populated with all 50 US state abbreviations.
+
+---
+
+## [MF-7] Street Address Autofill
+**Status:** ⬜ Not started
+
+### What's needed
+Street address field should autofill/suggest addresses as user types.
+
+### Fix approach (simplest first)
+Add `autocomplete="street-address"` to the address input — this triggers browser-stored address suggestions with zero API cost.
+
+For full Google Maps Places autocomplete (if client wants it):
+- Add Google Maps Places API key to `.env`
+- Use `@react-google-maps/api` or a lightweight wrapper
+- Call Places Autocomplete API on keystroke, show dropdown, fill fields on select
+
+---
+
+## [MF-8] Undo "Mark as Ordered" in Garment Purchase Report
+**Status:** ⬜ Not started
+
+### What's needed
+The "Mark Ordered" button we added (T1-E) needs an undo/toggle. When a row is already marked ordered, clicking "Ordered" badge should ask "Undo?" and set `is_ordered = false`.
+
+### Fix
+In `GarmentOrderReport.tsx`, update `handleMarkOrdered` to toggle: if already ordered, set `is_ordered = false, ordered_at = null`. Change the "Ordered" badge into a clickable button with confirm dialog.
+
+---
+
+## [MF-9] Box Label Refinement
+**Status:** ⬜ Awaiting client details
+
+### What's needed
+Client mentioned box label refinement but was vague. Need more specifics from client before implementing.
 
 ---
 
@@ -246,30 +303,7 @@ CREATE INDEX ON attachments(reference_type, reference_id);
 ---
 
 ## [T2-A] Scheduler Sorting (This Week / Next Week / Last Week)
-**Status:** ⬜ Not started
-**File:** `src/components/production/ProductionScheduler.tsx`
-
-### Current state
-- `startDate` / `endDate` state controls the DB query date range
-- Existing query already applies date range filtering
-
-### Fix
-Add 3 buttons to the scheduler header bar. Each calls a helper that sets `startDate`/`endDate`:
-
-```typescript
-const setWeekRange = (offset: -1 | 0 | 1) => {
-  const today = new Date();
-  const day = today.getDay(); // 0=Sun, 1=Mon...
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  setStartDate(monday.toISOString().split('T')[0]);
-  setEndDate(sunday.toISOString().split('T')[0]);
-};
-```
-
-Buttons: `Last Week` (offset -1) | `This Week` (offset 0) | `Next Week` (offset 1)
+**Status:** ✅ Done (completed during Tier 1 bonus)
 
 ---
 
@@ -285,7 +319,6 @@ Replace native browser "Leave site?" with custom modal: **"You have unsaved chan
 2. Add `useBlocker` from React Router (if using React Router v6.7+) or use a `useEffect` with `window.addEventListener('beforeunload', handler)` as fallback
 3. When blocker is triggered, show a custom modal instead of the native browser dialog
 4. "SAVE" → call existing save function → navigate; "CONTINUE" → allow navigation; "CANCEL" → dismiss modal, stay on page
-5. Check which version of React Router is installed: `grep -r "react-router" package.json`
 
 ---
 
@@ -294,36 +327,14 @@ Replace native browser "Leave site?" with custom modal: **"You have unsaved chan
 **File:** `src/components/production/MockupGenerator.tsx`
 
 ### What's needed
-**Current:** You can upload new artwork but CANNOT click a saved mockup thumbnail on the left panel to load it back onto the canvas.
-**Goal:** Click imprint on left → saved mockup loads onto canvas → edit (resize/reposition) → Save → replaces old mockup in DB.
-
-### How to implement
-1. In the left imprint panel, make each saved mockup `<img>` thumbnail clickable
-2. On click: call the canvas library (check if it's Fabric.js or Konva) to load the image URL onto the canvas — e.g., `fabric.Image.fromURL(mockupUrl, (img) => canvas.add(img))`
-3. Store a reference to which imprint is being edited (`editingImprintId`)
-4. On Save: if `editingImprintId` is set, UPDATE the existing mockup record instead of creating a new one
+**Current:** You can upload new artwork but CANNOT click a saved mockup thumbnail to load it back onto the canvas.
+**Goal:** Click imprint → saved mockup loads onto canvas → edit → Save → replaces old mockup in DB.
 
 ---
 
 ## [T2-D] Goods Ordered / Goods Received Auto-Column in Scheduler
-**Status:** ⬜ Not started
-**Depends on:** T1-E (is_ordered column) being done first
-
-### Files
-- `src/components/production/ProductionScheduler.tsx`
-- `src/components/purchase-orders/GarmentOrderReport.tsx`
-- DB: `production_schedule_entries` table
-
-### Fix
-**Step 1 — DB:**
-```sql
-ALTER TABLE production_schedule_entries ADD COLUMN IF NOT EXISTS goods_status text DEFAULT 'pending';
--- values: 'pending' | 'ordered' | 'received'
-```
-
-**Step 2 — Auto-update trigger:** Create a Postgres function that runs when `purchase_order_items.is_ordered` changes. If ALL items for a quote are `is_ordered = true`, update `production_schedule_entries.goods_status = 'ordered'` for that quote's entries. Similarly for received (link to existing receiving logic in `supabase/functions/` — check `receiving-service.ts`).
-
-**Step 3 — Scheduler column:** Add a "Goods" column in `ProductionScheduler.tsx` showing badge: grey = Pending, blue = Ordered, green = Received.
+**Status:** ⚠️ Superseded by BUG-2 fix above
+> BUG-2 implements the 2-column scheduler status (Stock Status + Art Status) which covers the intent of T2-D. Mark complete once BUG-2 is done.
 
 ---
 
@@ -341,15 +352,13 @@ ALTER TABLE production_schedule_entries ADD COLUMN IF NOT EXISTS goods_status te
 - `src/components/settings/CompanySettings.tsx` — add new settings fields here
 
 ### Fix
-1. Add to `company_settings` table:
+1. Add to `company_settings`:
 ```sql
 ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS auto_send_payment_link boolean DEFAULT false;
-ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS default_payment_split text DEFAULT '100'; -- '50_100' | '100'
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS default_payment_split text DEFAULT '100';
 ```
-2. In `quote-actions/index.ts`, after invoice + billing_queue entry created: check `auto_send_payment_link` setting → if true, generate payment links and send email
-3. For 50%: calculate `amount * 0.5`, create Stripe Payment Link for that amount
-4. For 100%: use full amount
-5. Email template shows both options with CTA buttons
+2. In `quote-actions/index.ts`, after invoice created: check `auto_send_payment_link` → if true, generate payment links and send email
+3. For 50%: calculate `amount * 0.5`, create Stripe Payment Link; for 100%: use full amount
 
 ---
 
@@ -374,68 +383,65 @@ ALTER TABLE quotes ADD COLUMN IF NOT EXISTS artwork_decline_reason text;
 ```
 
 ### Logic rules
-- `1a` Quote approved → artwork section unlocks (if artwork exists on quote)
-- `1b` Quote declined → artwork section stays locked
-- `1c` No artwork on quote (`imprints` have no mockup/artwork files) → artwork section hidden
-- `1d` Art declined → admin QuoteDetail shows "Resend for Artwork Approval" button
-- `1e` Customer requests changes after approval → `quote.status` resets to pending → new approval email sent → on re-approval: `quote-actions` updates WO, scheduler entries, invoice line items
-
-### How artwork existence is checked
-Query `quote_imprints` table for the quote. Check if any imprint has a non-null `artwork_url` or mockup. If none → `artwork_approval_status = 'not_applicable'`.
+- Quote approved → artwork section unlocks (if artwork exists on quote)
+- Quote declined → artwork section stays locked
+- No artwork on quote → artwork section hidden (`artwork_approval_status = 'not_applicable'`)
+- Art declined → admin QuoteDetail shows "Resend for Artwork Approval" button
+- Customer requests changes after approval → `quote.status` resets to pending → new approval email → on re-approval: `quote-actions` updates WO, scheduler entries, invoice
 
 ---
 
 # 🔵 PHASE 3.2 — Future Sprint (after 3.1 complete)
 
 ## [P3.2-1] Subscription Dashboard
-- Admin UI to manage user subscriptions, assign beta testers (give full access without payment), track monthly Stripe revenue
+- Admin UI to manage user subscriptions, assign beta testers, track monthly Stripe revenue
 - Relevant: `supabase/functions/create-subscription-checkout/index.ts`, `src/contexts/SubscriptionContext.tsx`
 
 ## [P3.2-2] Security — Noindex Public Links
-- Quote, invoice, and proof pages are public URLs — must not appear in Google
-- **Quick fix:** Add `<meta name="robots" content="noindex, nofollow">` to `PublicQuoteApprovalPage.tsx` and any public invoice page
-- For extra security: add `X-Robots-Tag: noindex` response header in edge functions that serve public pages
+- Add `<meta name="robots" content="noindex, nofollow">` to `PublicQuoteApprovalPage.tsx` and public invoice pages
+- Add `X-Robots-Tag: noindex` response header in edge functions serving public pages
 
 ## [P3.2-3] Speed Optimization
 - Garment lookup in QuoteBuilder: add debounce (300ms) + cache results in sessionStorage
-- MockupGenerator: lazy-load the canvas library (Fabric.js/Konva) only when modal opens
-- Files: `src/components/production/QuoteBuilder.tsx`, `src/components/production/MockupGenerator.tsx`
+- MockupGenerator: lazy-load canvas library only when modal opens
 
 ## [P3.2-4] Customer Portal Full Overhaul
 - Customers view unpaid invoices, past quotes, proofs, paid invoices, contacts; store payment methods
 - Existing portal edge functions: `portal-data/`, `portal-payment/`, `portal-proof-approval/`, `customer-payment-methods/`
 
 ## [P3.2-5] Customer CSV Upload from Printavo
-- Parse Printavo CSV export and map to `customers` table
-- Create: new settings page section + `supabase/functions/import-customers/index.ts` edge function
+- Parse Printavo CSV export, map to `customers` table
+- New settings page section + `supabase/functions/import-customers/index.ts`
 
 ---
 
-# ✅ Execution Order
+# ✅ Execution Order (Current)
 
 ```
-TIER 1 — Small Things
-├── [T1-A] Fix scheduler filter empty-array bug (ProductionScheduler.tsx ~line 363)
-├── [T1-B] Contact name in send-invoice email template
-├── [T1-C] Add quote_terms to company_settings SELECT in quote-approval/index.ts + append to email
-├── [T1-D] Fix admin password reset redirect URL in Supabase Dashboard + update redirectTo in auth code
-├── [T1-E] Add is_ordered column to purchase_order_items + checkbox UI in GarmentOrderReport.tsx
-└── [T1-F] Create attachments table + storage bucket + AttachmentsSection component
+BUGS (Fix now → push to prod)
+├── [BUG-1] QuoteBuilder qty showing 0 in quote view
+├── [BUG-2] Scheduler: fix column count, position, and values
+└── [BUG-3] Customer form: make address not required
 
-TIER 2 — Medium Features
-├── [T2-A] Scheduler This/Next/Last week buttons (setWeekRange helper)
-├── [T2-B] Custom unsaved changes modal in QuoteBuilder.tsx
-├── [T2-C] MockupGenerator: load existing mockup onto canvas on click
-└── [T2-D] goods_status column in production_schedule_entries + scheduler badge
+4/22 MINOR FIXES (Billable — after bugs)
+├── [MF-1] Portal email from sales@toddssportinggoods.com
+├── [MF-2] Box label printing fix (need client details)
+├── [MF-3] Remove mockup builder button from imprints
+├── [MF-4] Image upload directly to imprint box
+├── [MF-5] Company logo in email headers + email signature setting
+├── [MF-6] State dropdown in customer profile
+├── [MF-7] Address autofill
+├── [MF-8] Undo "Mark as Ordered"
+└── [MF-9] Box label refinement (awaiting client details)
 
-TIER 3 — Heavy Features
-├── [T3-A] Auto payment link 50%/100% (quote-actions + billing-service + Stripe)
-└── [T3-B] Quote + Artwork Approval flow (biggest — multiple files + DB changes)
+TIER 2 (dev branch → dev.inkops.ink staging)
+├── [T2-B] Custom unsaved changes modal in QuoteBuilder
+└── [T2-C] MockupGenerator: load existing mockup to canvas
+
+TIER 3 (dev branch)
+├── [T3-A] Auto payment link 50%/100%
+└── [T3-B] Quote + Artwork Approval flow (biggest feature)
 
 PHASE 3.2
-├── [P3.2-1] Subscription dashboard
-├── [P3.2-2] Noindex meta tags (quick)
-├── [P3.2-3] Speed optimization
-├── [P3.2-4] Customer portal overhaul
-└── [P3.2-5] CSV upload
+└── [P3.2-1 through P3.2-5]
 ```

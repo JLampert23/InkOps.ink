@@ -100,6 +100,8 @@ interface LineItem {
   total_price: number;
   color?: string;
   notes?: string;
+  group_label?: string | null;
+  total_quantity: number | null;
   qty_yxs: number | null;
   qty_ys: number | null;
   qty_ym: number | null;
@@ -579,9 +581,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const itemGroups = Object.entries(groupedItems);
 
   const totalQty = items.reduce((sum, item) => {
-    return sum + (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
+    const sizeSum = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
            (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) + (item.qty_5xl || 0);
+    // For CS/non-sized items, fall back to total_quantity
+    return sum + (sizeSum > 0 ? sizeSum : (item.total_quantity || 0));
   }, 0);
 
   const feesTotal = fees.reduce((sum, fee) => sum + fee.total_price, 0);
@@ -937,7 +941,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
                                    (item.qty_4xl || 0) + (item.qty_5xl || 0);
-                    const totalItems = sizeQty > 0 ? sizeQty : ((item as any).quantity || 0);
+                    // For CS/non-sized items, fall back to total_quantity
+                    const totalItems = sizeQty > 0 ? sizeQty : (item.total_quantity || 0);
 
                     return (
                       <React.Fragment key={item.id}>
@@ -997,7 +1002,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                         {item.qty_5xl || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
-                        {sizeQty === 0 ? ((item as any).quantity || '') : ''}
+                        {/* Qty column: for sized items shows blank (sizes ARE the qty); for CS items shows total_quantity */}
+                      {sizeQty === 0 ? (item.total_quantity || '') : ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
                         {totalItems}
