@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
     // Get company settings for branding
     const { data: companySettings } = await supabase
       .from("company_settings")
-      .select("company_name, inkops_subdomain, customer_url, email_from_address, resend_api_key, company_logo_primary_url, email_signature")
+      .select("company_name, inkops_subdomain, customer_url, email_from_address, secondary_email_from_address, resend_api_key, company_logo_primary_url, email_signature")
       .eq("id", customer.company_id)
       .maybeSingle();
 
@@ -210,7 +210,10 @@ Deno.serve(async (req: Request) => {
     // Ensure API key is ASCII-only (no invalid ByteString characters)
     const resendApiKey = (decryptedApiKey?.trim() || '').replace(/[^\x00-\x7F]/g, '');
 
-    let fromEmail = companySettings.email_from_address || 'noreply@inkops.com';
+    // Portal welcome emails use the secondary (portal/comms) sender, falling back to primary
+    let fromEmail = (companySettings as any).secondary_email_from_address
+      || companySettings.email_from_address
+      || 'noreply@inkops.com';
     fromEmail = fromEmail.replace(/[^\x00-\x7F]/g, '').trim();
 
     const companyNameAscii = (companySettings.company_name || 'Company').replace(/[^\x00-\x7F]/g, '').trim();

@@ -4795,17 +4795,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Secondary Sender Address
+                      Portal & Customer Communications Sender
                     </label>
                     <input
                       type="email"
                       value={secondaryEmailFromAddress}
                       onChange={(e) => setSecondaryEmailFromAddress(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="alerts@yourdomain.com"
+                      placeholder="sales@yourdomain.com"
                     />
                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Optional: Use for system notifications or alerts
+                      Portal welcome emails, quote sends, and customer notifications use this address.
+                      If blank, falls back to Primary Sender above.
                     </p>
                   </div>
                 </div>
@@ -4839,7 +4840,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Invoices and payment receipts always use your Primary address. All other emails (quotes, proofs, automations) use your Secondary address.
+                    Invoices and payment receipts always use your Primary address. Portal welcome emails, quotes, and customer notifications use your Portal & Customer Communications address (falls back to Primary if blank).
                   </p>
                 </div>
 
