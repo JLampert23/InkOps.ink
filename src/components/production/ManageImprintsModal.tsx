@@ -653,6 +653,40 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
   if (!isOpen) return null;
 
+  // Pre-compute MockupGenerator modal outside JSX (esbuild doesn't support IIFEs in JSX)
+  let mockupGeneratorModal: React.ReactNode = null;
+  if (mockupImprintIndex !== null && quoteId) {
+    const currentImprint = imprints[mockupImprintIndex];
+    if (currentImprint) {
+      const groupLabel = currentImprint.group_label || '';
+      let firstLineItem = lineItems?.find(item => item.group_label === groupLabel);
+      if (!firstLineItem && lineItems && lineItems.length > 0) {
+        firstLineItem = lineItems[0];
+      }
+      const garmentStyle = firstLineItem?.item_number?.trim();
+      const garmentColor = firstLineItem?.color?.trim();
+      if (firstLineItem && garmentStyle && garmentColor) {
+        mockupGeneratorModal = (
+          <MockupGenerator
+            lineItemId={firstLineItem.id || ''}
+            quoteId={quoteId}
+            customerId={quote?.customer_id || ''}
+            garmentStyle={garmentStyle}
+            garmentColor={garmentColor}
+            groupLabel={groupLabel}
+            imprintId={currentImprint.id || ''}
+            imprintLocation={currentImprint.location}
+            imprintTypeOfWork={currentImprint.type_of_work}
+            onClose={() => setMockupImprintIndex(null)}
+            onSave={async () => {
+              await loadImprints();
+            }}
+          />
+        );
+      }
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
@@ -907,87 +941,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         </div>
       </div>
 
-      {mockupImprintIndex !== null && quoteId && (() => {
-        const currentImprint = imprints[mockupImprintIndex];
-
-        // Validate that the imprint exists
-        if (!currentImprint) {
-          console.error('Cannot open MockupGenerator: Invalid imprint index');
-          showNotification('error', 'Missing Data', 'Selected imprint not found');
-          setMockupImprintIndex(null);
-          return null;
-        }
-
-        const groupLabel = currentImprint.group_label || '';
-
-        // Try to find line item by group_label, fallback to first line item if not found
-        let firstLineItem = lineItems?.find(item => item.group_label === groupLabel);
-        if (!firstLineItem && lineItems && lineItems.length > 0) {
-          firstLineItem = lineItems[0];
-        }
-
-        // Validate required data before opening MockupGenerator
-        if (!firstLineItem) {
-          console.error('Cannot open MockupGenerator: No line items available');
-          showNotification('error', 'Missing Data', 'No line items found for this quote');
-          setMockupImprintIndex(null);
-          return null;
-        }
-
-        const garmentStyle = firstLineItem.item_number?.trim();
-        const garmentColor = firstLineItem.color?.trim();
-
-        if (!garmentStyle) {
-          console.error('Cannot open MockupGenerator: Missing garment style');
-          showNotification('error', 'Missing Data', 'Line item is missing a style number');
-          setMockupImprintIndex(null);
-          return null;
-        }
-
-        if (!garmentColor) {
-          console.error('Cannot open MockupGenerator: Missing garment color');
-          showNotification('error', 'Missing Data', 'Line item is missing a color');
-          setMockupImprintIndex(null);
-          return null;
-        }
-
-        console.log('Opening MockupGenerator with:', {
-          currentImprint,
-          groupLabel,
-          firstLineItem,
-          garmentStyle,
-          garmentColor,
-          lineItemsCount: lineItems?.length,
-        });
-
-        console.log('ManageImprintsModal: Passing to MockupGenerator:', {
-          imprintId: currentImprint.id,
-          imprintLocation: currentImprint.location,
-          imprintTypeOfWork: currentImprint.type_of_work,
-          hasId: !!currentImprint.id,
-          hasLocation: !!currentImprint.location,
-          hasTypeOfWork: !!currentImprint.type_of_work,
-        });
-
-        return (
-          <MockupGenerator
-            lineItemId={firstLineItem.id || ''}
-            quoteId={quoteId}
-            customerId={quote?.customer_id || ''}
-            garmentStyle={garmentStyle}
-            garmentColor={garmentColor}
-            groupLabel={groupLabel}
-            imprintId={currentImprint.id || ''}
-            imprintLocation={currentImprint.location}
-            imprintTypeOfWork={currentImprint.type_of_work}
-            onClose={() => setMockupImprintIndex(null)}
-            onSave={async () => {
-              // Reload imprints to get updated mockups (but keep modal open)
-              await loadImprints();
-            }}
-          />
-        );
-      })()}
+      {mockupGeneratorModal}
     </div>
   );
 }
