@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('resend_api_key, email_from_address, secondary_email_from_address, quote_email_sender, company_name')
+      .select('resend_api_key, email_from_address, secondary_email_from_address, quote_email_sender, company_name, company_logo_primary_url, logo_url, email_signature')
       .eq('id', companyId)
       .maybeSingle();
 
@@ -259,6 +259,17 @@ Deno.serve(async (req: Request) => {
     let finalSubject = subject;
     if (shortCodeData) {
       finalSubject = renderTemplate(subject, shortCodeData);
+    }
+
+    // Wrap HTML with company branding: logo at top, email signature at bottom
+    if (html) {
+      const logoUrl = companySettings.company_logo_primary_url || companySettings.logo_url || null;
+      const emailSig = companySettings.email_signature || null;
+      html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">
+        ${ logoUrl ? `<div style="padding:20px 30px 15px;border-bottom:2px solid #e5e7eb;text-align:left;"><img src="${logoUrl}" alt="${fromName}" style="max-height:64px;max-width:220px;object-fit:contain;display:block;" /></div>` : '' }
+        <div style="padding:24px 30px;">${html}</div>
+        ${ emailSig ? `<div style="padding:16px 30px;border-top:1px solid #e5e7eb;font-size:13px;color:#6b7280;line-height:1.6;">${emailSig}</div>` : '' }
+      </div>`;
     }
 
     const toArray = Array.isArray(to) ? to : [to];

@@ -371,6 +371,61 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     }
   };
 
+  const handleDirectUploadToImprint = async (idx: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !quoteId) {
+      if (!quoteId) showNotification('error', 'Save Quote First', 'Please save the quote before uploading artwork');
+      return;
+    }
+    setUploading(true);
+    try {
+      const uploadedProofs: Proof[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${quoteId}-${Date.now()}-${i}.${fileExt}`;
+        const filePath = `${user?.id}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('imprint-proofs')
+          .upload(filePath, file, { cacheControl: '3600', upsert: false });
+        if (uploadError) {
+          showNotification('error', 'Upload Failed', `Failed to upload ${file.name}`);
+          continue;
+        }
+        const { data: { publicUrl } } = supabase.storage
+          .from('imprint-proofs')
+          .getPublicUrl(filePath);
+        uploadedProofs.push({
+          file_url: publicUrl,
+          file_name: file.name,
+          file_type: file.type,
+          version: (imprints[idx].proofs?.length || 0) + uploadedProofs.length + 1,
+          notes: '',
+        });
+      }
+      if (uploadedProofs.length > 0) {
+        const updatedImprints = [...imprints];
+        updatedImprints[idx] = {
+          ...updatedImprints[idx],
+          proofs: [...(updatedImprints[idx].proofs || []), ...uploadedProofs],
+        };
+        setImprints(updatedImprints);
+        if (imprints[idx].id) {
+          await supabase
+            .from('quote_imprints')
+            .update({ mockups: updatedImprints[idx].proofs })
+            .eq('id', imprints[idx].id);
+        }
+        showNotification('success', 'Upload Successful', `Uploaded ${uploadedProofs.length} file(s) to imprint`);
+      }
+    } catch (err) {
+      showNotification('error', 'Upload Failed', 'An error occurred while uploading');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
   const handleDeleteProof = async (index: number) => {
     const proof = currentImprint.proofs[index];
 
@@ -807,51 +862,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                 />
               </div>
 
-              {/* MF-4: Image upload to imprint box */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-400 mb-1.5">
-                  Images / Artwork
-                </label>
-                <label className={`flex items-center gap-2 px-3 py-2 border-2 border-dashed rounded cursor-pointer transition-colors text-sm ${
-                  uploading
-                    ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400'
-                    : 'border-gray-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-500 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
-                }`}>
-                  <ImageIcon className="w-4 h-4 flex-shrink-0" />
-                  <span>{uploading ? 'Uploading...' : 'Click to upload image(s) or mockup'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                    className="hidden"
-                  />
-                </label>
-                {currentImprint.proofs.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {currentImprint.proofs.map((proof, pIdx) => (
-                      <div key={pIdx} className="relative group">
-                        <img
-                          src={proof.file_url}
-                          alt={proof.file_name}
-                          className="w-16 h-16 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-400 transition-all"
-                          onClick={() => window.open(proof.file_url, '_blank')}
-                          title={proof.file_name}
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteProof(pIdx); }}
-                          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
-                          title="Remove image"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+
             </div>
 
             <div className="flex items-center gap-2">
@@ -920,6 +931,20 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                         >
                           <Palette className="w-4 h-4" />
                         </button>
+                        <label
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 cursor-pointer flex-shrink-0"
+                          title="Upload Artwork Image"
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => handleDirectUploadToImprint(idx, e)}
+                          />
+                        </label>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
