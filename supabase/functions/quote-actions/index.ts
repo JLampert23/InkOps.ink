@@ -758,7 +758,7 @@ Deno.serve(async (req: Request) => {
 
       // Guard: only sent quotes can be approved
       if (quote.status === 'draft') {
-        throw new Error("Cannot approve a draft quote. Send it to the customer first.");
+        throw new Error("This quote is still a Draft. Send it to the customer before approving.");
       }
       if (quote.status === 'approved' || quote.status === 'converted') {
         throw new Error("This quote has already been approved.");
