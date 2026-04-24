@@ -470,12 +470,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
           meta: { previous_status: 'approved' }
         });
 
-      showNotification('Quote reopened for editing', 'success');
+      showNotification('success', 'Quote Reopened', 'Quote reopened for editing.');
       loadQuoteDetails();
       onEdit();
     } catch (error) {
       console.error('Error reopening quote:', error);
-      showNotification('Failed to reopen quote', 'error');
+      showNotification('error', 'Error', 'Failed to reopen quote. Please try again.');
     } finally {
       setReopening(false);
     }
@@ -525,14 +525,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
       }
 
       const result = await response.json();
-      showNotification(
-        `Quote approved! Work Order ${result.work_order.work_order_number} and Invoice ${result.invoice.invoice_number} created.`,
-        'success'
-      );
+      showNotification('success', 'Quote Approved!', `Work Order ${result.work_order.work_order_number} and Invoice ${result.invoice.invoice_number} created.`);
       loadQuoteDetails();
     } catch (error: any) {
       console.error('Error approving quote:', error);
-      showNotification(error.message || 'Failed to approve quote', 'error');
+      showNotification('error', 'Cannot Approve Quote', error.message || 'Failed to approve quote');
     } finally {
       setApproving(false);
     }
