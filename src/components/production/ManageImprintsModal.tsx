@@ -919,6 +919,25 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                         {imprint.details && (
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5 line-clamp-1">{imprint.details}</p>
                         )}
+                        {imprint.proofs && imprint.proofs.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                            {imprint.proofs.map((proof, pIdx) => (
+                              <a
+                                key={pIdx}
+                                href={proof.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={proof.file_name}
+                              >
+                                <img
+                                  src={proof.file_url}
+                                  alt={proof.file_name}
+                                  className="w-12 h-12 object-cover rounded border border-gray-300 dark:border-slate-500 hover:opacity-80 transition-opacity"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button

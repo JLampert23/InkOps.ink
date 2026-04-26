@@ -279,7 +279,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
     if (statusFilter === 'all') {
       matchesStatus = true;
     } else if (statusFilter === 'active') {
-      matchesStatus = true;
+      matchesStatus = ['draft', 'sent', 'pending'].includes(quote.status);
     } else if (statusFilter === 'approved') {
       matchesStatus = ['approved', 'converted'].includes(quote.status);
     } else {
