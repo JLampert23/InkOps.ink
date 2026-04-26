@@ -219,6 +219,9 @@ Deno.serve(async (req: Request) => {
     const companyNameAscii = (companySettings.company_name || 'Company').replace(/[^\x00-\x7F]/g, '').trim();
     const subjectLine = `Welcome to ${companyNameAscii} Customer Portal`;
 
+    // Format from address with display name (e.g. "Todd's <sales@toddssportinggoods.com>")
+    const fromAddress = companyNameAscii ? `${companyNameAscii} <${fromEmail}>` : fromEmail;
+
     // Send email via Resend
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -227,7 +230,7 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: fromEmail,
+        from: fromAddress,
         to: [email],
         subject: subjectLine,
         html: emailBody,
