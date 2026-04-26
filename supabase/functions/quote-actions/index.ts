@@ -584,7 +584,7 @@ Deno.serve(async (req: Request) => {
           const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Authorization': authHeader!, // Forward user's JWT so send-email can verify them
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
