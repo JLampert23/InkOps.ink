@@ -1158,7 +1158,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                                         </div>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                                           {imprint.mockups.map((mockup: any, mockupIdx: number) => {
-                                            const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                            const mockupUrl = typeof mockup === 'string' ? mockup : (mockup?.file_url || mockup?.url || mockup?.composite_image_url || mockup?.garment_image_url);
                                             if (!mockupUrl) return null;
 
                                             return (
