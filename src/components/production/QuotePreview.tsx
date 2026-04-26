@@ -603,11 +603,15 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
             {imprints.length > 0 && (
               <div className="mb-3">
                 {imprints.map((imprint, idx) => {
-                  const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
-                    ? imprint.artwork_images
-                    : imprint.artwork_url
-                      ? [imprint.artwork_url]
-                      : [];
+                  // Collect images from artwork_images, artwork_url, and mockups (direct uploads)
+                  const artworkImages: string[] = [
+                    ...(imprint.artwork_images && Array.isArray(imprint.artwork_images)
+                      ? imprint.artwork_images
+                      : imprint.artwork_url ? [imprint.artwork_url] : []),
+                    ...(imprint.mockups && Array.isArray(imprint.mockups)
+                      ? imprint.mockups.map((m: any) => m.file_url || m.composite_image_url || m.garment_image_url || '').filter(Boolean)
+                      : []),
+                  ];
 
                   return (
                     <div key={idx} className="mb-3 border border-gray-300 p-2 bg-gray-50">
@@ -628,7 +632,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                             <img
                               key={imgIdx}
                               src={url}
-                              alt={`Artwork ${imgIdx + 1}`}
+                              alt={`Mockup ${imgIdx + 1}`}
                               className="h-24 w-24 object-contain border-2 border-gray-400 bg-white rounded shadow-sm"
                             />
                           ))}
