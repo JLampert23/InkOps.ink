@@ -55,9 +55,9 @@ Deno.serve(async (req: Request) => {
         const tier = session.metadata?.tier || 'professional';
         const subscriptionId = session.subscription as string;
 
+        // ── InkOps subscription upgrade ──────────────────────────────
         if (companyId) {
           console.log(`Upgrading company ${companyId} to ${tier} tier due to successful checkout session.`);
-          
           await supabase
             .from('company_settings')
             .update({
@@ -66,7 +66,62 @@ Deno.serve(async (req: Request) => {
               subscription_status: 'active',
             })
             .eq('id', companyId);
+          break;
         }
+
+        // ── Client invoice payment (payment link paid by customer) ────
+        const printavoInvoiceId = session.metadata?.printavo_invoice_id;
+        if (printavoInvoiceId) {
+          console.log(`Invoice payment received for printavo_invoice_id: ${printavoInvoiceId}`);
+          const amountPaid = (session.amount_total || 0) / 100;
+          const customerEmail = session.customer_details?.email || session.customer_email || null;
+          const customerName = session.customer_details?.name || null;
+          const paymentIntentId = session.payment_intent as string || null;
+
+          // 1. Mark payment link as paid
+          await supabase
+            .from('stripe_payment_links')
+            .update({ status: 'paid' })
+            .eq('printavo_invoice_id', printavoInvoiceId);
+
+          // 2. Record the payment in stripe_payments
+          await supabase
+            .from('stripe_payments')
+            .insert([{
+              printavo_invoice_id: printavoInvoiceId,
+              stripe_payment_intent_id: paymentIntentId,
+              amount: amountPaid,
+              currency: session.currency || 'usd',
+              status: 'succeeded',
+              customer_email: customerEmail,
+              customer_name: customerName,
+              payment_method: 'card',
+            }]);
+
+          // 3. Update the printavo invoice status to paid
+          await supabase
+            .from('printavo_invoices')
+            .update({
+              payment_status: 'paid',
+              paid_at: new Date().toISOString(),
+              amount_paid: amountPaid,
+            })
+            .eq('id', printavoInvoiceId);
+
+          // 4. Update stripe_invoices record if it exists
+          await supabase
+            .from('stripe_invoices')
+            .update({
+              status: 'paid',
+              amount_paid: amountPaid,
+              amount_remaining: 0,
+              paid_at: new Date().toISOString(),
+            })
+            .eq('printavo_invoice_id', printavoInvoiceId);
+
+          console.log(`Invoice ${printavoInvoiceId} marked as paid. Amount: $${amountPaid}`);
+        }
+
         break;
       }
       

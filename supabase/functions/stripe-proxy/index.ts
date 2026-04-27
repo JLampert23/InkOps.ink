@@ -408,6 +408,7 @@ Deno.serve(async (req: Request) => {
           auto_advance: false,
           collection_method: 'send_invoice',
           days_until_due: 30,
+          pending_invoice_items_behavior: 'exclude', // Allow empty invoice creation; items added below
         };
 
         if (customerId) {
