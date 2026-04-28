@@ -68,6 +68,8 @@ interface ManageImprintsModalProps {
   initialGroupLabel?: string;
   quote?: any;
   lineItems?: any[];
+  customerId?: string;
+  onImprintsUpdated?: (data: any[]) => void;
 }
 
 const extractNumColors = (columnName: string): number => {
@@ -78,7 +80,7 @@ const extractNumColors = (columnName: string): number => {
   return digitMatch ? parseInt(digitMatch[1]) : 1;
 };
 
-export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel, quote, lineItems }: ManageImprintsModalProps) {
+export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel, quote, lineItems, customerId, onImprintsUpdated }: ManageImprintsModalProps) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [imprints, setImprints] = useState<Imprint[]>([]);
@@ -309,6 +311,30 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     }
   };
 
+  // Helper: save an uploaded file to the customer artwork library
+  const saveToCustomerArtworkLibrary = async (fileUrl: string, fileName: string, fileType: string, fileSize: number) => {
+    if (!customerId) return;
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id)
+        .single();
+      if (!profile?.company_id) return;
+      await supabase.from('customer_artwork').insert({
+        customer_id: customerId,
+        company_id: profile.company_id,
+        file_name: fileName,
+        file_url: fileUrl,
+        file_type: fileType,
+        file_size: fileSize,
+        tags: ['imprint-upload'],
+      });
+    } catch (err) {
+      console.warn('Could not save to customer artwork library:', err);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0 || !quoteId) {
@@ -329,7 +355,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         const fileName = `${quoteId}-${Date.now()}-${i}.${fileExt}`;
         const filePath = `${user?.id}/${fileName}`;
 
-        const { error: uploadError, data } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('imprint-proofs')
           .upload(filePath, file, {
             cacheControl: '3600',
@@ -353,6 +379,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           version: currentImprint.proofs.length + uploadedProofs.length + 1,
           notes: '',
         });
+
+        // Save to customer artwork library
+        await saveToCustomerArtworkLibrary(publicUrl, file.name, file.type, file.size);
       }
 
       if (uploadedProofs.length > 0) {
@@ -402,6 +431,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           version: (imprints[idx].proofs?.length || 0) + uploadedProofs.length + 1,
           notes: '',
         });
+        // Save to customer artwork library
+        await saveToCustomerArtworkLibrary(publicUrl, file.name, file.type, file.size);
       }
       if (uploadedProofs.length > 0) {
         const updatedImprints = [...imprints];
@@ -415,6 +446,15 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             .from('quote_imprints')
             .update({ mockups: updatedImprints[idx].proofs })
             .eq('id', imprints[idx].id);
+        }
+        // Immediately refresh QuoteBuilder so the thumbnail appears without needing Save & Close
+        if (onImprintsUpdated && quoteId) {
+          const { data: fresh } = await supabase
+            .from('quote_imprints')
+            .select('*')
+            .eq('quote_id', quoteId)
+            .order('sort_order');
+          if (fresh) onImprintsUpdated(fresh);
         }
         showNotification('success', 'Upload Successful', `Uploaded ${uploadedProofs.length} file(s) to imprint`);
       }

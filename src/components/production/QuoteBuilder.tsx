@@ -3363,6 +3363,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         }}
         quoteId={quoteId}
         initialGroupLabel={showImprintsModal || ''}
+        customerId={selectedCustomerId || undefined}
+        onImprintsUpdated={(data) => setQuoteImprints(data)}
         lineItems={itemGroups.flatMap(group =>
           group.items.map(item => ({
             ...item,
