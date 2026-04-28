@@ -306,6 +306,7 @@ async function handleQuoteApproval(
   },
   corsHeaders: Record<string, string>
 ): Promise<Response> {
+  try {
   const { quote_id, approved, approver_name, approver_email, notes } = body;
 
   if (!quote_id || approved === undefined || !approver_name || !approver_email) {
@@ -336,9 +337,10 @@ async function handleQuoteApproval(
     );
   }
 
-  if (quote.status !== 'sent' && quote.status !== 'pending') {
+  const approvableStatuses = ['sent', 'pending', 'sent_for_approval', 'awaiting_approval', 'approval_sent'];
+  if (!approvableStatuses.includes(quote.status)) {
     return new Response(
-      JSON.stringify({ error: "This quote has already been processed" }),
+      JSON.stringify({ error: `This quote has already been processed (status: ${quote.status})` }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -624,4 +626,14 @@ async function handleQuoteApproval(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     }
   );
+  } catch (err: any) {
+    console.error("handleQuoteApproval error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Failed to process quote approval" }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
 }
