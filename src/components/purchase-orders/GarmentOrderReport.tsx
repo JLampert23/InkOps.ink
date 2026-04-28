@@ -1070,10 +1070,10 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                                   </span>
                                   <button
                                     onClick={() => handleUnmarkOrdered(garment)}
-                                    className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded transition-colors"
+                                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-300 dark:border-red-700 rounded transition-colors"
                                     title="Undo mark as ordered"
                                   >
-                                    Undo
+                                    ↩ Undo
                                   </button>
                                 </div>
                               ) : (
