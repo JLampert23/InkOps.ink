@@ -430,18 +430,22 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
                         (settings?.inkops_subdomain ? `https://${settings.inkops_subdomain}.inkops.ink/portal` : '') ||
                         `${window.location.origin}/portal`;
 
-      // Generate a real customer-specific session token
-      const result = await supabase.rpc('create_portal_session', {
-        p_email: email.toLowerCase().trim()
+      // Generate a customer-specific session token keyed by customer_id (not email)
+      // — fixes case where customers share an email or customers.email is empty
+      // and the email lives on the primary contact instead.
+      const result = await supabase.rpc('create_portal_session_by_customer_id', {
+        p_customer_id: customerId
       });
 
       if (result.error || !result.data?.success) {
-        showNotification('Failed to generate portal link — make sure customer has portal access enabled', 'error');
+        const reason = result.data?.error || 'make sure customer has portal access enabled';
+        showNotification(`Failed to generate portal link — ${reason}`, 'error');
         return;
       }
 
       const token = result.data.token;
-      const fullLink = `${portalBase}/login?token=${token}&email=${encodeURIComponent(email)}`;
+      const linkEmail = result.data.email || email;
+      const fullLink = `${portalBase}/login?token=${token}&email=${encodeURIComponent(linkEmail)}`;
 
       await navigator.clipboard.writeText(fullLink);
       showNotification('Portal link copied to clipboard!', 'success');
