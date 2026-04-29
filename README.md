@@ -1,7 +1,6 @@
 # InkOps
 
-A production-grade financial operations platform for screen printing and apparel decoration businesses. InkOps connects to the Printavo API v2 (GraphQL) and displays comprehensive financial data in a clean, filterable, customizable dashboard.
-
+A production-grade financial operations platform for screen printing and apparel decoration businesses. 
 ## Features
 
 ### Financial Analytics
