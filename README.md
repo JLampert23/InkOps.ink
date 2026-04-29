@@ -1,302 +1,212 @@
 # InkOps
 
-A production-grade financial operations platform for screen printing and apparel decoration businesses. InkOps connects to the Printavo API v2 (GraphQL) and displays comprehensive financial data in a clean, filterable, customizable dashboard.
+InkOps is a production-grade SaaS platform built for screen printing and apparel decoration businesses. It covers the full job lifecycle — from quoting and customer approvals through production, purchasing, invoicing, and payment collection — in a single unified application.
+
+---
 
 ## Features
 
-### Financial Analytics
-- **Dashboard Overview**: Real-time KPIs including total revenue, outstanding balances, payment metrics, and conversion rates
-- **Visual Reports**: Interactive charts showing monthly revenue trends, revenue by status, payment methods breakdown
-- **Invoice Explorer**: Search, filter, and sort invoices with expandable details showing line items, payments, and fees
-- **Payments Explorer**: Filter payments by date range, method, and amount with detailed transaction history
-- **Customer Profiles**: View customer lifetime value, outstanding balances, and complete financial history
+### Quote Management
+- Build detailed quotes with line items, size breakdowns, and imprint/decoration details
+- Send quotes to customers via shareable approval links
+- Customers can approve or reject quotes directly from a public-facing page
+- Automated follow-up emails for unanswered quotes with configurable scheduling
+- Quote-to-invoice conversion with full history tracking
 
-### Technical Features
-- **Secure API Proxy**: All Printavo API calls are proxied through Supabase Edge Functions
-- **Auto-Pagination**: Automatically fetches all records using cursor-based pagination
-- **Rate Limiting**: Built-in protection against API rate limits (10 requests per 5 seconds)
-- **Error Handling**: Comprehensive error handling with retry logic and exponential backoff
-- **Real-time Progress**: Live progress indicators during data fetching
-- **Responsive Design**: Mobile-friendly interface that works on all devices
+### Billing & Invoicing
+- Invoice management with status tracking (unpaid, partial, paid, overdue)
+- Manual and automated payment recording
+- PDF invoice generation and download
+- Aging reports and outstanding balance tracking
+- Invoice fees management with category and sort ordering
+- Financial lock to prevent editing of finalized invoices
 
-## Technology Stack
+### Customer Portal
+- White-label, subdomain-aware customer portal per company
+- Customers log in to view quotes, invoices, proofs, and order history
+- Inline quote approval and payment submission
+- Stripe payment processing from within the portal
+- Password setup, reset, and forgot-password flows
+- Company branding (logo, contact info, colors)
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **GraphQL Client**: Apollo Client
-- **Backend Proxy**: Supabase Edge Functions (Deno)
-- **Charts**: Recharts
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **Date Handling**: date-fns
+### Purchase Orders & Receiving
+- Create and manage purchase orders for garment suppliers
+- Auto-generate POs based on garment requirements from approved quotes
+- Goods receiving workflow with quantity verification
+- Garment order report across all active jobs
+
+### Production & Workflow
+- Kanban board and production scheduler views
+- Work order management linked to quotes and invoices
+- Imprint and decoration tracking with proof upload
+- Box label printing for finished goods
+- Custom workflow builder with configurable stages and statuses
+
+### Automations
+- Event-driven automation engine (invoice status changes, quote approvals, payments)
+- Quote follow-up automation with configurable timing and attempt limits
+- Custom automation rules with triggers, conditions, and actions
+- Automation queue with execution logs and history viewer
+
+### Analytics & Reporting
+- Revenue trends, invoice totals, and payment method breakdowns
+- Outstanding balances, overdue invoices, and AR aging
+- Revenue per decoration type, per garment, and per order
+- Sales by style, top-selling products, and units sold
+- Customer summary and payment reports
+- CSV and PDF export for all major reports
+
+### Email & Communication Templates
+- Rich-text email template editor with shortcode support
+- Smart blocks for dynamic content (customer name, invoice total, portal link, etc.)
+- Template validation to catch missing or broken shortcodes
+- SMS template support via Twilio
+- Automated report delivery via scheduled email
+
+### Customers & Contacts
+- Customer profiles with primary contacts, billing details, and linked history
+- Artwork library per customer
+- Tax exemption tracking
+- Payment methods storage
+- Fundraising credits management
+
+### Integrations
+- **Stripe** — Payment processing for invoices and the customer portal
+- **Square** — Alternative payment processor with full dashboard (transactions, deposits, refunds, inventory)
+- **SanMar** — Garment catalog, pricing, and media via PromoStandards API
+- **SSActivewear** — Garment catalog sync and pricing
+- **Chipply** — Import store orders directly as quotes
+- **ShipStation** — Shipping label creation and order tracking
+- **Twilio** — SMS notifications
+- **Resend** — Transactional email delivery
+
+### Platform & Access Control
+- Role-based access control (Admin, User, and custom roles)
+- Multi-tenant architecture with company data isolation
+- Subscription tiers with feature gating
+- Dark mode support
+- Notification system with email forwarding
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend Framework | React 18 + TypeScript |
+| Build Tool | Vite 5 |
+| Styling | Tailwind CSS |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Rich Text | React Quill |
+| Database | Supabase (PostgreSQL) |
+| Auth | Supabase Auth |
+| Backend Functions | Supabase Edge Functions (Deno) |
+| PDF Generation | jsPDF + jspdf-autotable |
+| Date Utilities | date-fns |
+
+---
 
 ## Project Structure
 
 ```
-inkops/
-├── src/
-│   ├── components/           # React components
-│   │   ├── DashboardOverview.tsx    # Financial KPIs and charts
-│   │   ├── InvoiceExplorer.tsx      # Invoice search and details
-│   │   ├── PaymentsExplorer.tsx     # Payment history and filters
-│   │   └── CustomerProfiles.tsx     # Customer financial profiles
-│   ├── graphql/
-│   │   └── queries.ts        # All GraphQL queries
-│   ├── hooks/
-│   │   └── usePrintavoData.ts       # Data fetching hook
-│   ├── lib/
-│   │   └── apollo-client.ts         # Apollo Client setup
-│   ├── types/
-│   │   └── printavo.ts              # TypeScript definitions
-│   ├── utils/
-│   │   ├── pagination.ts            # Auto-pagination utility
-│   │   └── financial-aggregations.ts # Financial calculations
-│   ├── App.tsx               # Main application
-│   └── main.tsx              # Entry point
-├── supabase/
-│   └── functions/
-│       └── printavo-proxy/
-│           └── index.ts      # Secure API proxy with rate limiting
-├── .env                      # Environment variables
-└── package.json              # Dependencies
+src/
+  components/
+    accounting/       # AR reports, customer billing, payments
+    analytics/        # Financial analytics and charting
+    automations/      # Workflow automation engine and rule builder
+    billing/          # Invoice management, billing queue, payment modals
+    chipply/          # Chipply import manager and integration settings
+    common/           # Shared UI components (modals, selectors, etc.)
+    diagnostics/      # Integration diagnostics
+    email/            # Communication templates and email editor
+    portal/           # Customer-facing self-service portal
+    production/       # Quotes, work orders, kanban, scheduler, imprints
+    purchase-orders/  # PO management, receiving, garment report
+    settings/         # App and company configuration
+    shared/           # Attachments and other shared components
+    square/           # Square payment processor integration dashboard
+  contexts/           # React contexts (Auth, Theme, Notifications, etc.)
+  hooks/              # Custom React hooks
+  lib/                # Supabase and Apollo client setup
+  services/           # Business logic and API service layer
+  types/              # TypeScript type definitions
+  utils/              # PDF/CSV export, calculations, date utilities
+
+supabase/
+  functions/          # Supabase Edge Functions (API proxies, email, webhooks)
+  migrations/         # Database migration history
 ```
 
-## Setup Instructions
+---
+
+## Getting Started
 
 ### Prerequisites
+- Node.js 18+
+- A Supabase project
+- (Optional) Accounts for any third-party integrations you want to enable
 
-- Node.js 18+ and npm
-- Printavo API credentials (email + token)
-- Supabase account (included in this setup)
-
-### 1. Install Dependencies
+### Installation
 
 ```bash
 npm install
 ```
 
-### 2. Configure Printavo API Credentials
+### Environment Variables
 
-The application uses Supabase Edge Functions to securely proxy API requests. You need to configure your Printavo credentials as Supabase secrets:
+Copy `.env.example` to `.env` and fill in your values:
 
-**Important**: Your Printavo credentials are stored securely in the Supabase Edge Function environment and are never exposed to the frontend.
+```bash
+cp .env.example .env
+```
 
-To configure your credentials, you'll need to:
+Required variables:
+- `VITE_SUPABASE_URL` — Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` — Your Supabase anonymous key
 
-1. Get your Printavo API credentials:
-   - Email: Your Printavo account email
-   - Token: Your Printavo API token (found in Printavo account settings)
+All other integration credentials (Stripe, Square, SanMar, etc.) are configured per-company inside the application's Settings panel and stored encrypted in the database.
 
-2. Configure the secrets in Supabase:
-   - The Edge Function expects two environment variables:
-     - `PRINTAVO_EMAIL`: Your Printavo account email
-     - `PRINTAVO_TOKEN`: Your Printavo API token
-
-### 3. Run the Development Server
+### Development
 
 ```bash
 npm run dev
 ```
 
-The application will start at `http://localhost:5173`
-
-### 4. Build for Production
+### Build
 
 ```bash
 npm run build
 ```
 
-## GraphQL Queries
-
-The application fetches the following data from Printavo API v2:
-
-### Invoices
-- Invoice number, status, dates, totals
-- Customer information
-- Line items with quantities and prices
-- Associated payments
-- Fees and taxes
-
-### Payments
-- Payment amount, date, and method
-- Linked invoice information
-- Customer details
-
-### Estimates/Quotes
-- Quote number and totals
-- Customer information
-- Conversion status (estimate → invoice)
-- Line items
-
-### Customers
-- Customer details and contact information
-- Complete invoice history
-- Quote history
-- Lifetime value calculations
-
-## API Integration Details
-
-### Authentication
-All requests to the Printavo API require:
-```
-Content-Type: application/json
-email: {{USER_EMAIL}}
-token: {{API_TOKEN}}
-```
-
-These credentials are securely stored in the Supabase Edge Function environment.
-
-### Rate Limiting
-The Printavo API has a rate limit of **10 requests per 5 seconds per user/IP**.
-
-The application handles this by:
-- Implementing a request queue in the Edge Function
-- Tracking request counts within time windows
-- Automatically waiting when approaching limits
-- Retry logic with exponential backoff
-
-### Pagination
-All GraphQL queries use cursor-based pagination:
-```graphql
-query GetInvoices($after: String, $first: Int = 50) {
-  invoices(after: $after, first: $first) {
-    edges {
-      cursor
-      node { ... }
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-```
-
-The application automatically fetches all pages until `hasNextPage` is false.
-
-## Financial Metrics Calculated
-
-### Overview Dashboard
-- **Total Revenue**: Sum of all invoice totals
-- **Outstanding Balance**: Sum of unpaid invoice balances
-- **Total Payments**: Sum of all payment amounts
-- **Average Invoice Value**: Total revenue / invoice count
-- **Conversion Rate**: (Converted estimates / total estimates) × 100
-- **Total Fees & Tax**: Sum of all fees and taxes collected
-
-### Monthly Analysis
-- Revenue by month
-- Invoice count by month
-- Payment trends over time
-
-### Customer Metrics
-- Lifetime Value (LTV): Total revenue from customer
-- Outstanding Balance: Unpaid invoice amounts
-- Total Invoices: Count of customer invoices
-- Total Estimates: Count of customer quotes
-
-## Available Scripts
+### Type Check
 
 ```bash
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-npm run typecheck    # Type check without emitting
+npm run typecheck
 ```
 
-## Error Handling
+---
 
-The application includes comprehensive error handling:
+## Database
 
-1. **Network Errors**: Automatic retry with exponential backoff
-2. **GraphQL Errors**: Detailed error logging and user-friendly messages
-3. **Rate Limit Protection**: Automatic request queuing and throttling
-4. **Invalid Credentials**: Clear error messages directing users to check configuration
+InkOps uses Supabase (PostgreSQL) with Row Level Security enabled on all tables. All migrations are in `supabase/migrations/` and are applied in chronological order.
 
-## Environment Variables
+Multi-tenant data isolation is enforced at the database level via `company_id` columns and RLS policies. Each company's data is fully isolated from all other companies.
 
-Create a `.env` file with:
+---
 
-```env
-VITE_SUPABASE_URL=your-supabase-url
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+## Customer Portal
 
-# Printavo credentials are configured in Supabase Edge Function secrets
-# PRINTAVO_EMAIL=your-printavo-email@example.com
-# PRINTAVO_TOKEN=your-printavo-api-token
+The customer portal is subdomain-aware. Each company can configure a custom subdomain (e.g., `yourshop.inkops.ink`) through Settings. Customers access their portal at:
+
+```
+https://{company-subdomain}.inkops.ink/customer/{customer-id}
 ```
 
-## Security Considerations
+Customers authenticate via email/password or magic link. The portal displays their quotes, invoices, proofs, and payment history, and allows them to approve quotes and submit payments.
 
-- API credentials are NEVER exposed to the frontend
-- All API requests go through the secure Supabase Edge Function proxy
-- Environment variables for Printavo credentials are server-side only
-- Rate limiting prevents API abuse
-- Error messages don't expose sensitive information
-
-## Customization
-
-### Adding New Queries
-
-1. Add the GraphQL query to `src/graphql/queries.ts`
-2. Use the `fetchAllPages` utility to handle pagination
-3. Add the data to your component
-
-Example:
-```typescript
-import { fetchAllPages } from '../utils/pagination';
-import { apolloClient } from '../lib/apollo-client';
-import { GET_YOUR_QUERY } from '../graphql/queries';
-
-const data = await fetchAllPages(
-  apolloClient,
-  GET_YOUR_QUERY,
-  'queryName'
-);
-```
-
-### Adding New Financial Metrics
-
-Add calculation functions to `src/utils/financial-aggregations.ts`:
-
-```typescript
-export function calculateNewMetric(invoices: Invoice[]): number {
-  // Your calculation logic
-  return result;
-}
-```
-
-### Customizing Charts
-
-The dashboard uses Recharts. Customize charts in the component files:
-- `src/components/DashboardOverview.tsx` for dashboard charts
-- Modify colors, axes, tooltips, etc.
-
-## Troubleshooting
-
-### "Error Loading Data" Message
-- Check that Printavo credentials are configured in Supabase Edge Function
-- Verify credentials are correct in your Printavo account
-- Check browser console for detailed error messages
-
-### No Data Showing
-- Ensure your Printavo account has invoices/payments/estimates
-- Check the network tab for API responses
-- Verify the GraphQL queries match your Printavo API version
-
-### Slow Loading
-- The application fetches ALL records on load
-- Loading time depends on your data volume
-- Progress indicators show real-time status
-- Consider implementing caching for large datasets
-
-## Support
-
-For issues related to:
-- **Printavo API**: Check Printavo API documentation or contact Printavo support
-- **Application bugs**: Check the browser console for error messages
-- **GraphQL queries**: Verify query structure matches Printavo API v2 schema
+---
 
 ## License
 
-This project is provided as-is for integration with Printavo API v2.
+Proprietary. All rights reserved.
