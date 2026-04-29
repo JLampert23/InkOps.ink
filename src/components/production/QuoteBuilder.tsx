@@ -3068,7 +3068,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
                                             <div className="flex flex-wrap gap-1.5">
                                               {imprint.mockups.map((mockup: any, mockupIdx: number) => {
-                                                const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                                const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url || mockup?.file_url;
                                                 if (!mockupUrl) return null;
 
                                                 return (

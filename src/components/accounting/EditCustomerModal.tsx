@@ -426,11 +426,24 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
 
       const customUrl = settings?.customer_url;
       const isValidPortalUrl = customUrl && customUrl.includes('/portal');
-      const portalUrl = isValidPortalUrl ? customUrl :
+      const portalBase = isValidPortalUrl ? customUrl :
                         (settings?.inkops_subdomain ? `https://${settings.inkops_subdomain}.inkops.ink/portal` : '') ||
-                        `${window.location.origin}/portal/login`;
+                        `${window.location.origin}/portal`;
 
-      await navigator.clipboard.writeText(portalUrl);
+      // Generate a real customer-specific session token
+      const result = await supabase.rpc('create_portal_session', {
+        p_email: email.toLowerCase().trim()
+      });
+
+      if (result.error || !result.data?.success) {
+        showNotification('Failed to generate portal link — make sure customer has portal access enabled', 'error');
+        return;
+      }
+
+      const token = result.data.token;
+      const fullLink = `${portalBase}/login?token=${token}&email=${encodeURIComponent(email)}`;
+
+      await navigator.clipboard.writeText(fullLink);
       showNotification('Portal link copied to clipboard!', 'success');
     } catch (error) {
       console.error('Error copying portal link:', error);
