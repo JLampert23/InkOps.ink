@@ -27,7 +27,7 @@ interface CustomerPortalContextType {
   loginWithPassword: (email: string, password: string) => Promise<{ success: boolean; requiresSetup?: boolean; error?: string }>;
   requestPasswordReset: (email: string) => Promise<boolean>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
-  setupPassword: (email: string, password: string, setupToken: string) => Promise<boolean>;
+  setupPassword: (email: string, password: string, setupToken: string) => Promise<{ success: boolean; customerId?: string }>;
   logout: () => void;
 }
 
@@ -271,7 +271,7 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setupPassword = useCallback(async (email: string, password: string, setupToken: string): Promise<boolean> => {
+  const setupPassword = useCallback(async (email: string, password: string, setupToken: string): Promise<{ success: boolean; customerId?: string }> => {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -286,10 +286,32 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
       });
 
       const result = await response.json();
-      return response.ok && result.success;
+
+      if (!response.ok || !result.success) {
+        return { success: false };
+      }
+
+      // Build the same session shape as loginWithToken / loginWithPassword so the
+      // user is fully logged in immediately after setting their password.
+      if (result.customer && result.branding) {
+        const portalUser = {
+          email: result.customer.email,
+          name: result.customer.name,
+          company_id: result.customer.company_id,
+          customer_id: result.customer.id,
+        };
+
+        setUser(portalUser);
+        setBranding(result.branding);
+
+        localStorage.setItem('customer_portal_user', JSON.stringify(portalUser));
+        localStorage.setItem('customer_portal_branding', JSON.stringify(result.branding));
+      }
+
+      return { success: true, customerId: result.customer_id };
     } catch (error) {
       console.error('Error setting up password:', error);
-      return false;
+      return { success: false };
     }
   }, []);
 

@@ -94,12 +94,33 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Fetch full customer + branding so the frontend can build a session
+    // and skip the second login step. Same shape as verify-magic-link.
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("id, email, contact_name, company_id")
+      .eq("id", data.customer_id)
+      .maybeSingle();
+
+    const { data: branding } = await supabase
+      .from("company_settings")
+      .select("company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email, customer_url")
+      .eq("id", data.company_id)
+      .maybeSingle();
+
     return new Response(
       JSON.stringify({
         success: true,
         message: "Password has been set successfully",
         customer_id: data.customer_id,
-        company_id: data.company_id
+        company_id: data.company_id,
+        customer: customer ? {
+          id: customer.id,
+          email: customer.email,
+          name: customer.contact_name,
+          company_id: customer.company_id,
+        } : null,
+        branding: branding || null,
       }),
       {
         status: 200,
