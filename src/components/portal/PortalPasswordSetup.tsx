@@ -65,11 +65,15 @@ export function PortalPasswordSetup() {
 
     const result = await setupPassword(email, password, setupToken);
 
-    if (result) {
+    if (result.success) {
       setSuccess(true);
-      setMessage('Password set successfully! Redirecting to login...');
+      setMessage('Password set successfully! Taking you to your portal...');
       setTimeout(() => {
-        window.location.href = '/portal/login';
+        // Customer is now logged in (session stored by setupPassword) — go
+        // straight to their portal instead of bouncing through generic login.
+        window.location.href = result.customerId
+          ? `/portal/customer/${result.customerId}`
+          : '/portal/login';
       }, 2000);
     } else {
       setMessage('Failed to set password. The link may be expired or invalid.');
