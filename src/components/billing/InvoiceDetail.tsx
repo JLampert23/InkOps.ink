@@ -73,7 +73,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generatingLink, setGeneratingLink] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [creatingStripeInvoice, setCreatingStripeInvoice] = useState(false);
@@ -307,29 +306,27 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     }
   };
 
-  const handleGenerateLink = async () => {
-    if (!invoice?.billingQueueId) return;
-    setGeneratingLink(true);
-    try {
-      const url = await billingService.generatePaymentLink(invoice.billingQueueId);
-      await navigator.clipboard.writeText(url);
-      await loadInvoice();
-      showNotification('success', 'Payment link generated and copied to clipboard!');
-    } catch (err: any) {
-      showNotification('error', 'Failed to generate payment link', err.message);
-    } finally {
-      setGeneratingLink(false);
-    }
-  };
-
   const handleCreateStripeInvoice = async () => {
     if (!invoice?.billingQueueId) return;
     setCreatingStripeInvoice(true);
     try {
       const url = await billingService.createStripeInvoice(invoice.billingQueueId);
       setStripeInvoiceUrl(url);
-      await loadInvoice();
-      showNotification('success', 'Stripe invoice created successfully!');
+
+      // Auto-send the invoice email after creation. If the email fails the
+      // invoice is still created — surface the error but don't block.
+      try {
+        await billingService.sendInvoiceEmail(invoice.billingQueueId);
+        await loadInvoice();
+        showNotification('success', 'Stripe invoice created and sent to customer!');
+      } catch (sendErr: any) {
+        await loadInvoice();
+        showNotification(
+          'success',
+          'Stripe invoice created — but the email failed to send. Use "Send Invoice to Customer" to retry.',
+          sendErr?.message
+        );
+      }
     } catch (err: any) {
       showNotification('error', 'Failed to create Stripe invoice', err.message);
     } finally {
@@ -1459,20 +1456,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               {invoice.billingQueueId && (
                 <>
                   <button
-                    onClick={handleGenerateLink}
-                    disabled={generatingLink || !!invoice.stripePaymentLink || isCancelled}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={isCancelled ? 'Invoice is cancelled' : undefined}
-                  >
-                    {generatingLink ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <LinkIcon className="w-4 h-4" />
-                    )}
-                    {invoice.stripePaymentLink ? 'Payment Link Created' : 'Generate Payment Link'}
-                  </button>
-
-                  <button
                     onClick={handleCreateStripeInvoice}
                     disabled={creatingStripeInvoice || !!invoice.stripeInvoice || isCancelled}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1483,7 +1466,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                     ) : (
                       <DollarSign className="w-4 h-4" />
                     )}
-                    {invoice.stripeInvoice ? 'Stripe Invoice Created' : 'Create Stripe Invoice'}
+                    {invoice.stripeInvoice ? 'Stripe Invoice Created' : 'Create & Send Stripe Invoice'}
                   </button>
 
                   <button
