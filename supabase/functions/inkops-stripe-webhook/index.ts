@@ -125,6 +125,66 @@ Deno.serve(async (req: Request) => {
         break;
       }
       
+      case 'invoice.paid': {
+        // Fired when a Stripe-hosted invoice is fully paid. The "Create Stripe
+        // Invoice" button on InkOps invoices uses this flow (see
+        // stripe-service.ts → createStripeInvoiceWithMinimumDue), which fires
+        // invoice.paid rather than checkout.session.completed.
+        const invoice = event.data.object;
+        const printavoInvoiceId = invoice.metadata?.printavo_invoice_id;
+
+        // No printavo_invoice_id metadata = this is a Stripe-side invoice we
+        // don't track (e.g. an InkOps subscription renewal). Acknowledge and skip.
+        if (!printavoInvoiceId) {
+          console.log(`invoice.paid without printavo_invoice_id - skipping. Stripe invoice: ${invoice.id}`);
+          break;
+        }
+
+        console.log(`Stripe Invoice paid for printavo_invoice_id: ${printavoInvoiceId}`);
+        const amountPaid = (invoice.amount_paid || 0) / 100;
+        const customerEmail = invoice.customer_email || null;
+        const customerName = invoice.customer_name || null;
+        const paymentIntentId = invoice.payment_intent as string || null;
+
+        // 1. Record the payment in stripe_payments
+        await supabase
+          .from('stripe_payments')
+          .insert([{
+            printavo_invoice_id: printavoInvoiceId,
+            stripe_payment_intent_id: paymentIntentId,
+            amount: amountPaid,
+            currency: invoice.currency || 'usd',
+            status: 'succeeded',
+            customer_email: customerEmail,
+            customer_name: customerName,
+            payment_method: 'card',
+          }]);
+
+        // 2. Mark the printavo invoice as paid
+        await supabase
+          .from('printavo_invoices')
+          .update({
+            payment_status: 'paid',
+            paid_at: new Date().toISOString(),
+            amount_paid: amountPaid,
+          })
+          .eq('id', printavoInvoiceId);
+
+        // 3. Update stripe_invoices record
+        await supabase
+          .from('stripe_invoices')
+          .update({
+            status: 'paid',
+            amount_paid: amountPaid,
+            amount_remaining: 0,
+            paid_at: new Date().toISOString(),
+          })
+          .eq('printavo_invoice_id', printavoInvoiceId);
+
+        console.log(`Invoice ${printavoInvoiceId} marked as paid via Stripe Invoice. Amount: $${amountPaid}`);
+        break;
+      }
+
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
         const customerId = subscription.customer as string;
