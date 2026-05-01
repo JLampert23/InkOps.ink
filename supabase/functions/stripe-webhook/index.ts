@@ -699,6 +699,43 @@ Deno.serve(async (req: Request) => {
           }]);
         }
 
+        if (printavoInvoiceId && paymentIntentId) {
+          const { data: existingUnifiedPayment } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('stripe_payment_intent_id', paymentIntentId)
+            .maybeSingle();
+
+          if (!existingUnifiedPayment) {
+            const { data: invoiceData } = await supabase
+              .from('printavo_invoices')
+              .select('customer_id')
+              .eq('id', printavoInvoiceId)
+              .maybeSingle();
+
+            await supabase.from('payments').insert([{
+              company_id: companyId,
+              invoice_id: printavoInvoiceId,
+              customer_id: invoiceData?.customer_id || null,
+              amount: amountPaid / 100,
+              payment_date: new Date().toISOString(),
+              payment_method: 'Stripe',
+              payment_type: 'stripe',
+              stripe_transaction_id: chargeId || paymentIntentId,
+              stripe_payment_intent_id: paymentIntentId,
+              stripe_charge_id: chargeId || null,
+              status: 'successful',
+              source: 'stripe',
+              metadata: {
+                stripe_invoice_id: invoice.id,
+                customer_email: invoice.customer_email,
+                customer_name: invoice.customer_name,
+                payment_method_type: 'card',
+              },
+            }]);
+          }
+        }
+
         const amountPaidDollars = amountPaid / 100;
         const amountRemainingDollars = amountRemaining / 100;
         const isFullyPaid = amountRemaining === 0 || invoice.status === 'paid';
