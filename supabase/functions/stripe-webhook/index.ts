@@ -699,11 +699,12 @@ Deno.serve(async (req: Request) => {
           }]);
         }
 
-        if (printavoInvoiceId && paymentIntentId) {
+        if (printavoInvoiceId) {
+          const dedupeKey = paymentIntentId || invoice.id;
           const { data: existingUnifiedPayment } = await supabase
             .from('payments')
             .select('id')
-            .eq('stripe_payment_intent_id', paymentIntentId)
+            .eq('stripe_transaction_id', dedupeKey)
             .maybeSingle();
 
           if (!existingUnifiedPayment) {
@@ -713,7 +714,7 @@ Deno.serve(async (req: Request) => {
               .eq('id', printavoInvoiceId)
               .maybeSingle();
 
-            await supabase.from('payments').insert([{
+            const { error: paymentsInsertError } = await supabase.from('payments').insert([{
               company_id: companyId,
               invoice_id: printavoInvoiceId,
               customer_id: invoiceData?.customer_id || null,
@@ -721,8 +722,8 @@ Deno.serve(async (req: Request) => {
               payment_date: new Date().toISOString(),
               payment_method: 'Stripe',
               payment_type: 'stripe',
-              stripe_transaction_id: chargeId || paymentIntentId,
-              stripe_payment_intent_id: paymentIntentId,
+              stripe_transaction_id: chargeId || paymentIntentId || invoice.id,
+              stripe_payment_intent_id: paymentIntentId || null,
               stripe_charge_id: chargeId || null,
               status: 'successful',
               source: 'stripe',
@@ -733,6 +734,13 @@ Deno.serve(async (req: Request) => {
                 payment_method_type: 'card',
               },
             }]);
+            if (paymentsInsertError) {
+              console.error('Failed to insert into payments table:', paymentsInsertError);
+            } else {
+              console.log(`Inserted payments row for invoice ${printavoInvoiceId}, dedupeKey: ${dedupeKey}`);
+            }
+          } else {
+            console.log(`Payment already exists for dedupeKey: ${dedupeKey}, skipping insert`);
           }
         }
 
