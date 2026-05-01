@@ -25,3 +25,48 @@ entrypoint = "./functions/inkops-stripe-webhook/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/quote-actions/index.ts"
+
+# Public-facing functions hit by customers (no auth header) — every one of these
+# MUST have verify_jwt = false or Supabase's gateway returns
+# "UNAUTHORIZED_NO_AUTH_HEADER" before our code runs. Adding here so future
+# `supabase functions deploy <name>` calls don't need --no-verify-jwt to work.
+
+[functions.quote-approval]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/quote-approval/index.ts"
+
+[functions.verify-magic-link]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/verify-magic-link/index.ts"
+
+[functions.send-magic-link]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-magic-link/index.ts"
+
+[functions.set-customer-password]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/set-customer-password/index.ts"
+
+[functions.verify-customer-password]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/verify-customer-password/index.ts"
+
+[functions.request-password-reset]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/request-password-reset/index.ts"
+
+[functions.reset-customer-password]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/reset-customer-password/index.ts"
+
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/stripe-webhook/index.ts"
