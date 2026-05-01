@@ -71,50 +71,63 @@ async function verifyStripeSignature(
   }
 }
 
-async function getWebhookSecret(): Promise<string> {
+async function resolveWebhookSecret(stored: string): Promise<string | null> {
+  if (!stored) return null;
+  if (stored.startsWith('whsec_')) return stored;
+
+  try {
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ action: 'decrypt', token: stored }),
+    });
+
+    if (!decryptResponse.ok) return null;
+    const decryptResult = await decryptResponse.json();
+    if (!decryptResult.success || !decryptResult.result) return null;
+    return decryptResult.result;
+  } catch (e) {
+    console.error('Decryption error:', e);
+    return null;
+  }
+}
+
+async function verifyAndIdentifyCompany(
+  rawBody: string,
+  signature: string
+): Promise<{ companyId: string } | null> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const { data, error } = await supabase
+  const { data: companies, error } = await supabase
     .from('company_settings')
-    .select('stripe_webhook_secret')
-    .maybeSingle();
+    .select('id, stripe_webhook_secret')
+    .not('stripe_webhook_secret', 'is', null);
 
   if (error) {
-    console.error('Database error fetching webhook secret:', error);
+    console.error('Database error fetching company settings:', error);
     throw new Error(`Database error: ${error.message}`);
   }
 
-  if (!data?.stripe_webhook_secret) {
-    console.error('No webhook secret found in database');
-    throw new Error('Stripe webhook secret not configured. Please add it in Settings.');
+  if (!companies || companies.length === 0) {
+    console.error('No companies with webhook secrets configured');
+    return null;
   }
 
-  console.log('Attempting to decrypt webhook secret...');
-  const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseServiceKey}`,
-    },
-    body: JSON.stringify({
-      action: 'decrypt',
-      token: data.stripe_webhook_secret,
-    }),
-  });
+  for (const company of companies) {
+    const secret = await resolveWebhookSecret(company.stripe_webhook_secret);
+    if (!secret) continue;
 
-  if (!decryptResponse.ok) {
-    const errorText = await decryptResponse.text();
-    console.error('Decryption failed:', errorText);
-    throw new Error(`Failed to decrypt webhook secret: ${errorText}`);
+    const isValid = await verifyStripeSignature(rawBody, signature, secret);
+    if (isValid) {
+      console.log(`Webhook signature verified for company: ${company.id}`);
+      return { companyId: company.id };
+    }
   }
 
-  const decryptResult = await decryptResponse.json();
-  if (!decryptResult.success || !decryptResult.result) {
-    console.error('Decryption returned invalid result:', decryptResult);
-    throw new Error('Decryption failed: Invalid response from crypto service');
-  }
-
-  return decryptResult.result;
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -142,11 +155,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const webhookSecret = await getWebhookSecret();
-    const isValid = await verifyStripeSignature(rawBody, signature, webhookSecret);
+    const verified = await verifyAndIdentifyCompany(rawBody, signature);
 
-    if (!isValid) {
-      console.error('Invalid webhook signature');
+    if (!verified) {
+      console.error('Invalid webhook signature - no matching company secret');
       return new Response(
         JSON.stringify({ error: 'Invalid signature' }),
         {
@@ -156,15 +168,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const companyId = verified.companyId;
     const event = JSON.parse(rawBody);
-    console.log('Webhook event received:', event.type);
-    
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('id')
-      .maybeSingle();
-    
-    const companyId = settings?.id;
+    console.log('Webhook event received:', event.type, 'for company:', companyId);
     
     await supabase.from('stripe_webhook_events').insert([{
       company_id: companyId,
