@@ -539,6 +539,7 @@ async function handleQuoteApproval(
           id: invoiceId,
           invoice_number: invoiceNumber,
           company_id: customer.company_id,
+          customer_id: session.customer_id,
           customer_name: quote.customer_name,
           customer_email: quote.customer_email,
           customer_company: quote.customer_company,

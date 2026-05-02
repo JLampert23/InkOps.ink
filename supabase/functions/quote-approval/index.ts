@@ -789,12 +789,23 @@ Deno.serve(async (req: Request) => {
             }
 
             const invoiceId = invoiceNumber;
+            let resolvedCustomerId: string | null = null;
+            if (quote.customer_email) {
+              const { data: matchedCustomer } = await supabase
+                .from("customers")
+                .select("id")
+                .eq("company_id", approval.company_id)
+                .ilike("email", quote.customer_email)
+                .maybeSingle();
+              resolvedCustomerId = matchedCustomer?.id || null;
+            }
             const { data: invoice, error: invError } = await supabase
               .from("printavo_invoices")
               .insert([{
                 id: invoiceId,
                 invoice_number: invoiceNumber,
                 company_id: approval.company_id,
+                customer_id: resolvedCustomerId,
                 customer_name: quote.customer_name,
                 customer_email: quote.customer_email,
                 customer_company: quote.customer_company,

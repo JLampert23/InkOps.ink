@@ -862,12 +862,23 @@ Deno.serve(async (req: Request) => {
         console.log("Invoice already exists, using existing:", existingInvoice.id);
         invoice = existingInvoice;
       } else {
+        let resolvedCustomerId: string | null = null;
+        if (quote.customer_email) {
+          const { data: matchedCustomer } = await supabaseAdmin
+            .from("customers")
+            .select("id")
+            .eq("company_id", profile.company_id)
+            .ilike("email", quote.customer_email)
+            .maybeSingle();
+          resolvedCustomerId = matchedCustomer?.id || null;
+        }
         const { data: newInvoice, error: invError } = await supabaseAdmin
           .from("printavo_invoices")
           .insert([{
           id: invoiceId,
           invoice_number: invoiceNumber,
           company_id: profile.company_id,
+          customer_id: resolvedCustomerId,
           customer_name: quote.customer_name,
           customer_email: quote.customer_email,
           customer_company: quote.customer_company,
