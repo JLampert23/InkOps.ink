@@ -489,9 +489,41 @@ export class WorkOrderService {
     workOrderId: string,
     customInvoiceStatusId: string | null
   ): Promise<{ data: WorkOrderWithDetails | null; error: any }> {
+    // Look up the new status name so we can mirror "COMPLETE" to the
+    // workflow status field that the Workorders Complete filter reads.
+    let statusName: string | null = null;
+    if (customInvoiceStatusId) {
+      const { data: statusRow } = await supabase
+        .from('custom_invoice_statuses')
+        .select('name')
+        .eq('id', customInvoiceStatusId)
+        .maybeSingle();
+      statusName = statusRow?.name || null;
+    }
+
+    const isComplete = statusName?.toLowerCase().includes('complete');
+
+    const updates: Record<string, any> = { custom_invoice_status_id: customInvoiceStatusId };
+    if (isComplete) {
+      updates.status = 'Completed';
+      updates.completed_at = new Date().toISOString();
+    } else if (customInvoiceStatusId !== null) {
+      // A non-complete status was chosen — if the work order was previously
+      // marked Completed via this same path, move it back to In Production.
+      const { data: existing } = await supabase
+        .from('work_orders')
+        .select('status')
+        .eq('id', workOrderId)
+        .maybeSingle();
+      if (existing?.status === 'Completed') {
+        updates.status = 'In Production';
+        updates.completed_at = null;
+      }
+    }
+
     const { error: updateError } = await supabase
       .from('work_orders')
-      .update({ custom_invoice_status_id: customInvoiceStatusId })
+      .update(updates)
       .eq('id', workOrderId);
 
     if (updateError) {
