@@ -71,6 +71,65 @@ async function verifyStripeSignature(
   }
 }
 
+async function decryptCompanySecret(stored: string): Promise<string | null> {
+  if (!stored) return null;
+  if (stored.startsWith('sk_') || stored.startsWith('rk_')) return stored;
+  try {
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ action: 'decrypt', token: stored }),
+    });
+    if (!decryptResponse.ok) return null;
+    const decryptResult = await decryptResponse.json();
+    if (!decryptResult.success || !decryptResult.result) return null;
+    return decryptResult.result;
+  } catch (e) {
+    console.error('Stripe key decryption error:', e);
+    return null;
+  }
+}
+
+async function fetchInvoiceChargeIds(
+  stripeSecretKey: string,
+  invoiceId: string
+): Promise<{ paymentIntentId: string | null; chargeId: string | null }> {
+  try {
+    const params = new URLSearchParams();
+    params.append('expand[]', 'payments.data.payment.payment_intent');
+    params.append('expand[]', 'payments.data.payment.charge');
+    const resp = await fetch(
+      `https://api.stripe.com/v1/invoices/${invoiceId}?${params.toString()}`,
+      { headers: { 'Authorization': `Bearer ${stripeSecretKey}` } }
+    );
+    if (!resp.ok) {
+      console.error('Stripe invoice retrieve failed:', await resp.text().catch(() => ''));
+      return { paymentIntentId: null, chargeId: null };
+    }
+    const inv = await resp.json();
+    let pi: string | null = typeof inv.payment_intent === 'string' ? inv.payment_intent : null;
+    let ch: string | null = typeof inv.charge === 'string' ? inv.charge : null;
+    if ((!pi || !ch) && Array.isArray(inv.payments?.data)) {
+      for (const ip of inv.payments.data) {
+        const paid = ip.payment;
+        if (!paid) continue;
+        const ipi = typeof paid.payment_intent === 'string' ? paid.payment_intent : paid.payment_intent?.id;
+        const ich = typeof paid.charge === 'string' ? paid.charge : paid.charge?.id;
+        pi = pi || ipi || null;
+        ch = ch || ich || null;
+        if (pi && ch) break;
+      }
+    }
+    return { paymentIntentId: pi, chargeId: ch };
+  } catch (e) {
+    console.error('fetchInvoiceChargeIds error:', e);
+    return { paymentIntentId: null, chargeId: null };
+  }
+}
+
 async function resolveWebhookSecret(stored: string): Promise<string | null> {
   if (!stored) return null;
   if (stored.startsWith('whsec_')) return stored;
@@ -675,10 +734,33 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        const paymentIntentId = invoice.payment_intent;
-        const chargeId = invoice.charge;
+        let paymentIntentId: string | null = invoice.payment_intent || null;
+        let chargeId: string | null = invoice.charge || null;
         const amountPaid = invoice.amount_paid || 0;
         const amountRemaining = invoice.amount_remaining || 0;
+
+        // Newer Stripe API (2025-12-15.clover) drops payment_intent/charge from
+        // invoice.paid events. Fetch them via API so payments rows are refundable.
+        if (!paymentIntentId && !chargeId && invoice.id) {
+          const { data: companyRow } = await supabase
+            .from('company_settings')
+            .select('stripe_secret_key')
+            .eq('id', companyId)
+            .maybeSingle();
+          if (companyRow?.stripe_secret_key) {
+            const sk = await decryptCompanySecret(companyRow.stripe_secret_key);
+            if (sk) {
+              const ids = await fetchInvoiceChargeIds(sk, invoice.id);
+              paymentIntentId = ids.paymentIntentId;
+              chargeId = ids.chargeId;
+              console.log(`Backfilled IDs for invoice ${invoice.id}: pi=${paymentIntentId}, charge=${chargeId}`);
+            } else {
+              console.warn(`Could not decrypt stripe_secret_key for company ${companyId}`);
+            }
+          } else {
+            console.warn(`No stripe_secret_key for company ${companyId} — cannot backfill charge IDs`);
+          }
+        }
 
         const { data: existingPayment } = await supabase
           .from('stripe_payment_history')
@@ -700,11 +782,11 @@ Deno.serve(async (req: Request) => {
         }
 
         if (printavoInvoiceId) {
-          const dedupeKey = paymentIntentId || invoice.id;
+          const dedupeCandidates = [chargeId, paymentIntentId, invoice.id].filter(Boolean) as string[];
           const { data: existingUnifiedPayment } = await supabase
             .from('payments')
             .select('id')
-            .eq('stripe_transaction_id', dedupeKey)
+            .in('stripe_transaction_id', dedupeCandidates)
             .maybeSingle();
 
           if (!existingUnifiedPayment) {
@@ -737,10 +819,10 @@ Deno.serve(async (req: Request) => {
             if (paymentsInsertError) {
               console.error('Failed to insert into payments table:', paymentsInsertError);
             } else {
-              console.log(`Inserted payments row for invoice ${printavoInvoiceId}, dedupeKey: ${dedupeKey}`);
+              console.log(`Inserted payments row for invoice ${printavoInvoiceId}, candidates: ${dedupeCandidates.join('|')}`);
             }
           } else {
-            console.log(`Payment already exists for dedupeKey: ${dedupeKey}, skipping insert`);
+            console.log(`Payment already exists, skipping insert. candidates: ${dedupeCandidates.join('|')}`);
           }
         }
 

@@ -7,15 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-async function getStripeKey(): Promise<string> {
+async function getStripeKey(companyId?: string): Promise<string> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const { data, error } = await supabase
-    .from('company_settings')
-    .select('stripe_secret_key')
-    .maybeSingle();
+  let query = supabase.from('company_settings').select('stripe_secret_key');
+  if (companyId) query = query.eq('id', companyId);
+  const { data, error } = await query.maybeSingle();
 
   if (error || !data?.stripe_secret_key) {
     throw new Error('Stripe secret key not configured');
@@ -166,18 +165,96 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!payment.stripe_charge_id && !payment.stripe_payment_intent_id) {
-      return new Response(
-        JSON.stringify({ error: "No Stripe transaction ID found" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    // Get Stripe secret key (scoped to this payment's company for multi-tenant)
+    const stripeSecretKey = await getStripeKey(payment.company_id);
 
-    // Get Stripe secret key
-    const stripeSecretKey = await getStripeKey();
+    // Backfill charge/payment_intent if missing but we have an invoice ID.
+    // Newer Stripe API (2025-12-15.clover) drops payment_intent from invoice.paid
+    // events, so older payment rows recorded only the invoice ID (in_...).
+    if (!payment.stripe_charge_id && !payment.stripe_payment_intent_id) {
+      const invoiceId =
+        (typeof payment.stripe_transaction_id === 'string' && payment.stripe_transaction_id.startsWith('in_'))
+          ? payment.stripe_transaction_id
+          : (typeof payment.metadata?.stripe_invoice_id === 'string' ? payment.metadata.stripe_invoice_id : null);
+
+      if (!invoiceId) {
+        return new Response(
+          JSON.stringify({ error: "No Stripe transaction ID found" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      console.log(`Backfilling charge/payment_intent for payment ${payment.id} via invoice ${invoiceId}`);
+
+      const params = new URLSearchParams();
+      params.append('expand[]', 'payments.data.payment.payment_intent');
+      params.append('expand[]', 'payments.data.payment.charge');
+      const invoiceResp = await fetch(
+        `https://api.stripe.com/v1/invoices/${invoiceId}?${params.toString()}`,
+        { headers: { 'Authorization': `Bearer ${stripeSecretKey}` } }
+      );
+
+      if (!invoiceResp.ok) {
+        const err = await invoiceResp.json().catch(() => ({}));
+        console.error('Failed to fetch invoice from Stripe:', err);
+        return new Response(
+          JSON.stringify({ error: "Could not retrieve charge from Stripe", details: err.error?.message }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const stripeInvoice = await invoiceResp.json();
+
+      // Try direct fields first (older API), then payments[] array (newer API)
+      let backfillPI: string | null = typeof stripeInvoice.payment_intent === 'string' ? stripeInvoice.payment_intent : null;
+      let backfillCharge: string | null = typeof stripeInvoice.charge === 'string' ? stripeInvoice.charge : null;
+
+      if (!backfillPI && !backfillCharge && Array.isArray(stripeInvoice.payments?.data)) {
+        for (const ip of stripeInvoice.payments.data) {
+          const paid = ip.payment;
+          if (!paid) continue;
+          const pi = typeof paid.payment_intent === 'string' ? paid.payment_intent : paid.payment_intent?.id;
+          const ch = typeof paid.charge === 'string' ? paid.charge : paid.charge?.id;
+          if (pi || ch) {
+            backfillPI = pi || backfillPI;
+            backfillCharge = ch || backfillCharge;
+            break;
+          }
+        }
+      }
+
+      if (!backfillPI && !backfillCharge) {
+        console.error('No payment_intent or charge found on invoice:', JSON.stringify(stripeInvoice).slice(0, 1000));
+        return new Response(
+          JSON.stringify({ error: "Stripe invoice has no associated charge yet" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      payment.stripe_payment_intent_id = backfillPI;
+      payment.stripe_charge_id = backfillCharge;
+
+      await supabaseAuth
+        .from('payments')
+        .update({
+          stripe_payment_intent_id: backfillPI,
+          stripe_charge_id: backfillCharge,
+          stripe_transaction_id: backfillCharge || backfillPI || payment.stripe_transaction_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', payment.id);
+
+      console.log(`Backfilled payment ${payment.id}: pi=${backfillPI}, charge=${backfillCharge}`);
+    }
 
     // Create refund via Stripe API
     const refundData: any = {};
