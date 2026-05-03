@@ -395,7 +395,7 @@ export class WorkOrderService {
   static async completeLineItem(
     lineItemId: string
   ): Promise<{ data: WorkOrderLineItem | null; error: any }> {
-    return await supabase
+    const result = await supabase
       .from('work_order_line_items')
       .update({
         is_completed: true,
@@ -404,12 +404,52 @@ export class WorkOrderService {
       .eq('id', lineItemId)
       .select()
       .single();
+
+    if (!result.error && result.data?.work_order_id) {
+      await this.syncWorkOrderCompletionStatus(result.data.work_order_id);
+    }
+
+    return result;
+  }
+
+  // When the last line item flips to completed, move the parent work order to
+  // the "Completed" tab. When a previously-completed work order has a line item
+  // re-opened, move it back to "In Production".
+  static async syncWorkOrderCompletionStatus(workOrderId: string): Promise<void> {
+    const { data: items } = await supabase
+      .from('work_order_line_items')
+      .select('is_completed')
+      .eq('work_order_id', workOrderId);
+
+    if (!items || items.length === 0) return;
+
+    const allComplete = items.every((i: any) => i.is_completed === true);
+
+    const { data: wo } = await supabase
+      .from('work_orders')
+      .select('status, completed_at')
+      .eq('id', workOrderId)
+      .maybeSingle();
+
+    if (!wo) return;
+
+    if (allComplete && wo.status !== 'Completed') {
+      await supabase
+        .from('work_orders')
+        .update({ status: 'Completed', completed_at: new Date().toISOString() })
+        .eq('id', workOrderId);
+    } else if (!allComplete && wo.status === 'Completed') {
+      await supabase
+        .from('work_orders')
+        .update({ status: 'In Production', completed_at: null })
+        .eq('id', workOrderId);
+    }
   }
 
   static async uncompleteLineItem(
     lineItemId: string
   ): Promise<{ data: WorkOrderLineItem | null; error: any }> {
-    return await supabase
+    const result = await supabase
       .from('work_order_line_items')
       .update({
         is_completed: false,
@@ -418,6 +458,12 @@ export class WorkOrderService {
       .eq('id', lineItemId)
       .select()
       .single();
+
+    if (!result.error && result.data?.work_order_id) {
+      await this.syncWorkOrderCompletionStatus(result.data.work_order_id);
+    }
+
+    return result;
   }
 
   static async getLineItemsByWorkOrder(

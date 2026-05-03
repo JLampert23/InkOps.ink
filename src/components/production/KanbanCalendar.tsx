@@ -237,7 +237,7 @@ function CalendarGrid({ typeOfWork, onNavigateToWorkOrder, onClose, inline = fal
         .select(`
           id, quote_number, customer_name, status, production_due_date,
           quote_line_items ( id, quantity, size_2xs, size_xs, size_s, size_m, size_l, size_xl, size_2xl, size_3xl, size_4xl, size_5xl, size_6xl, garment_color ),
-          quote_imprints ( id, imprint_type )
+          quote_imprints ( id, type_of_work )
         `)
         .eq('company_id', companyId)
         .not('production_due_date', 'is', null)
@@ -246,12 +246,36 @@ function CalendarGrid({ typeOfWork, onNavigateToWorkOrder, onClose, inline = fal
       const { data: workOrders } = await supabase
         .from('work_orders')
         .select(`
-          id, work_order_number, customer_name, status, production_due_date,
+          id, work_order_number, customer_name, status, production_due_date, quote_id,
           work_order_line_items ( id, quantity, sizes, color )
         `)
         .eq('company_id', companyId)
         .not('production_due_date', 'is', null)
         .in('status', ['pending_scheduling', 'scheduled', 'in_production']);
+
+      // Look up imprint types for each work order via its source quote
+      const woQuoteIds = Array.from(
+        new Set((workOrders || []).map((w: any) => w.quote_id).filter(Boolean))
+      ) as string[];
+      const woQuoteImprints: Record<string, string[]> = {};
+      if (woQuoteIds.length > 0) {
+        const { data: woImprints } = await supabase
+          .from('quote_imprints')
+          .select('quote_id, type_of_work')
+          .in('quote_id', woQuoteIds);
+        (woImprints || []).forEach((imp: any) => {
+          if (!woQuoteImprints[imp.quote_id]) woQuoteImprints[imp.quote_id] = [];
+          if (imp.type_of_work) woQuoteImprints[imp.quote_id].push(imp.type_of_work);
+        });
+      }
+
+      const showAll = !typeOfWork || typeOfWork.toLowerCase() === 'all';
+      const matchesCalendar = (imprintTypes: string[]): boolean => {
+        if (showAll) return true;
+        if (imprintTypes.length === 0) return false; // unknown type → don't show on any specific calendar
+        const target = typeOfWork.toLowerCase();
+        return imprintTypes.some((t) => (t || '').toLowerCase() === target);
+      };
 
       const kanbanJobs: KanbanJob[] = [];
 
@@ -259,18 +283,23 @@ function CalendarGrid({ typeOfWork, onNavigateToWorkOrder, onClose, inline = fal
         quotes.forEach(quote => {
           const lineItems = (quote as any).quote_line_items || [];
           const imprints = (quote as any).quote_imprints || [];
+          const imprintTypes = imprints
+            .map((i: any) => i.type_of_work)
+            .filter(Boolean) as string[];
+
+          if (!matchesCalendar(imprintTypes)) return;
+
           const totalPieces = lineItems.reduce((sum: number, item: any) => {
             const sizes = [item.size_2xs, item.size_xs, item.size_s, item.size_m, item.size_l, item.size_xl, item.size_2xl, item.size_3xl, item.size_4xl, item.size_5xl, item.size_6xl];
             const lineTotal = sizes.reduce((s: number, size: any) => s + (parseInt(size?.toString() || '0') || 0), 0);
             return sum + (lineTotal * (item.quantity || 1));
           }, 0);
           const primaryColor = lineItems[0]?.garment_color || null;
-          const imprintType = imprints[0]?.imprint_type || typeOfWork;
           kanbanJobs.push({
             id: `quote-${quote.id}`, quote_id: quote.id, work_order_id: null,
             work_order_number: null, quote_number: quote.quote_number,
             customer_name: quote.customer_name, production_due_date: quote.production_due_date,
-            imprint_type: imprintType, total_pieces: totalPieces, primary_color: primaryColor,
+            imprint_type: typeOfWork, total_pieces: totalPieces, primary_color: primaryColor,
             status: quote.status || 'quote',
           });
         });
@@ -278,6 +307,10 @@ function CalendarGrid({ typeOfWork, onNavigateToWorkOrder, onClose, inline = fal
 
       if (workOrders) {
         workOrders.forEach(wo => {
+          const imprintTypes = wo.quote_id ? (woQuoteImprints[wo.quote_id] || []) : [];
+
+          if (!matchesCalendar(imprintTypes)) return;
+
           const lineItems = (wo as any).work_order_line_items || [];
           const totalPieces = lineItems.reduce((sum: number, item: any) => {
             const sizesObj = item.sizes || {};

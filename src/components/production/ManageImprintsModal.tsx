@@ -496,19 +496,83 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     });
   };
 
-  const handleAddImprint = () => {
+  const handleAddImprint = async () => {
     if (!currentImprint.type_of_work || !currentImprint.location) {
       showNotification('error', 'Missing Information', 'Please fill in Type of Work and Location');
       return;
     }
 
+    // Build the new local list first so the modal stays responsive
+    let nextImprints: Imprint[];
+    let savedIndex: number;
     if (editingIndex !== null) {
-      const updated = [...imprints];
-      updated[editingIndex] = { ...currentImprint };
-      setImprints(updated);
-      setEditingIndex(null);
+      nextImprints = [...imprints];
+      nextImprints[editingIndex] = { ...currentImprint };
+      savedIndex = editingIndex;
     } else {
-      setImprints([...imprints, { ...currentImprint }]);
+      nextImprints = [...imprints, { ...currentImprint }];
+      savedIndex = nextImprints.length - 1;
+    }
+    setImprints(nextImprints);
+    setEditingIndex(null);
+
+    // Persist this single imprint immediately so it shows in the parent
+    // QuoteBuilder without forcing the user to hit Save & Close every time.
+    if (quoteId) {
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user?.id)
+          .single();
+
+        if (profile?.company_id) {
+          const target = nextImprints[savedIndex];
+          const imprintData = {
+            quote_id: quoteId,
+            company_id: profile.company_id,
+            sort_order: savedIndex + 1,
+            location: target.location,
+            price_matrix_id: target.price_matrix_id || null,
+            matrix: target.matrix,
+            column_number: target.column_number,
+            type_of_work: target.type_of_work,
+            details: target.details,
+            mockups: target.proofs,
+            thread_ink_color: target.thread_ink_color,
+            pricing_matrix_column: target.pricing_matrix_column,
+            group_label: target.group_label ?? '',
+            num_colors: extractNumColors(target.pricing_matrix_column || ''),
+          };
+
+          if (target.id) {
+            await supabase.from('quote_imprints').update(imprintData).eq('id', target.id);
+          } else {
+            const { data: inserted } = await supabase
+              .from('quote_imprints')
+              .insert(imprintData)
+              .select()
+              .single();
+            if (inserted?.id) {
+              const withId = [...nextImprints];
+              withId[savedIndex] = { ...target, id: inserted.id };
+              setImprints(withId);
+              nextImprints = withId;
+            }
+          }
+
+          if (onImprintsUpdated) {
+            const { data: refreshed } = await supabase
+              .from('quote_imprints')
+              .select('*')
+              .eq('quote_id', quoteId)
+              .order('sort_order');
+            if (refreshed) onImprintsUpdated(refreshed);
+          }
+        }
+      } catch (err) {
+        console.error('Auto-save imprint failed:', err);
+      }
     }
 
     setCurrentImprint({
@@ -544,8 +608,28 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     }
   };
 
-  const handleDeleteImprint = (index: number) => {
+  const handleDeleteImprint = async (index: number) => {
+    const removed = imprints[index];
     setImprints(imprints.filter((_, i) => i !== index));
+
+    // Mirror the auto-save behavior: persist deletes immediately so the parent
+    // QuoteBuilder reflects them without forcing Save & Close.
+    if (removed?.id && quoteId) {
+      try {
+        await supabase.from('quote_imprints').delete().eq('id', removed.id);
+        if (onImprintsUpdated) {
+          const { data: refreshed } = await supabase
+            .from('quote_imprints')
+            .select('*')
+            .eq('quote_id', quoteId)
+            .order('sort_order');
+          if (refreshed) onImprintsUpdated(refreshed);
+        }
+      } catch (err) {
+        console.error('Auto-delete imprint failed:', err);
+      }
+    }
+
     if (editingIndex === index) {
       setCurrentImprint({
         location: '',

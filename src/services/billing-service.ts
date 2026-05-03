@@ -621,24 +621,21 @@ export const billingService = {
       if (error) throw error;
 
       const invoices = await Promise.all((data || []).map(async (item) => {
-        const { data: printavoPayments } = await supabase
-          .from('printavo_payments')
-          .select('payment_date, payment_method')
+        const { data: latestPayment } = await supabase
+          .from('payments')
+          .select('payment_date, payment_method, stripe_charge_id, stripe_payment_intent_id, stripe_transaction_id, status')
           .eq('invoice_id', item.id)
+          .in('status', ['successful', 'succeeded'])
           .order('payment_date', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        const { data: stripePayments } = await supabase
-          .from('stripe_payments')
-          .select('created_at, stripe_payment_intent_id, payment_method')
-          .eq('printavo_invoice_id', item.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const latestPayment = printavoPayments || stripePayments;
         const paymentMethod = latestPayment?.payment_method || 'manual';
+        const transactionId =
+          latestPayment?.stripe_charge_id ||
+          latestPayment?.stripe_payment_intent_id ||
+          latestPayment?.stripe_transaction_id ||
+          '';
 
         return {
           id: item.id,
@@ -650,7 +647,7 @@ export const billingService = {
           amountPaid: parseFloat(item.amount_paid),
           invoiceDate: item.invoice_date,
           paymentDate: latestPayment?.payment_date || item.updated_at,
-          stripePaymentIntentId: stripePayments?.stripe_payment_intent_id || '',
+          stripePaymentIntentId: transactionId,
           paymentMethod: paymentMethod,
         };
       }));

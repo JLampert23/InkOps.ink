@@ -25,8 +25,11 @@ interface Payment {
   payment_date: string;
   amount: number;
   payment_method: string;
-  stripe_charge_id: string;
-  stripe_payment_intent_id: string;
+  stripe_charge_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_transaction_id: string | null;
+  status: string;
+  source: string;
 }
 
 export default function PaidInvoices() {
@@ -66,17 +69,17 @@ export default function PaidInvoices() {
         .from('printavo_invoices')
         .select(`
           *,
-          stripe_invoices (
-            stripe_invoice_id,
-            stripe_payments (
-              id,
-              payment_date,
-              amount,
-              payment_method,
-              stripe_charge_id,
-              stripe_payment_intent_id,
-              status
-            )
+          payments!invoice_id (
+            id,
+            payment_date,
+            amount,
+            payment_method,
+            payment_type,
+            stripe_charge_id,
+            stripe_payment_intent_id,
+            stripe_transaction_id,
+            status,
+            source
           )
         `)
         .eq('status_stage', 'paid')
@@ -93,8 +96,13 @@ export default function PaidInvoices() {
       if (error) throw error;
 
       let processedInvoices: PaidInvoice[] = (data || []).map((inv: any) => {
-        const payments = inv.stripe_invoices?.stripe_payments || [];
-        const lastPayment = payments.length > 0 ? payments[payments.length - 1] : null;
+        const allPayments = (inv.payments || []) as any[];
+        const successfulPayments = allPayments
+          .filter((p) => p.status === 'successful' || p.status === 'succeeded')
+          .sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
+        const lastPayment = successfulPayments.length > 0
+          ? successfulPayments[successfulPayments.length - 1]
+          : null;
 
         return {
           invoice_id: inv.invoice_id,
@@ -106,10 +114,14 @@ export default function PaidInvoices() {
           total: parseFloat(inv.total || 0),
           amount_paid: parseFloat(inv.amount_paid || 0),
           payment_method: lastPayment?.payment_method || 'N/A',
-          stripe_transaction_id: lastPayment?.stripe_charge_id || lastPayment?.stripe_payment_intent_id || 'N/A',
+          stripe_transaction_id:
+            lastPayment?.stripe_charge_id ||
+            lastPayment?.stripe_payment_intent_id ||
+            lastPayment?.stripe_transaction_id ||
+            'N/A',
           notes: inv.notes || '',
           status_stage: inv.status_stage,
-          payments: payments.filter((p: any) => p.status === 'succeeded'),
+          payments: successfulPayments,
         };
       });
 
@@ -390,7 +402,7 @@ export default function PaidInvoices() {
                                         {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
                                       </div>
                                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        {formatPaymentMethod(payment.payment_method)} • {payment.stripe_charge_id || payment.stripe_payment_intent_id}
+                                        {formatPaymentMethod(payment.payment_method)} • {payment.stripe_charge_id || payment.stripe_payment_intent_id || payment.stripe_transaction_id || 'N/A'}
                                       </div>
                                     </div>
                                   </div>
