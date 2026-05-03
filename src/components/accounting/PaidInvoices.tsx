@@ -97,11 +97,13 @@ export default function PaidInvoices() {
 
       let processedInvoices: PaidInvoice[] = (data || []).map((inv: any) => {
         const allPayments = (inv.payments || []) as any[];
-        const successfulPayments = allPayments
-          .filter((p) => p.status === 'successful' || p.status === 'succeeded')
-          .sort((a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime());
-        const lastPayment = successfulPayments.length > 0
-          ? successfulPayments[successfulPayments.length - 1]
+        // Show the payment that paid this invoice even if later refunded —
+        // Jamie still wants to see the original method + Stripe transaction ID.
+        const sortedPayments = [...allPayments].sort(
+          (a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+        );
+        const lastPayment = sortedPayments.length > 0
+          ? sortedPayments[sortedPayments.length - 1]
           : null;
 
         return {
@@ -121,7 +123,7 @@ export default function PaidInvoices() {
             'N/A',
           notes: inv.notes || '',
           status_stage: inv.status_stage,
-          payments: successfulPayments,
+          payments: sortedPayments,
         };
       });
 

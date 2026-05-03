@@ -621,11 +621,13 @@ export const billingService = {
       if (error) throw error;
 
       const invoices = await Promise.all((data || []).map(async (item) => {
+        // Don't filter by status here — a refunded Stripe payment is still
+        // the payment that paid this invoice, and we want to surface its
+        // method + transaction ID in the Paid Invoices list.
         const { data: latestPayment } = await supabase
           .from('payments')
           .select('payment_date, payment_method, stripe_charge_id, stripe_payment_intent_id, stripe_transaction_id, status')
           .eq('invoice_id', item.id)
-          .in('status', ['successful', 'succeeded'])
           .order('payment_date', { ascending: false })
           .limit(1)
           .maybeSingle();
