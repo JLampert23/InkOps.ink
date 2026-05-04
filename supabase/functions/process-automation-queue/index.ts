@@ -545,7 +545,10 @@ async function executeWebhook(supabase: any, config: any, triggerData: any, comp
 }
 
 async function executeSendMessage(supabase: any, config: any, triggerData: any, companyId: string) {
-  const { message_type, to, subject, message } = config;
+  const { to, subject, message } = config;
+  // Older automations were saved without message_type set. Default to email so
+  // they actually deliver instead of silently no-op'ing.
+  const message_type = config.message_type || 'email';
 
   // Resolve recipient
   let recipient = to;
