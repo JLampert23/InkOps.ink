@@ -583,13 +583,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const itemGroups = Object.entries(groupedItems);
 
   const totalQty = items.reduce((sum, item) => {
+    // Match QuoteBuilder.calculateItemsTotal: sizes + total_quantity (additive),
+    // not "one or the other". Older QuoteDetail logic showed 0 whenever
+    // total_quantity was non-zero on a sized item or when sizes were 0 on a CS item
+    // because of falsy fallthrough on the aggregate column.
     const sizeSum = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
            (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
            (item.qty_4xl || 0) + (item.qty_5xl || 0) +
            (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
-    // For CS/non-sized items, fall back to total_quantity
-    return sum + (sizeSum > 0 ? sizeSum : (item.total_quantity || 0));
+    return sum + sizeSum + (item.total_quantity || 0);
   }, 0);
 
   const feesTotal = fees.reduce((sum, fee) => sum + fee.total_price, 0);
@@ -947,8 +950,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                                    (item.qty_4xl || 0) + (item.qty_5xl || 0) +
                                    (item.qty_sm || 0) + (item.qty_lxl || 0) +
                                    (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
-                    // For CS/non-sized items, fall back to total_quantity
-                    const totalItems = sizeQty > 0 ? sizeQty : (item.total_quantity || 0);
+                    const csQty = item.total_quantity || 0;
+                    // Items column = sizes + customer-supplied qty (matches QuoteBuilder)
+                    const totalItems = sizeQty + csQty;
 
                     return (
                       <React.Fragment key={item.id}>
@@ -1008,8 +1012,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                         {item.qty_5xl || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
-                        {/* Qty column: for sized items shows blank (sizes ARE the qty); for CS items shows total_quantity */}
-                      {sizeQty === 0 ? (item.total_quantity || '') : ''}
+                        {/* Qty column = customer-supplied total_quantity (the "Qty"
+                            input in QuoteBuilder). Always show it when set so it
+                            matches what the user entered. Sizes are shown in their
+                            own columns; the Items column to the right shows the sum. */}
+                        {csQty || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
                         {totalItems}
