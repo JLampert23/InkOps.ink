@@ -1088,7 +1088,7 @@ function WorkOrderDetailsSection({
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
           <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
             <DollarSign className="w-4 h-4" />
-            <span>Invoice Status</span>
+            <span>Work Order Status</span>
           </label>
 
           {updatingInvoiceStatus ? (
@@ -1115,7 +1115,7 @@ function WorkOrderDetailsSection({
               </button>
             </div>
           ) : (
-            <div className="text-gray-500 dark:text-gray-400 text-sm mb-3">No invoice status set</div>
+            <div className="text-gray-500 dark:text-gray-400 text-sm mb-3">No work order status set</div>
           )}
 
           {customInvoiceStatuses.length > 0 ? (
@@ -1125,7 +1125,7 @@ function WorkOrderDetailsSection({
               disabled={updatingInvoiceStatus}
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">-- Select Invoice Status --</option>
+              <option value="">-- Select Work Order Status --</option>
               {customInvoiceStatuses.map((status) => (
                 <option key={status.id} value={status.id}>
                   {status.name}

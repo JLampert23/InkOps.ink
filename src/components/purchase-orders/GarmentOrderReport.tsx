@@ -463,14 +463,39 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     if (!companyId) return;
     try {
       const now = new Date().toISOString();
-      const { error } = await supabase
+      // Update any existing staging rows for this style+color.
+      const { data: updated, error: updateError } = await supabase
         .from('garment_requirements_staging')
         .update({ is_ordered: true, ordered_at: now })
         .eq('company_id', companyId)
         .eq('style_number', garment.style_number)
-        .eq('color', garment.color);
+        .eq('color', garment.color)
+        .select('id');
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // If no staging row exists yet (quote was approved without auto-PO
+      // creation), insert one so the flag persists across refreshes.
+      if (!updated || updated.length === 0) {
+        const firstJob = garment.jobs[0];
+        if (!firstJob?.quote_id) {
+          showToast('Cannot mark ordered: no linked quote found for this garment.');
+          return;
+        }
+        const { error: insertError } = await supabase
+          .from('garment_requirements_staging')
+          .insert([{
+            company_id: companyId,
+            quote_id: firstJob.quote_id,
+            work_order_id: firstJob.work_order_id || null,
+            supplier_name: garment.supplier === 'Unknown' ? null : garment.supplier,
+            style_number: garment.style_number,
+            color: garment.color,
+            is_ordered: true,
+            ordered_at: now,
+          }]);
+        if (insertError) throw insertError;
+      }
 
       setGarments(prev =>
         prev.map(g =>
