@@ -1181,8 +1181,38 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     }]);
   };
 
-  const removeItemGroup = (groupId: string) => {
+  const removeItemGroup = async (groupId: string) => {
+    const removedGroup = itemGroups.find(g => g.id === groupId);
     setItemGroups(itemGroups.filter(group => group.id !== groupId));
+
+    // Cascade-delete the group's imprints from the database so they don't
+    // become orphans (showing up on schedulers with no line group to attach
+    // to). production_schedule_entries.imprint_id is ON DELETE CASCADE so
+    // the schedule rows go away automatically.
+    if (quoteId && removedGroup) {
+      try {
+        const groupLabel = removedGroup.label ?? '';
+        let deleteQuery = supabase
+          .from('quote_imprints')
+          .delete()
+          .eq('quote_id', quoteId);
+        if (groupLabel) {
+          deleteQuery = deleteQuery.eq('group_label', groupLabel);
+        } else {
+          deleteQuery = deleteQuery.or('group_label.is.null,group_label.eq.');
+        }
+        await deleteQuery;
+
+        const { data: refreshed } = await supabase
+          .from('quote_imprints')
+          .select('*')
+          .eq('quote_id', quoteId)
+          .order('sort_order');
+        if (refreshed) setQuoteImprints(refreshed);
+      } catch (err) {
+        console.error('Failed to cascade-delete imprints for removed group:', err);
+      }
+    }
   };
 
   const updateGroupLabel = (groupId: string, label: string) => {
