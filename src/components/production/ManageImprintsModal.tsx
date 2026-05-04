@@ -528,10 +528,26 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
         if (profile?.company_id) {
           const target = nextImprints[savedIndex];
+
+          // For new imprints, take the next sort_order across the entire
+          // quote — not per modal session — so imprint_number stays unique
+          // across groups (QTE-0059-01, QTE-0059-02, QTE-0059-03 etc.).
+          let sortOrder = savedIndex + 1;
+          if (!target.id) {
+            const { data: maxRow } = await supabase
+              .from('quote_imprints')
+              .select('sort_order')
+              .eq('quote_id', quoteId)
+              .order('sort_order', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            sortOrder = (maxRow?.sort_order ?? 0) + 1;
+          }
+
           const imprintData = {
             quote_id: quoteId,
             company_id: profile.company_id,
-            sort_order: savedIndex + 1,
+            sort_order: sortOrder,
             location: target.location,
             price_matrix_id: target.price_matrix_id || null,
             matrix: target.matrix,
@@ -546,7 +562,10 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           };
 
           if (target.id) {
-            await supabase.from('quote_imprints').update(imprintData).eq('id', target.id);
+            // Don't overwrite an existing imprint's sort_order — that
+            // would change its imprint_number and confuse downstream views.
+            const { sort_order: _omit, ...updateData } = imprintData;
+            await supabase.from('quote_imprints').update(updateData).eq('id', target.id);
           } else {
             const { data: inserted } = await supabase
               .from('quote_imprints')
@@ -777,12 +796,23 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           }
         }
 
+        // Look up the highest sort_order across the whole quote so newly
+        // inserted imprints get unique numbers across all groups (the
+        // imprint_number trigger uses sort_order to build QTE-{quote}-{NN}).
+        const { data: maxRow } = await supabase
+          .from('quote_imprints')
+          .select('sort_order')
+          .eq('quote_id', quoteId)
+          .order('sort_order', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        let nextSortOrder = (maxRow?.sort_order ?? 0) + 1;
+
         for (let idx = 0; idx < imprints.length; idx++) {
           const imp = imprints[idx];
-          const imprintData = {
+          const baseData = {
             quote_id: quoteId,
             company_id: profile.company_id,
-            sort_order: idx + 1,
             location: imp.location,
             price_matrix_id: imp.price_matrix_id || null,
             matrix: imp.matrix,
@@ -797,9 +827,10 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           };
 
           if (imp.id) {
+            // Preserve existing imprint's sort_order so imprint_number is stable.
             const { error } = await supabase
               .from('quote_imprints')
-              .update(imprintData)
+              .update(baseData)
               .eq('id', imp.id);
 
             if (error) {
@@ -810,7 +841,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           } else {
             const { error } = await supabase
               .from('quote_imprints')
-              .insert(imprintData);
+              .insert({ ...baseData, sort_order: nextSortOrder });
+            nextSortOrder += 1;
 
             if (error) {
               console.error('Error inserting imprint:', error);
