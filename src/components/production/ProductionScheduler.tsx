@@ -635,14 +635,14 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Qty
                 </th>
-                {/* 2 hard-coded status columns — Proof Status then Garment Status, after Qty */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-purple-50/50 dark:bg-purple-900/10">
-                  <div>Proof Status</div>
-                  <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Approved / Rejected</div>
-                </th>
+                {/* 2 hard-coded status columns — Stock Status then Art Status, after Qty */}
                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-blue-50/50 dark:bg-blue-900/10">
-                  <div>Garment Status</div>
+                  <div>Stock Status</div>
                   <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Ordered / Partial / Received</div>
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-purple-50/50 dark:bg-purple-900/10">
+                  <div>Art Status</div>
+                  <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Approved / Rejected</div>
                 </th>
                 {workflowSteps.map(step => (
                   <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider relative">
@@ -861,27 +861,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quantity}
                     </td>
-                    {/* Proof Status (art/proof) — FIRST hard-coded status column */}
-                    <td className="px-3 py-3 text-center bg-purple-50/30 dark:bg-purple-900/5">
-                      {entry.art_status === 'approved' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />Approved
-                        </span>
-                      ) : entry.art_status === 'rejected' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
-                          <X className="w-3 h-3" />Rejected
-                        </span>
-                      ) : entry.art_status === 'pending' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />Pending
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
-                          —
-                        </span>
-                      )}
-                    </td>
-                    {/* Garment Status (stock) — SECOND hard-coded status column */}
+                    {/* Stock Status — FIRST hard-coded status column */}
                     <td className="px-3 py-3 text-center bg-blue-50/30 dark:bg-blue-900/5">
                       {entry.stock_status === 'received' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
@@ -898,6 +878,26 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
                           <Clock className="w-3 h-3" />—
+                        </span>
+                      )}
+                    </td>
+                    {/* Art Status — SECOND hard-coded status column */}
+                    <td className="px-3 py-3 text-center bg-purple-50/30 dark:bg-purple-900/5">
+                      {entry.art_status === 'approved' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Approved
+                        </span>
+                      ) : entry.art_status === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
+                          <X className="w-3 h-3" />Rejected
+                        </span>
+                      ) : entry.art_status === 'pending' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />Pending
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          —
                         </span>
                       )}
                     </td>

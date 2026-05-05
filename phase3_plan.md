@@ -100,7 +100,19 @@ npx supabase functions deploy send-invoice --project-ref cuaukcvccxvfpuxaciac
 ---
 
 ## [BUG-1] QuoteBuilder — Qty Shows 0 in Quote View After Save
-**Status:** ⬜ Not started | **Priority:** 1st
+**Status:** 🟡 Pushed to `dev` (commit b0facd1) — awaiting validation on dev.inkops.ink | **Priority:** 1st
+
+### Resolution attempted (2026-05-04)
+Hypothesis in this doc was `quantity` field; actual QuoteDetail code uses `total_quantity`. The two views diverged on the formula:
+- **QuoteBuilder** `calculateItemsTotal`: `sizeQty + total_quantity` (additive)
+- **QuoteDetail** (old): `sizeQty > 0 ? sizeQty : total_quantity` (either-or, plus a separate Qty column that hid total_quantity for sized rows)
+
+Aligned QuoteDetail to QuoteBuilder's formula:
+- Qty column → always shows `total_quantity` (matches QuoteBuilder Qty input)
+- Items column → `sizeQty + total_quantity`
+- Top-of-quote totalQty rollup uses the same sum
+
+**Not yet validated against Jamie's reproduction case.** If he tests on dev and the bug persists, the fix is wrong direction and we need to dig into how QuoteBuilder writes the value rather than how QuoteDetail reads it.
 
 ### What's broken
 - In **QuoteBuilder** (editing mode): Qty column shows the correct value entered (e.g. `2`)
@@ -124,7 +136,20 @@ Find where QuoteDetail renders the Qty column and check what field it reads from
 ---
 
 ## [BUG-2] Scheduler — Status Columns Wrong Position and Wrong Count
-**Status:** ⬜ Not started | **Priority:** 2nd
+**Status:** 🟡 Fix pushed to `dev` — awaiting validation on dev.inkops.ink | **Priority:** 2nd
+
+### Resolution attempted (2026-05-05)
+On inspection, `ProductionScheduler.tsx` was already partially refactored — the 3-column setup was reduced to 2 columns positioned right after Qty, with `stock_status` and `art_status` enrichment logic computing values from `garment_requirements_staging` + PO receiving + `quotes.artwork_approval_status`. What remained wrong:
+- Headers were labeled **"Proof Status"** and **"Garment Status"** instead of the client-requested **"Art Status"** / **"Stock Status"**
+- Order was reversed: Art (Proof) was first, Stock (Garment) was second — client wants Stock first
+
+Edits applied to `src/components/production/ProductionScheduler.tsx`:
+- Renamed header `Proof Status` → `Art Status`, `Garment Status` → `Stock Status`
+- Swapped column order so Stock Status renders first (right after Qty), then Art Status
+- Swapped matching `<td>` cells in the row body so values align with the new header order
+- Color theming preserved: Stock = blue, Art = purple
+
+**Not validated on prod data.** If on dev.inkops.ink Jamie sees correct labels/order but values look wrong (e.g. all "—"), the issue is in the enrichment computation (lines 200-265), not the columns.
 
 ### What's wrong (client feedback)
 - We added 3 columns (Stock Ordered, Stock Received, Art Approved) — client wants **2 only**
