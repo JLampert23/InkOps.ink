@@ -70,3 +70,14 @@ entrypoint = "./functions/reset-customer-password/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/stripe-webhook/index.ts"
+
+# Internal-call-only function. Called by process-automation-queue with the
+# service role key. Supabase's gateway rejects the new sb_secret_... key
+# format as UNAUTHORIZED_INVALID_JWT_FORMAT when verify_jwt = true, breaking
+# every automation email. send-email does its own auth check internally
+# (bearerToken === SUPABASE_SERVICE_ROLE_KEY), so disabling gateway JWT
+# verification is safe.
+[functions.send-email]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-email/index.ts"
