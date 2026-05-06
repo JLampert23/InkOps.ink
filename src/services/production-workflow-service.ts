@@ -176,11 +176,11 @@ export class ProductionWorkflowService {
         .from('work_order_workflow_tracking')
         .select('*')
         .eq('work_order_id', workOrderId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 
-      return { data, error: null };
+      return { data: data ?? null, error: null };
     } catch (error) {
       console.error('Error fetching workflow tracking:', error);
       return { data: null, error };
