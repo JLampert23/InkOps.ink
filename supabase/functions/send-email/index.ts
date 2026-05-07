@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
 
     const userToken = req.headers.get('X-User-Token') || '';
     const authHeader = req.headers.get('Authorization');
-    const bearerToken = authHeader?.replace('Bearer ', '') || '';
+    const bearerToken = (authHeader?.replace('Bearer ', '') || '').trim();
     const isServiceCall = bearerToken === supabaseServiceKey;
     const token = isServiceCall ? bearerToken : (userToken || bearerToken);
 
