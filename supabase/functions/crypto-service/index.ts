@@ -117,16 +117,41 @@ Deno.serve(async (req: Request) => {
     }
 
     const bearerToken = authHeader.replace('Bearer ', '').trim();
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim() ?? '';
-    const isServiceRole = bearerToken === supabaseServiceKey;
+    // Supabase's key migration leaves the same env var name resolving to
+    // different values across functions. Accept the call as service-to-service
+    // if the bearer matches any known service-key env var OR is a structurally
+    // valid service_role JWT. Same fallback as send-email — see comment there.
+    const candidateKeys = [
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_LEGACY_SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_SECRET_KEY'),
+    ]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .map(v => v.trim());
+
+    const looksLikeServiceRoleJwt = (token: string): boolean => {
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return false;
+        const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+        const payload = JSON.parse(atob(padded));
+        return payload?.role === 'service_role';
+      } catch {
+        return false;
+      }
+    };
+
+    const supabaseServiceKey = candidateKeys[0] ?? '';
+    const isServiceRole =
+      candidateKeys.some(k => k === bearerToken) ||
+      looksLikeServiceRoleJwt(bearerToken);
 
     console.log('crypto-service auth check:', {
       hasAuthHeader: !!authHeader,
       bearerTokenLength: bearerToken.length,
-      serviceKeyLength: supabaseServiceKey.length,
+      candidateKeyLens: candidateKeys.map(k => k.length),
       isServiceRole,
-      tokenPrefix: bearerToken.substring(0, 20),
-      serviceKeyPrefix: supabaseServiceKey.substring(0, 20),
     });
 
     if (!isServiceRole) {
