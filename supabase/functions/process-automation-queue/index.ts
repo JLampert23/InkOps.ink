@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
@@ -407,7 +407,7 @@ async function executeSendEmail(supabase: any, config: any, triggerData: any, co
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
   // Call send-email function
   const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
@@ -448,7 +448,7 @@ async function executeSendSMS(supabase: any, config: any, triggerData: any, comp
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
   const response = await fetch(`${supabaseUrl}/functions/v1/twilio-sms`, {
     method: 'POST',
@@ -557,7 +557,7 @@ async function executeSendMessage(supabase: any, config: any, triggerData: any, 
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
   if (message_type === 'email') {
     // Send email
@@ -654,7 +654,7 @@ async function executeRequestPayment(supabase: any, config: any, triggerData: an
   if (send_reminder && invoice.customer_email) {
     // Send payment reminder email
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
     await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method: 'POST',
@@ -729,7 +729,7 @@ async function executeRequestApproval(supabase: any, config: any, triggerData: a
 
   // Send approval request email
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
   await fetch(`${supabaseUrl}/functions/v1/send-email`, {
     method: 'POST',
@@ -904,7 +904,7 @@ async function processQuoteFollowup(supabase: any, queueItem: any) {
 
     // Send follow-up email
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
 
     const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method: 'POST',
