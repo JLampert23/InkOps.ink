@@ -25,7 +25,7 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
   const [workOrders, setWorkOrders] = useState<WorkOrderWithImprints[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'in_production' | 'completed'>('in_production');
   const [customInvoiceStatuses, setCustomInvoiceStatuses] = useState<CustomInvoiceStatus[]>([]);
   const [invoiceStatusesMap, setInvoiceStatusesMap] = useState<Record<string, CustomInvoiceStatus>>({});
 
@@ -124,19 +124,20 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
       wo.work_order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       wo.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || wo.status === statusFilter;
+    const matchesTab =
+      activeTab === 'completed'
+        ? wo.status === 'Completed'
+        : wo.status !== 'Completed';
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesTab;
   });
 
   const stats = {
     total: workOrders.length,
-    inProduction: workOrders.filter(wo => wo.status === 'In Production').length,
+    inProduction: workOrders.filter(wo => wo.status !== 'Completed').length,
     completed: workOrders.filter(wo => wo.status === 'Completed').length,
     overdue: workOrders.filter(wo => isOverdue(wo.production_due_date) && wo.status !== 'Completed').length,
   };
-
-  const uniqueStatuses = [...new Set(workOrders.map(wo => wo.status))];
 
   return (
     <div className="space-y-6">
@@ -175,9 +176,31 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+        <div className="flex border-b border-gray-200 dark:border-slate-700">
+          <button
+            onClick={() => setActiveTab('in_production')}
+            className={`flex-1 px-6 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'in_production'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+            }`}
+          >
+            In Production ({stats.inProduction})
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`flex-1 px-6 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'completed'
+                ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 bg-green-50/50 dark:bg-green-900/10'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+            }`}
+          >
+            Completed ({stats.completed})
+          </button>
+        </div>
+        <div className="p-4">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
@@ -186,18 +209,6 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
             />
-          </div>
-          <div className="flex gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-            >
-              <option value="all">All Statuses</option>
-              {uniqueStatuses.map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
           </div>
         </div>
       </div>
@@ -212,8 +223,10 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No work orders found</h3>
           <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-            {searchTerm || statusFilter !== 'all'
-              ? 'Try adjusting your filters to see more results'
+            {searchTerm
+              ? 'Try adjusting your search to see more results'
+              : activeTab === 'completed'
+              ? 'No completed work orders yet'
               : 'Work orders are created automatically when quotes are approved'}
           </p>
         </div>
