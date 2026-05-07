@@ -868,7 +868,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                           <CheckCircle className="w-3 h-3" />Received
                         </span>
                       ) : entry.stock_status === 'ordered' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
                           <CheckCircle className="w-3 h-3" />Ordered
                         </span>
                       ) : entry.stock_status === 'partial' ? (
