@@ -51,7 +51,31 @@ Deno.serve(async (req: Request) => {
     const userToken = req.headers.get('X-User-Token') || '';
     const authHeader = req.headers.get('Authorization');
     const bearerToken = (authHeader?.replace('Bearer ', '') || '').trim();
-    const isServiceCall = bearerToken === supabaseServiceKey;
+
+    // Supabase's new key system can leave the same env var name resolving
+    // to different values in different deployed functions (sb_secret_... vs
+    // legacy JWT). Try every known service-key env var so we accept whichever
+    // value the caller actually has.
+    const candidateKeys = [
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_LEGACY_SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_SECRET_KEY'),
+      Deno.env.get('SB_SERVICE_ROLE_KEY'),
+    ]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .map(v => v.trim());
+
+    const isServiceCall = candidateKeys.some(k => k === bearerToken);
+
+    console.log('send-email: env diagnostic:', {
+      serviceRoleKeyLen: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.length ?? 0,
+      legacyServiceKeyLen: Deno.env.get('SUPABASE_LEGACY_SERVICE_ROLE_KEY')?.length ?? 0,
+      secretKeyLen: Deno.env.get('SUPABASE_SECRET_KEY')?.length ?? 0,
+      publishableKeyLen: Deno.env.get('SUPABASE_PUBLISHABLE_KEY')?.length ?? 0,
+      anonKeyLen: Deno.env.get('SUPABASE_ANON_KEY')?.length ?? 0,
+      jwtSecretLen: Deno.env.get('SUPABASE_JWT_SECRET')?.length ?? 0,
+      candidateKeyLens: candidateKeys.map(k => k.length),
+    });
     const token = isServiceCall ? bearerToken : (userToken || bearerToken);
 
     console.log('send-email: Auth check:', {
