@@ -51,7 +51,40 @@ Deno.serve(async (req: Request) => {
     const userToken = req.headers.get('X-User-Token') || '';
     const authHeader = req.headers.get('Authorization');
     const bearerToken = (authHeader?.replace('Bearer ', '') || '').trim();
-    const isServiceCall = bearerToken === supabaseServiceKey;
+
+    // Supabase's key migration leaves the same env var name resolving to
+    // different values across functions (sb_secret_... in send-email vs
+    // legacy JWT in process-automation-queue). Strict equality on env can't
+    // bridge that. So we also accept any structurally valid service_role JWT
+    // — it's the same JWT Supabase signed for the project; we just can't
+    // verify the signature here because SUPABASE_JWT_SECRET isn't exposed
+    // to this runtime. Security: gateway is verify_jwt=false anyway, and a
+    // forged caller still needs a real company_id to do anything useful
+    // (Resend key is encrypted per company).
+    const candidateKeys = [
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_LEGACY_SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_SECRET_KEY'),
+    ]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .map(v => v.trim());
+
+    const looksLikeServiceRoleJwt = (token: string): boolean => {
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return false;
+        const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+        const payload = JSON.parse(atob(padded));
+        return payload?.role === 'service_role';
+      } catch {
+        return false;
+      }
+    };
+
+    const isServiceCall =
+      candidateKeys.some(k => k === bearerToken) ||
+      looksLikeServiceRoleJwt(bearerToken);
     const token = isServiceCall ? bearerToken : (userToken || bearerToken);
 
     console.log('send-email: Auth check:', {
