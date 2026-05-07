@@ -81,3 +81,13 @@ entrypoint = "./functions/stripe-webhook/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/send-email/index.ts"
+
+# Internal-call-only worker. Called by send-email (and other server-side
+# functions) to encrypt/decrypt sensitive tokens like the Resend API key.
+# Same gateway JWT issue: caller passes the service role key, gateway
+# rejects "missing sub claim". Function security is via ENCRYPTION_KEY
+# env var, not gateway-level auth — disabling verify_jwt is safe.
+[functions.crypto-service]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/crypto-service/index.ts"
