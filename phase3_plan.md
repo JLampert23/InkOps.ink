@@ -126,27 +126,55 @@ ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS minimum_deposit_percent in
 ---
 
 ### [3.1-C] Mockup Generator — Click thumbnail to edit + resave
-**Status:** ⬜ Not started | **File:** `MockupGenerator.tsx`
+**Status:** 🟡 Built locally (uncommitted on `dev`) — needs Jamie validation. | **File:** `MockupGenerator.tsx`
 
 **Confirmed (Jamie's doc #4):** click a saved mockup on the left → loads onto canvas → edit → save replaces existing record.
+
+**What was found (honest):** the feature was already built for new-format mockups stored as `{url, proof_id}` objects. Clicking calls `loadExistingProof(proofId)` which loads artwork onto the canvas, and `handleSave` correctly UPDATEs the existing proof when `proofId` is set. The gap was **legacy mockups stored as plain string URLs** — clicking those did nothing because there's no `proof_id` linkage to follow.
+
+**Fix:** modified the click handler. When a legacy string-format mockup is clicked, queries `proofs` table for a row where `composite_image_url = mockupUrl` to recover the proof_id, then calls `loadExistingProof(recoveredProofId)`. If no matching proof is found (truly orphaned mockup), logs a warning. New-format mockups continue to use the direct proof_id path.
 
 ---
 
 ### [3.1-D] Custom Save Warning in Quote Builder
-**Status:** ⬜ Not started | **File:** `QuoteBuilder.tsx`
+**Status:** 🟡 Built locally (uncommitted on `dev`) — needs Jamie validation on devs.inkops.ink. | **File:** `QuoteBuilder.tsx`
 
 **Confirmed (Jamie's doc #5):** custom modal "You have unsaved changes…are you sure you want to continue without saving?" with **[ SAVE ] [ CONTINUE ] [ CANCEL ]** instead of native `beforeunload`.
+
+**Implementation:**
+- Added `hasUnsavedChanges` state + `showUnsavedChangesModal` state + `skipDirtyCheckRef` ref.
+- `useEffect` watches all user-editable state (customer/contact, quote metadata, billing/shipping, line items, fees, imprints, totals tax). First run skipped via ref so initial mount + DB hydration don't false-positive.
+- `loadQuote` resets the dirty flag on completion (clean baseline).
+- `handleSave` and `handleSaveAndClose` reset dirty flag on success.
+- `handleCancel` checks `hasUnsavedChanges`; if true, opens the modal instead of immediately closing.
+- Modal has 3 actions: **Save** (calls `performSave`, resets dirty, calls `onSave`), **Continue without saving** (calls `proceedWithCancel`), **Cancel** (closes modal, stays in editor).
+
+**Typecheck:** clean — no new errors introduced (existing TS6133/TS2339 noise in unrelated lines).
 
 ---
 
 ## Items awaiting client clarification ⏳
 
-### [3.1-E] Copy invoice — clear history
-**Status:** ⏳ Awaiting Jamie's clarification on what "history" means.
-**Source:** Jamie's doc small things #4 ("When i copy an invoice the history should be cleared on that copy").
-**Open questions sent:**
-- Payment records cleared? Status change log cleared? Both?
-- Should the copied invoice start as Draft?
+### [3.1-E] Copy QUOTE — produce a clean copy with no related data
+**Status:** 🟡 Built locally (uncommitted on `dev`) — needs edge function redeploy + Jamie validation.
+**Source:** Jamie's chat reply: *"i think i ment copy quote — and when a quote is copied it should just copy the quote itself nothing else"*
+**File:** `supabase/functions/quote-actions/index.ts` (`duplicate` action)
+
+**What I found:** the existing duplicate handler was already correctly creating a draft quote, copying line items, and copying imprints. BUT it was also copying **proofs** and **proof_artwork** — the artwork approval history records (with prior approve/decline state, customer signatures, version history). Those don't make sense for a brand-new draft quote and are exactly the "history" Jamie wanted gone.
+
+**Implementation:**
+- Removed `originalProofs` fetch.
+- Removed the entire proofs + proof_artwork copy block.
+- Removed the now-unused `imprintIdMap` (only ever used to wire proofs to new imprint ids).
+- Quote duplicate now copies: quote header (status='draft'), line items (price_locked=true), imprints. Nothing else.
+- Code still does NOT trigger any cascading WO / scheduler / invoice creation — those are gated on quote.status='approved', and our new copy is 'draft'.
+
+**Note on quote_fees:** the existing duplicate code was NEVER copying quote_fees. That's arguably a separate bug (fees are part of the quote pricing). Left untouched per Jamie's "nothing else" intent — flag for follow-up if he notices missing fees on a copy.
+
+**Deploy step needed before testing:**
+```bash
+npx supabase functions deploy quote-actions --project-ref cuaukcvccxvfpuxaciac
+```
 
 ### [3.1-F] Master Scheduler
 **Status:** ⏳ Awaiting Jamie's full scope ("still working through it").
@@ -157,9 +185,17 @@ ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS minimum_deposit_percent in
 - Replace current default scheduler view OR sit alongside as a separate tab?
 
 ### [3.1-G] Scheduler — visible tabs along the top instead of dropdown
-**Status:** ⬜ Not started — confirmed in Jamie's chat reply #2.
-**File:** `ProductionScheduler.tsx` + `SchedulerTabManager.tsx`
-**Scope:** replace the current schedule selector dropdown with horizontal tabs across the top of the scheduler page. One tab per saved schedule. Active tab visually distinct.
+**Status:** 🟡 Built locally (uncommitted on `dev`) — needs Jamie validation on devs.inkops.ink.
+**File:** `ProductionDashboard.tsx`
+**Scope (final):** the dropdown Jamie was referring to was the **Type of Work** dropdown that switches between work types (Screen Print / Embroidery / etc.) on the Scheduling AND Kanban Calendar views — NOT the saved-tab manager (that's already tabs). Replaced both dropdowns with horizontal tab buttons.
+
+**Implementation:**
+- Scheduling view: row of tabs, one per active type_of_work. No "View All" (matches existing dropdown behavior — the scheduler always picks the first one if 'all' was selected).
+- Kanban Calendar view: same row of tabs, plus a "View All" tab at the start (matches existing dropdown behavior).
+- Active tab: blue text + blue bottom border + light blue tint background.
+- Tabs use `overflow-x-auto` so 5+ work types scroll horizontally instead of wrapping.
+
+**Typecheck:** clean — no errors in ProductionDashboard.tsx.
 
 ---
 
@@ -203,10 +239,11 @@ ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS minimum_deposit_percent in
 **Scope:** full debug + feature build — customers can store payment info properly, see all open/unpaid invoices, view past quotes, proofs, paid invoices, contacts.
 **Files:** `portal-data/`, `portal-payment/`, `portal-proof-approval/`, `customer-payment-methods/`, `CustomerPortalPage.tsx`.
 
-### [3.2-F] Customer portal branding ⏳
-**Status:** ⏳ Awaiting Jamie's clarification on what type.
-**Source:** Jamie's doc 3.2 #6.
-**Open question sent:** logo upload? Color theme picker? Custom subdomain (`portal.toddssportinggoods.com`)? Full white-label (all of the above)?
+### [3.2-F] Customer portal branding — company logo
+**Status:** ⬜ Not started — confirmed scope.
+**Source:** Jamie's chat reply: *"I want the portal to have the company name so the customers portal that are my customers should see a todds logo"*
+**Scope:** when a customer accesses the portal, they should see the company's logo (and company name). Logo is sourced from `company_settings.company_logo_primary_url` (already exists). No subdomain or color theme requested — just logo + company name on the portal pages.
+**Files:** portal templates / `CustomerPortalPage.tsx` / portal layout component.
 
 ---
 
@@ -217,20 +254,22 @@ ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS minimum_deposit_percent in
 **Background:** commit `b0c7013` was supposed to generate a unique token per customer when admin clicks Copy Link. Jamie says it's still not working.
 **Open question sent:** what does he see — same link for every customer, error message, broken URL? Which customer did he test? Screenshot if possible.
 
-### Square dashboard removal
-**Status:** Acknowledged, not urgent.
-**Scope:** remove `src/components/square/SquareReports.tsx` + `SquareCustomers.tsx`, drop their routing entries, remove integration. Estimated: a few hours.
+### Square dashboard — HIDE the UI (soft remove)
+**Status:** ⬜ Not started — confirmed scope.
+**Source:** Jamie's chat reply: *"lets hold off can you just remove the UI so it is not visible?"*
+**Scope:** remove the navigation entries / menu items / route registrations that expose Square pages to the user. Keep `src/components/square/SquareReports.tsx` and `SquareCustomers.tsx` files intact (and their service code) so we can flip it back on later without rebuilding.
+**Implementation:** find where Square is added to nav (likely `App.tsx` routes + sidebar/menu component) and remove those lines.
 
 ---
 
 # Open Questions Outstanding (waiting on Jamie)
 
-1. **BUG-2 colors** — explicit yes/no on switching Stock Status "Ordered" badge from blue to RED.
-2. **Copy invoice** — what specifically should be cleared? Should copy start as Draft?
-3. **Master scheduler** — full UX scope (move mechanism, columns, layout).
-4. **Customer portal branding** — what type of branding.
-5. **Customer portal link bug** — repro details + screenshot.
-6. **BUG-3** — screenshot of the address-required error and which screen.
+1. ~~BUG-2 colors~~ ✅ Confirmed YES (2026-05-08) — promote color fix from dev to prod.
+2. ~~Copy invoice~~ ✅ Re-scoped to Copy QUOTE — see [3.1-E].
+3. **Master scheduler** — full UX scope (move mechanism, columns, layout). Still pending.
+4. ~~Customer portal branding~~ ✅ Confirmed = company logo on portal — see [3.2-F].
+5. **Customer portal link bug** — repro details + screenshot. Jamie just confirmed it's still broken in his 2026-05-08 reply ("the link does not seem to be specific to each customer") but didn't send repro yet.
+6. **BUG-3** — screenshot of the address-required error and which screen. Still pending.
 
 ---
 
