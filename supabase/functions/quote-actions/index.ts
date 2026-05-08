@@ -144,11 +144,10 @@ Deno.serve(async (req: Request) => {
         .eq("quote_id", quoteId)
         .order("sort_order");
 
-      // Get proofs
-      const { data: originalProofs } = await supabase
-        .from("proofs")
-        .select("*")
-        .eq("quote_id", quoteId);
+      // Per client spec ("when a quote is copied it should just copy the quote
+      // itself nothing else"), do NOT carry proof history forward — proofs
+      // hold artwork approval state (approved/declined, customer signatures,
+      // version history) that doesn't make sense for a brand-new draft quote.
 
       // Generate new quote number
       const { data: quoteNumber } = await supabase.rpc("generate_quote_number", {
@@ -302,10 +301,8 @@ Deno.serve(async (req: Request) => {
 
       // Duplicate imprints with ALL fields
       if (originalImprints && originalImprints.length > 0) {
-        const imprintIdMap = new Map();
-
         for (const imprint of originalImprints) {
-          const { data: newImprint, error: imprintError } = await supabase
+          await supabase
             .from("quote_imprints")
             .insert([{
               quote_id: newQuote.id,
@@ -327,89 +324,10 @@ Deno.serve(async (req: Request) => {
               artwork_url: imprint.artwork_url,
               artwork_images: imprint.artwork_images,
               garment_images: imprint.garment_images,
-            }])
-            .select()
-            .single();
-
-          if (!imprintError && newImprint) {
-            imprintIdMap.set(imprint.id, newImprint.id);
-          }
+            }]);
         }
-
-        // Duplicate proofs with ALL fields
-        if (originalProofs && originalProofs.length > 0) {
-          for (const proof of originalProofs) {
-            const newImprintId = proof.imprint_id ? imprintIdMap.get(proof.imprint_id) : null;
-
-            const { data: newProof, error: proofError } = await supabase
-              .from("proofs")
-              .insert([{
-                company_id: profile.company_id,
-                quote_id: newQuote.id,
-                line_item_id: proof.line_item_id,
-                customer_id: proof.customer_id,
-                imprint_id: newImprintId,
-                proof_number: proof.proof_number,
-                proof_version: proof.proof_version,
-                garment_image_url: proof.garment_image_url,
-                garment_name: proof.garment_name,
-                garment_brand: proof.garment_brand,
-                garment_description: proof.garment_description,
-                print_width: proof.print_width,
-                print_height: proof.print_height,
-                print_depth: proof.print_depth,
-                print_unit: proof.print_unit,
-                status: "pending",
-                notes: proof.notes,
-                created_by: user.id,
-                composite_image_url: proof.composite_image_url,
-                type_of_work: proof.type_of_work,
-                decoration_location_id: proof.decoration_location_id,
-                pricing_matrix_id: proof.pricing_matrix_id,
-                pricing_matrix_column: proof.pricing_matrix_column,
-                imprint_unit_price: proof.imprint_unit_price,
-                imprint_setup_fee: proof.imprint_setup_fee,
-                group_label: proof.group_label,
-                selected_colors: proof.selected_colors,
-              }])
-              .select()
-              .single();
-
-            if (!proofError && newProof && proof.id) {
-              // Duplicate proof artwork
-              const { data: originalArtwork } = await supabase
-                .from("proof_artwork")
-                .select("*")
-                .eq("proof_id", proof.id);
-
-              if (originalArtwork && originalArtwork.length > 0) {
-                const newArtwork = originalArtwork.map((art: any) => ({
-                  proof_id: newProof.id,
-                  company_id: profile.company_id,
-                  imprint_id: newImprintId,
-                  artwork_url: art.artwork_url,
-                  artwork_name: art.artwork_name,
-                  artwork_version: art.artwork_version,
-                  file_type: art.file_type,
-                  file_size: art.file_size,
-                  position_x: art.position_x,
-                  position_y: art.position_y,
-                  scale: art.scale,
-                  rotation: art.rotation,
-                  customer_artwork_id: art.customer_artwork_id,
-                  print_location: art.print_location,
-                  width_inches: art.width_inches,
-                  height_inches: art.height_inches,
-                  sort_order: art.sort_order,
-                }));
-
-                await supabase
-                  .from("proof_artwork")
-                  .insert(newArtwork);
-              }
-            }
-          }
-        }
+        // Note: proofs and proof_artwork are intentionally NOT copied — see
+        // comment near the originalImprints fetch above.
       }
 
       return new Response(
