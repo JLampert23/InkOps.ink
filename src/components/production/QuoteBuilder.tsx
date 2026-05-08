@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw, ArrowLeft, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -314,6 +314,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Unsaved-changes guard. The tracker useEffect (further down) flips
+  // hasUnsavedChanges to true whenever a tracked field changes; loadQuote
+  // and successful saves reset it. The ref skips one tracker cycle when
+  // we hydrate state from DB, so a fresh load isn't seen as user edits.
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
+  const skipDirtyCheckRef = useRef(true);
+
   const createDraftQuote = async () => {
     if (!user || draftCreatedRef.current) return;
 
@@ -406,6 +414,26 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       loadCustomerContacts(selectedCustomerId);
     }
   }, [selectedCustomerId, quoteId]);
+
+  // Mark dirty whenever any tracked user-editable field changes. The first
+  // run is skipped (mount + hydration). loadQuote and successful saves
+  // re-arm skipDirtyCheckRef so their setState cascades don't false-positive.
+  useEffect(() => {
+    if (skipDirtyCheckRef.current) {
+      skipDirtyCheckRef.current = false;
+      return;
+    }
+    setHasUnsavedChanges(true);
+  }, [
+    selectedCustomerId, selectedContactId,
+    quoteNumber, quoteStatus, createdDate, productionDueDate, customerDueDate,
+    terms, poNumber, deliveryMethod, nickname, productionNotes,
+    billCompany, billName, billFirstName, billLastName,
+    billAddress1, billAddress2, billCity, billState, billZip,
+    shipCompany, shipName, shipAddress1, shipAddress2, shipCity, shipState, shipZip,
+    itemGroups, fees, discount, discountType, salesTaxRate,
+    quoteImprints,
+  ]);
 
 
 
@@ -805,6 +833,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       });
     }
 
+    // Loaded data from DB — clean baseline, no unsaved changes yet.
+    skipDirtyCheckRef.current = true;
+    setHasUnsavedChanges(false);
     setLoading(false);
   };
 
@@ -2252,12 +2283,18 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   };
 
   const handleSave = async () => {
-    await performSave(false);
+    const success = await performSave(false);
+    if (success) {
+      skipDirtyCheckRef.current = true;
+      setHasUnsavedChanges(false);
+    }
   };
 
   const handleSaveAndClose = async () => {
     const success = await performSave(false);
     if (success) {
+      skipDirtyCheckRef.current = true;
+      setHasUnsavedChanges(false);
       onSave?.();
     }
   };
@@ -2275,8 +2312,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     }
   };
 
-  const handleCancel = async () => {
-    // Check if quote has any meaningful data
+  // Cleanup + navigate away. Splitting this out so the unsaved-changes modal
+  // can call it on the "Continue without saving" path.
+  const proceedWithCancel = async () => {
     const hasLineItems = itemGroups.some(group => group.items.length > 0);
     const hasFees = fees.length > 0;
     const hasCustomer = !!selectedCustomerId;
@@ -2285,10 +2323,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
     const isEmpty = !hasLineItems && !hasFees && !hasCustomer && !hasNotes && !hasImprints;
 
-    // If we created a draft quote and it's still empty, delete it
     if (quoteId && isEmpty && draftCreatedRef.current) {
       try {
-        // Delete the empty draft quote and related records
         await supabase.from('quote_line_items').delete().eq('quote_id', quoteId);
         await supabase.from('quote_fees').delete().eq('quote_id', quoteId);
         await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
@@ -2307,6 +2343,33 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     }
 
     onCancel?.();
+  };
+
+  const handleCancel = async () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedChangesModal(true);
+      return;
+    }
+    await proceedWithCancel();
+  };
+
+  const handleUnsavedSave = async () => {
+    setShowUnsavedChangesModal(false);
+    const success = await performSave(false);
+    if (success) {
+      skipDirtyCheckRef.current = true;
+      setHasUnsavedChanges(false);
+      onSave?.();
+    }
+  };
+
+  const handleUnsavedDiscard = async () => {
+    setShowUnsavedChangesModal(false);
+    await proceedWithCancel();
+  };
+
+  const handleUnsavedKeepEditing = () => {
+    setShowUnsavedChangesModal(false);
   };
 
   if (loading) {
@@ -3548,6 +3611,51 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           </div>
         );
       })()}
+
+      {/* Unsaved Changes Modal — fires from handleCancel when hasUnsavedChanges */}
+      {showUnsavedChangesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    You have unsaved changes
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Are you sure you want to continue without saving?
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 p-4 border-t border-gray-200 dark:border-slate-700">
+              <button
+                onClick={handleUnsavedKeepEditing}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded hover:bg-gray-50 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUnsavedDiscard}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 rounded disabled:opacity-50"
+              >
+                Continue without saving
+              </button>
+              <button
+                onClick={handleUnsavedSave}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
