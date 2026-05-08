@@ -2336,13 +2336,30 @@ export default function MockupGenerator({
                                     className="relative group"
                                   >
                                     <div
-                                      onClick={() => {
+                                      onClick={async () => {
+                                        // New format: object with proof_id — load directly.
                                         if (mockupProofId) {
                                           loadExistingProof(mockupProofId);
+                                          return;
+                                        }
+                                        // Legacy format: plain string URL with no proof_id linkage.
+                                        // Try to recover the proof by matching the composite_image_url.
+                                        if (mockupUrl && companyId) {
+                                          const { data: matchingProof } = await supabase
+                                            .from('proofs')
+                                            .select('id')
+                                            .eq('composite_image_url', mockupUrl)
+                                            .eq('company_id', companyId)
+                                            .maybeSingle();
+                                          if (matchingProof?.id) {
+                                            loadExistingProof(matchingProof.id);
+                                          } else {
+                                            console.warn('MockupGenerator: legacy mockup has no matching proof record, cannot edit:', mockupUrl);
+                                          }
                                         }
                                       }}
                                       className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-400 dark:border-green-500 overflow-hidden cursor-pointer hover:border-green-500 dark:hover:border-green-400 transition-colors"
-                                      title={mockupProofId ? "Click to edit mockup" : "Mockup preview"}
+                                      title="Click to edit mockup"
                                     >
                                       <img
                                         src={mockupUrl}
