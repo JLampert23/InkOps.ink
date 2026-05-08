@@ -133,22 +133,26 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
               </div>
             ) : (
               <>
-                {/* Type of Work Dropdown */}
-                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Type of Work
-                  </label>
-                  <select
-                    value={schedulerType}
-                    onChange={(e) => setSelectedScheduleType(e.target.value)}
-                    className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                  >
-                    {typesOfWork.map((type) => (
-                      <option key={type.id} value={type.work_type_name}>
-                        {type.work_type_name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Type of Work — visible tabs along the top (per client spec, replaces dropdown) */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+                  <div className="flex overflow-x-auto border-b border-gray-200 dark:border-slate-700">
+                    {typesOfWork.map((type) => {
+                      const isActive = schedulerType === type.work_type_name;
+                      return (
+                        <button
+                          key={type.id}
+                          onClick={() => setSelectedScheduleType(type.work_type_name)}
+                          className={`px-6 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
+                            isActive
+                              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                          }`}
+                        >
+                          {type.work_type_name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Selected Schedule */}
@@ -170,23 +174,36 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
               </div>
             ) : (
               <>
-                {/* Type of Work Dropdown */}
-                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Type of Work
-                  </label>
-                  <select
-                    value={selectedScheduleType}
-                    onChange={(e) => setSelectedScheduleType(e.target.value)}
-                    className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                  >
-                    <option value="all">View All</option>
-                    {typesOfWork.map((type) => (
-                      <option key={type.id} value={type.work_type_name}>
-                        {type.work_type_name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Type of Work — visible tabs along the top (per client spec, replaces dropdown) */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+                  <div className="flex overflow-x-auto border-b border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setSelectedScheduleType('all')}
+                      className={`px-6 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
+                        selectedScheduleType === 'all'
+                          ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                      }`}
+                    >
+                      View All
+                    </button>
+                    {typesOfWork.map((type) => {
+                      const isActive = selectedScheduleType === type.work_type_name;
+                      return (
+                        <button
+                          key={type.id}
+                          onClick={() => setSelectedScheduleType(type.work_type_name)}
+                          className={`px-6 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
+                            isActive
+                              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                          }`}
+                        >
+                          {type.work_type_name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Kanban Calendar Full Screen */}
