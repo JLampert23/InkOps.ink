@@ -396,13 +396,16 @@ function AppContent() {
     },
   ];
 
-  const squareNavItems = [
-    {
-      id: 'square' as Tab,
-      name: 'Square Dashboard',
-      icon: CreditCard,
-      description: 'Square transactions & reports'
-    },
+  // Square Dashboard hidden per client request (2026-05-08). Source files
+  // and route handler are intact so we can re-enable by uncommenting the
+  // entry below.
+  const squareNavItems: Array<{ id: Tab; name: string; icon: typeof CreditCard; description: string }> = [
+    // {
+    //   id: 'square' as Tab,
+    //   name: 'Square Dashboard',
+    //   icon: CreditCard,
+    //   description: 'Square transactions & reports'
+    // },
   ];
 
   const productionNavItems = [
