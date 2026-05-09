@@ -88,40 +88,133 @@ End-to-end verification: 3 re-queued automation_queue entries flipped to `status
 ## Items confirmed and ready to build
 
 ### [3.1-A] Quote + Artwork Approval Flow ⭐ BIGGEST
-**Status:** ⬜ Not started | **Files:** `quote-approval/`, `quote-actions/`, `PublicQuoteApproval.tsx`, `QuoteDetail.tsx`
+**Status:** 📐 Design locked, awaiting client answers on 4 open questions before code | **Files:** `quote-approval/`, `quote-actions/`, `PublicQuoteApproval.tsx`, `QuoteDetail.tsx`
+**Estimated effort:** 3–4 days (code + tests + design refinement + manual validation)
 
 **Confirmed flow (from Jamie's doc + chat reply):**
 - Customer approves quote → artwork section unlocks (only if artwork exists on quote)
 - Customer declines quote → artwork section stays locked
-- No artwork on quote → artwork approval section grayed out / hidden
+- No artwork on quote → artwork approval section grayed out / hidden (`artwork_approval_status='not_applicable'`)
 - Customer declines artwork → admin sees "Resend for Artwork Approval" button on QuoteDetail
 - **Change request flow:** customer requests changes off-platform → admin (user) edits the quote in QuoteBuilder → admin manually re-sends for approval → on re-approval, the existing **work order, scheduler entry, AND invoice all UPDATE in place** (not new ones)
 
 **DB changes:**
 ```sql
-ALTER TABLE quotes ADD COLUMN IF NOT EXISTS artwork_approval_status text DEFAULT 'pending';
--- values: 'not_applicable' | 'pending' | 'sent' | 'approved' | 'declined'
-ALTER TABLE quotes ADD COLUMN IF NOT EXISTS artwork_approval_sent_at timestamptz;
-ALTER TABLE quotes ADD COLUMN IF NOT EXISTS artwork_approved_at timestamptz;
-ALTER TABLE quotes ADD COLUMN IF NOT EXISTS artwork_declined_at timestamptz;
-ALTER TABLE quotes ADD COLUMN IF NOT EXISTS artwork_decline_reason text;
+ALTER TABLE quotes
+  ADD COLUMN IF NOT EXISTS artwork_approval_status text DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS artwork_approval_sent_at timestamptz,
+  ADD COLUMN IF NOT EXISTS artwork_approved_at timestamptz,
+  ADD COLUMN IF NOT EXISTS artwork_declined_at timestamptz,
+  ADD COLUMN IF NOT EXISTS artwork_decline_reason text;
+-- artwork_approval_status values: 'not_applicable' | 'pending' | 'sent' | 'approved' | 'declined'
 ```
+
+**State machine:**
+```
+quote sent → has artwork? → no → status='not_applicable' (done)
+                          → yes → status='pending'
+   ↓
+customer approves quote → UI unlocks artwork section, status stays 'pending'
+   ↓
+   ├── customer approves artwork → status='approved', artwork_approved_at=now
+   └── customer declines artwork → status='declined', artwork_declined_at=now,
+                                    artwork_decline_reason=text (optional)
+                                    ↓
+                                    admin clicks "Resend for Artwork Approval"
+                                    ↓
+                                    status='pending', clear declined_at, send fresh email
+```
+
+**Code changes:**
+| File | What changes |
+|------|--------------|
+| Migration | DB columns above |
+| `supabase/functions/quote-approval/index.ts` (GET) | Return `artwork_approval_status`, `artwork_decline_reason`, mockup composite image URLs in payload. |
+| `supabase/functions/quote-approval/index.ts` (POST) | New action types: `approve_artwork`, `decline_artwork`. Validate `quote.status='approved'` before allowing artwork actions. Update quote columns. |
+| `supabase/functions/quote-actions/index.ts` (`approve` action) | **CRITICAL CHANGE**: detect if quote already has WO/scheduler entries/invoice. If yes, UPDATE existing instead of INSERT new. If no, current INSERT path. |
+| `supabase/functions/quote-actions/index.ts` (`resend_artwork_approval` NEW action) | Reset `artwork_approval_status='pending'`, clear `artwork_declined_at`, send approval email. |
+| `src/components/production/PublicQuoteApproval.tsx` (customer-facing) | Add Artwork Approval section. Locked until quote approved. Shows mockup composite. Approve / Decline buttons. Decline reason textarea (optional). |
+| `src/components/production/QuoteDetail.tsx` (admin) | Add artwork status badge near header. If declined, show reason + "Resend for Artwork Approval" button. Timeline of approval events. |
+
+**Re-approval cascade pseudocode (the risky part):**
+```typescript
+// In quote-actions/approve action
+const existingWO = await supabase.from('work_orders')
+  .select('id').eq('quote_id', quoteId).maybeSingle();
+
+if (existingWO) {
+  // RE-APPROVAL PATH — update existing
+  await updateWorkOrderFromQuote(existingWO.id, quote, lineItems, imprints);
+  await replaceSchedulerEntriesForQuote(existingWO.id, imprints); // delete+recreate, simpler
+  await updateInvoiceFromQuote(quote.id, lineItems, fees);
+} else {
+  // FIRST APPROVAL — current INSERT path
+  await createWorkOrder(...);
+  await createSchedulerEntries(...);
+  await createInvoice(...);
+}
+```
+
+**Open questions sent to Jamie (2026-05-08) — defaults will apply if no reply:**
+1. Decline reason required or optional? *(defaulting to optional)*
+2. Artwork approval same page as quote approval, or separate link? *(defaulting to same page, locked until approved)*
+3. Multi-imprint: approve together or separately? *(defaulting to together)*
+4. WO in production at edit time: block or warn? *(defaulting to warn with confirm dialog)*
+
+**Integration test plan (mandatory before merge to prod):**
+- `scripts/verify-quote-artwork-flow-happy-path.ts` — create test quote with artwork → send → approve quote → assert artwork unlocks → approve artwork → assert state transitions.
+- `scripts/verify-artwork-decline-resend-flow.ts` — approve quote → decline artwork with reason → admin resend → re-approve → assert all state transitions.
+- `scripts/verify-reapproval-cascade.ts` — approve → WO+scheduler+invoice created → admin edits → re-send → re-approve → assert SAME ids updated. **Most important test.**
+- `scripts/verify-no-artwork-flow.ts` — quote without artwork → approve → assert artwork status='not_applicable' and no artwork UI shown.
 
 ---
 
 ### [3.1-B] Auto Payment Link — 50% minimum, balance on Complete
-**Status:** ⬜ Not started | **Files:** `quote-actions/`, `billing-service.ts`, `stripe-proxy/`, `CompanySettings.tsx`
+**Status:** 📐 Design locked, awaiting client answer on 1 open question before code | **Files:** `quote-actions/`, `billing-service.ts`, `stripe-proxy/`, `create-payment-link/` (new), `stripe-webhook/`, `CompanySettings.tsx`, `InvoiceDetail.tsx`
+**Estimated effort:** 1.5–2 days (code + tests + manual validation)
 
 **Confirmed flow (from Jamie's chat reply #5):**
 - After quote approval + invoice creation, automatically send payment link to customer
-- Payment link is **minimum 50%** — customer can enter ANY amount ≥ 50% if they want to pay more (e.g. full upfront)
-- On work order status = "COMPLETE" (the existing PRODUCTION COMPLETE automation), an automation rule fires the **second payment link** for the remaining balance
+- Payment link is **minimum 50%** — customer can enter ANY amount ≥ 50% (Stripe handles via `custom_unit_amount.minimum`)
+- On work order status = "COMPLETE" (existing PRODUCTION COMPLETE automation), automation rule fires the **second payment link** for the remaining balance
 
 **DB changes:**
 ```sql
-ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS auto_send_payment_link boolean DEFAULT false;
-ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS minimum_deposit_percent integer DEFAULT 50;
+ALTER TABLE company_settings
+  ADD COLUMN IF NOT EXISTS auto_send_payment_link boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS minimum_deposit_percent integer DEFAULT 50;
+
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS deposit_payment_link_id text,
+  ADD COLUMN IF NOT EXISTS deposit_payment_link_url text,
+  ADD COLUMN IF NOT EXISTS balance_payment_link_id text,
+  ADD COLUMN IF NOT EXISTS balance_payment_link_url text;
 ```
+
+**Code changes:**
+| File | What changes |
+|------|--------------|
+| Migration | DB columns above |
+| `supabase/functions/create-payment-link/index.ts` (NEW) | Stripe Payment Link API call with `custom_unit_amount.minimum = total * minPct/100` and `preset = same`. Returns `{ id, url }`. Uses encrypted Stripe key per company. |
+| `supabase/functions/quote-actions/index.ts` (`approve` action) | After invoice created: if `company_settings.auto_send_payment_link=true`, call create-payment-link for the deposit, save link id+url on invoice, send email with link. |
+| `supabase/functions/process-automation-queue/index.ts` (new action OR piggyback `send_message`) | Action triggered on `work_order_invoice_status_changed='COMPLETE'`. Calculates remaining balance, generates second payment link, emails customer. |
+| `supabase/functions/stripe-webhook/index.ts` | Add handling for `checkout.session.completed` from payment links (since payment links don't fire `invoice.paid` directly). Records payment in `payments` table. |
+| `src/components/settings/CompanySettings.tsx` | Toggle for `auto_send_payment_link`, numeric input for `minimum_deposit_percent`. |
+| `src/services/billing-service.ts` | Helper `outstanding_balance(invoice_id) = invoice.total - sum(payments.where(status='succeeded').amount)`. |
+| `src/components/billing/InvoiceDetail.tsx` | Show payment link status badges (Deposit Sent / Deposit Paid / Balance Sent / Paid in Full). |
+
+**Edge case logic:**
+- Customer pays 100% via deposit link → `outstanding_balance(invoice) = 0` → skip second link on Complete trigger.
+- Refunds — already handled in `stripe-refund/`. `outstanding_balance` always reads current `payments` state, so a refund automatically unhides the balance link path.
+- Tax — open question (see below).
+
+**Open question sent to Jamie (2026-05-08) — default applies if no reply:**
+1. Deposit % calculated **before tax** or **after tax (total)**? *(defaulting to after tax — % of grand total)*
+
+**Integration test plan (write before merge to prod):**
+- `scripts/verify-deposit-link-flow.ts` — create test quote → approve via quote-actions → assert invoice has `deposit_payment_link_url` → simulate Stripe webhook for partial payment → assert `payments` row created → assert `outstanding_balance` updated.
+- `scripts/verify-balance-link-flow.ts` — load fixture invoice with deposit paid → mark linked WO `COMPLETE` → assert automation_queue entry → assert `balance_payment_link_url` populated and emailed.
+- Run both against the dev Supabase project (Stripe in test mode).
 
 ---
 
@@ -239,6 +332,18 @@ npx supabase functions deploy quote-actions --project-ref cuaukcvccxvfpuxaciac
 **Scope:** full debug + feature build — customers can store payment info properly, see all open/unpaid invoices, view past quotes, proofs, paid invoices, contacts.
 **Files:** `portal-data/`, `portal-payment/`, `portal-proof-approval/`, `customer-payment-methods/`, `CustomerPortalPage.tsx`.
 
+### [3.2-G] Admin subscription oversight dashboard
+**Status:** ⬜ Not started — added by us (not in Jamie's doc, but operational need).
+**Scope:** dashboard for the platform admin (you) to:
+- See all users' subscription tiers and statuses
+- Manually upgrade / downgrade / cancel any user's subscription
+- Track monthly Stripe revenue (total + per-tier breakdown)
+- Toggle beta-tester flag on individual users (overlaps with [3.2-B])
+**Files:** new admin page (e.g. `src/components/admin/SubscriptionAdmin.tsx`), Stripe revenue query via `stripe-proxy`, RLS guard requiring `super_admin` role.
+**Note:** keep this scoped to YOU running the platform — not customer-facing. Hide behind super_admin role check.
+
+---
+
 ### [3.2-F] Customer portal branding — company logo
 **Status:** ⬜ Not started — confirmed scope.
 **Source:** Jamie's chat reply: *"I want the portal to have the company name so the customers portal that are my customers should see a todds logo"*
@@ -247,12 +352,41 @@ npx supabase functions deploy quote-actions --project-ref cuaukcvccxvfpuxaciac
 
 ---
 
+# 🐛 Bugs found by Jamie during dev validation (2026-05-08)
+
+### Email spam — every step status change firing email ✅ FIXED
+**Status:** ✅ Pushed to prod (commit `d22395d` on 2026-05-09).
+**Root cause:** old client-side code in `ProductionScheduler.tsx` was calling `supabase.rpc('queue_matching_automations', ...)` on every step change, ignoring `trigger_config.status_name` filter. Was masked by JWT bugs silently failing emails — once JWT fixed, over-firing started actually delivering. Removed the client-side enqueue. DB trigger from May 7 already enqueues correctly with target-status filter.
+
+### QTE-0059 group order swaps between Quote Viewer and Quote Builder
+**Status:** 🟡 Built locally on dev (uncommitted). Awaiting Jamie validation on QTE-0059 specifically.
+**File:** `src/components/production/QuoteDetail.tsx`
+**Root cause:** QuoteDetail sorted line items by `created_at`, QuoteBuilder by `sort_order`. The former ignores user-controlled ordering set when reordering groups in the editor.
+**Fix:** changed QuoteDetail's query to `.order('sort_order', { ascending: true })` to match QuoteBuilder. Both views now derive group order from the same column the user controls.
+
+---
+
+# 📋 Jamie's May 8 follow-up requests (validation feedback)
+
+| Item | Original status | Follow-up needed |
+|------|----------------|------------------|
+| BUG-2 Stock Status colors | ✅ on prod | 🔴 Hook "marked ordered" → check-in module workflow (partial check-in = yellow, full = green) |
+| WO list tabs | ✅ on prod | 🟡 Remove 4 stat cards above table (built on dev, uncommitted) |
+| QuoteBuilder unsaved-changes modal | ✅ on prod (cancel button only) | 🟡 Extended on dev — same modal now fires from in-app nav clicks (sidebar tabs, sub-tabs, customers link, settings) via NavigationGuardContext + browser-level via beforeunload. Awaiting Jamie validation. |
+| Scheduler / Kanban tabs | ✅ on prod | None — fully approved |
+| Mockup click-to-edit | ✅ on prod | None — fully approved |
+| Copy Quote | ✅ on prod | None — fully approved |
+| Square hidden | ✅ on prod | None — fully approved |
+
+---
+
 # 🆕 New asks from chat (not in original docs)
 
-### Customer portal link still broken per individual customer
-**Status:** ⏳ Awaiting repro details.
-**Background:** commit `b0c7013` was supposed to generate a unique token per customer when admin clicks Copy Link. Jamie says it's still not working.
-**Open question sent:** what does he see — same link for every customer, error message, broken URL? Which customer did he test? Screenshot if possible.
+### Customer portal link still broken per individual customer ✅ FIXED
+**Status:** ✅ Fixed + deployed (2026-05-09). No client repro needed — root cause was visible in code.
+**Root cause:** the `EditCustomerModal` "Copy Portal Link" button was already fixed (uses `create_portal_session_by_customer_id` RPC). But the SEPARATE "Send Welcome Email" button in the same modal triggered the `send-customer-portal-welcome` edge function, which was still calling the OLD `create_portal_session(p_email)` RPC. That older RPC has a documented bug (see migration `20260430120000`): when two customers share an email or when `customers.email` is empty (address only on the primary contact), the email-based lookup picks the wrong customer or the same customer for everybody. Result: every welcome email got a token tied to the wrong customer.
+**Fix:** swapped the RPC call in `send-customer-portal-welcome/index.ts` to `create_portal_session_by_customer_id(p_customer_id)` — the customer UUID is already in the request body. Same return shape, no other changes. Deployed.
+**Note:** `send-magic-link/index.ts` still uses the old RPC, but that's customer-self-initiated (only email available, no customer_id). Different problem — would require a "which account?" UX picker. Left for later.
 
 ### Square dashboard — HIDE the UI (soft remove)
 **Status:** ⬜ Not started — confirmed scope.
