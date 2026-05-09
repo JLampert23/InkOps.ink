@@ -380,40 +380,13 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       [stepId]: newStatus,
     };
 
-    // Update the database first
+    // Update the database. The DB trigger
+    // `enqueue_scheduler_step_status_automation` (added 2026-05-07) handles
+    // the automation enqueue with proper trigger_config.status_name filtering,
+    // so we don't enqueue from the client. The previous client-side call to
+    // `queue_matching_automations` here ignored trigger_config and fired an
+    // email on every status change — see chat 2026-05-08, removed for that.
     await updateEntry(entryId, { step_statuses: updatedStatuses });
-
-    // Trigger automation if companyId exists
-    if (companyId) {
-      try {
-        console.log('Queuing automation for work step status change:', { stepId, newStatus });
-        
-        // Use the database function to find all matching automations and queue them
-        // This is better than direct insert because it handles the logic of matching rules
-        const { error: rpcError } = await supabase.rpc('queue_matching_automations', {
-          p_company_id: companyId,
-          p_trigger_type: 'work_step_status_changed',
-          p_trigger_data: {
-            step_name: stepId,
-            status: newStatus,
-            quote_id: entry.quote_id,
-            work_order_id: entry.work_order_id,
-            quote_number: entry.quote_number,
-            customer_name: entry.customer_name,
-            type_of_work: entry.type_of_work,
-            station: entry.station,
-            imprint_number: entry.imprint_number,
-            quantity: entry.quantity,
-            new_status: newStatus, // added for compatibility with standard conditions
-            changed_at: new Date().toISOString()
-          }
-        });
-
-        if (rpcError) throw rpcError;
-      } catch (err) {
-        console.error('Failed to trigger automation:', err);
-      }
-    }
 
     setEditingCell(null);
   };
