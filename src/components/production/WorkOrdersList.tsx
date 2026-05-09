@@ -133,10 +133,8 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
   });
 
   const stats = {
-    total: workOrders.length,
     inProduction: workOrders.filter(wo => wo.status !== 'Completed').length,
     completed: workOrders.filter(wo => wo.status === 'Completed').length,
-    overdue: workOrders.filter(wo => isOverdue(wo.production_due_date) && wo.status !== 'Completed').length,
   };
 
   return (
@@ -155,25 +153,6 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Refresh</span>
         </button>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Orders</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.inProduction}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">In Production</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.completed}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.overdue}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Overdue</div>
-        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
