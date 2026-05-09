@@ -82,9 +82,13 @@ Deno.serve(async (req: Request) => {
       throw new Error("Company settings not found");
     }
 
-    // Generate magic link token for password setup
-    const result = await supabase.rpc("create_portal_session", {
-      p_email: email.toLowerCase().trim()
+    // Generate magic link token for password setup. Use the by-customer-id
+    // RPC because we already have the customer UUID from the request — the
+    // by-email RPC has a documented bug where it picks the wrong customer if
+    // two share an email (or customers.email is empty and the address lives
+    // on the primary contact). See migration 20260430120000.
+    const result = await supabase.rpc("create_portal_session_by_customer_id", {
+      p_customer_id: customerId
     });
 
     if (result.error) {
