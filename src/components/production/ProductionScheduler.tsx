@@ -197,13 +197,17 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       // ── Enrich: Stock Status + Art Status ────────────────────────────────
       const uniqueQuoteIds = [...new Set(entriesData.map((e: any) => e.quote_id).filter(Boolean))] as string[];
       if (uniqueQuoteIds.length > 0) {
-        // Staging: determine if garments are ordered / partially ordered
+        // Staging: ordering progress + non-PO receipts (Path C, 2026-05-09).
+        // quantity_received here covers items the user marked Ordered without
+        // a formal PO and then checked in via the Receiving Dashboard's
+        // Quick Receive flow. Together with PO-backed receipts below we get
+        // the true received total per quote.
         const { data: stagingRows } = await supabase
           .from('garment_requirements_staging')
-          .select('quote_id, is_ordered, total_quantity')
+          .select('quote_id, is_ordered, total_quantity, quantity_received')
           .in('quote_id', uniqueQuoteIds);
 
-        // PO receiving: check how many units received per quote
+        // PO receiving: check how many units received per quote (PO path)
         const { data: poReceived } = await supabase
           .from('purchase_order_line_items')
           .select('quantity_received, purchase_orders!inner(quote_id)')
@@ -216,33 +220,50 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
           .select('id, artwork_approval_status')
           .in('id', uniqueQuoteIds);
 
-        // Build stock_status per quote
+        // Build stock_status per quote.
+        // Semantics per client spec (2026-05-08):
+        //   red   = ordered  (marked ordered, no receipts yet)
+        //   yellow = partial (some units received, not all)
+        //   green = received (all units received)
+        // Pre-spec the "partial" state used to mean partial-ordering. Now it
+        // means partial RECEIPT, which is what the colors are supposed to
+        // signal to the floor.
         const stockMap = new Map<string, 'none' | 'ordered' | 'partial' | 'received'>();
         if (stagingRows && stagingRows.length > 0) {
-          const byQuote = new Map<string, { ordered: number; total: number; needed: number }>();
+          const byQuote = new Map<string, { ordered: number; total: number; needed: number; stagingReceived: number }>();
           stagingRows.forEach((s: any) => {
-            if (!byQuote.has(s.quote_id)) byQuote.set(s.quote_id, { ordered: 0, total: 0, needed: 0 });
+            if (!byQuote.has(s.quote_id)) {
+              byQuote.set(s.quote_id, { ordered: 0, total: 0, needed: 0, stagingReceived: 0 });
+            }
             const q = byQuote.get(s.quote_id)!;
             if (s.is_ordered) q.ordered += 1;
             q.total += 1;
             q.needed += s.total_quantity || 0;
+            q.stagingReceived += s.quantity_received || 0;
           });
 
-          // Add received quantities
-          const receivedByQuote = new Map<string, number>();
+          // PO-backed receipts per quote
+          const poReceivedByQuote = new Map<string, number>();
           poReceived?.forEach((r: any) => {
             const qid = r.purchase_orders?.quote_id;
-            if (qid) receivedByQuote.set(qid, (receivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
+            if (qid) poReceivedByQuote.set(qid, (poReceivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
           });
 
           byQuote.forEach((val, qid) => {
-            const received = receivedByQuote.get(qid) || 0;
-            if (val.needed > 0 && received >= val.needed) {
-              stockMap.set(qid, 'received');
-            } else if (val.ordered === val.total && val.total > 0) {
+            const totalReceived = val.stagingReceived + (poReceivedByQuote.get(qid) || 0);
+            const allOrdered = val.ordered === val.total && val.total > 0;
+            const someOrdered = val.ordered > 0;
+
+            if (val.needed > 0 && totalReceived >= val.needed) {
+              stockMap.set(qid, 'received');     // green — fully checked in
+            } else if (totalReceived > 0) {
+              stockMap.set(qid, 'partial');       // yellow — some checked in
+            } else if (allOrdered) {
+              stockMap.set(qid, 'ordered');       // red — ordered, none received yet
+            } else if (someOrdered) {
+              // Partial ordering with no receipts — still effectively waiting
+              // to be ordered, surface as "ordered" red so it's visible.
               stockMap.set(qid, 'ordered');
-            } else if (val.ordered > 0) {
-              stockMap.set(qid, 'partial');
             } else {
               stockMap.set(qid, 'none');
             }

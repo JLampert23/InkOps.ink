@@ -32,11 +32,34 @@ interface ReceivingDashboardProps {
   onViewPO: (poId: string) => void;
 }
 
+interface MarkedOrderedItem {
+  id: string;
+  quote_id: string;
+  work_order_id: string | null;
+  style_number: string | null;
+  style_name: string | null;
+  color: string | null;
+  total_quantity: number;
+  quantity_received: number;
+  ordered_at: string | null;
+  supplier_name: string | null;
+  customer_name?: string;
+  quote_number?: string;
+}
+
 export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboardProps) {
   const [closedPOs, setClosedPOs] = useState<PurchaseOrder[]>([]);
   const [overduePOs, setOverduePOs] = useState<PurchaseOrder[]>([]);
   const [openPOs, setOpenPOs] = useState<PurchaseOrder[]>([]);
   const [recentReceiving, setRecentReceiving] = useState<any[]>([]);
+  // Items the user marked Ordered in Garment Order Report but never built
+  // into a formal PO. Surface them here so the user has one place to
+  // record receipts. (Path C from the 2026-05-08 client decision.)
+  const [markedOrderedItems, setMarkedOrderedItems] = useState<MarkedOrderedItem[]>([]);
+  // Per-row in-progress qty input for the Quick Receive form. Keyed by
+  // staging row id so each row's input is independent.
+  const [receiveQtyDraft, setReceiveQtyDraft] = useState<Record<string, string>>({});
+  const [savingReceive, setSavingReceive] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +97,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         loadOverduePOs(profile.company_id),
         loadOpenPOs(profile.company_id),
         loadRecentReceiving(profile.company_id),
+        loadMarkedOrderedItems(profile.company_id),
       ]);
     } catch (error) {
       console.error('Error loading receiving dashboard:', error);
@@ -81,6 +105,102 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
     } finally {
       setLoading(false);
     }
+  };
+
+  // Quick Receive: record additional units received against a staging row.
+  // Adds qtyJustReceived to the existing quantity_received and flips
+  // is_received=true once we hit total_quantity. The Stock Status badge in
+  // ProductionScheduler reads from these columns to show partial/received.
+  const handleQuickReceive = async (item: MarkedOrderedItem, qtyJustReceived: number) => {
+    if (qtyJustReceived <= 0) return;
+    setSavingReceive((prev) => ({ ...prev, [item.id]: true }));
+    try {
+      const newReceived = item.quantity_received + qtyJustReceived;
+      const isFullyReceived = newReceived >= item.total_quantity;
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase
+        .from('garment_requirements_staging')
+        .update({
+          quantity_received: newReceived,
+          is_received: isFullyReceived,
+          received_at: new Date().toISOString(),
+          received_by: user?.email || user?.id || null,
+        })
+        .eq('id', item.id);
+
+      if (error) throw error;
+
+      setReceiveQtyDraft((prev) => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+
+      // Reload so fully-received rows drop off the list and partial rows
+      // show the updated counter.
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id || '')
+        .maybeSingle();
+      if (profile?.company_id) {
+        await loadMarkedOrderedItems(profile.company_id);
+      }
+    } catch (err) {
+      console.error('Quick receive failed:', err);
+      alert('Failed to record receipt. Please try again.');
+    } finally {
+      setSavingReceive((prev) => ({ ...prev, [item.id]: false }));
+    }
+  };
+
+  const loadMarkedOrderedItems = async (companyId: string) => {
+    // Items flagged "Ordered" in Garment Order Report that have NOT been
+    // turned into a formal PO and have NOT been fully received yet.
+    // Pulls customer / quote number from the linked quote so the dashboard
+    // row is meaningful at a glance.
+    const { data, error } = await supabase
+      .from('garment_requirements_staging')
+      .select(`
+        id, quote_id, work_order_id,
+        style_number, style_name, color,
+        total_quantity, quantity_received,
+        ordered_at, supplier_name,
+        is_po_created, is_received,
+        quotes!garment_requirements_staging_quote_id_fkey (
+          quote_number,
+          customer_name
+        )
+      `)
+      .eq('company_id', companyId)
+      .eq('is_ordered', true)
+      .eq('is_received', false)
+      .or('is_po_created.is.null,is_po_created.eq.false')
+      .order('ordered_at', { ascending: false, nullsFirst: false });
+
+    if (error) {
+      console.error('Error loading marked-ordered items:', error);
+      setMarkedOrderedItems([]);
+      return;
+    }
+
+    setMarkedOrderedItems(
+      (data || []).map((row: any) => ({
+        id: row.id,
+        quote_id: row.quote_id,
+        work_order_id: row.work_order_id,
+        style_number: row.style_number,
+        style_name: row.style_name,
+        color: row.color,
+        total_quantity: row.total_quantity || 0,
+        quantity_received: row.quantity_received || 0,
+        ordered_at: row.ordered_at,
+        supplier_name: row.supplier_name,
+        customer_name: row.quotes?.customer_name,
+        quote_number: row.quotes?.quote_number,
+      }))
+    );
   };
 
   const loadClosedPOs = async (companyId: string) => {
@@ -404,6 +524,108 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
           </div>
         </div>
       </div>
+
+      {/* Marked Ordered (no PO) — Quick Receive section.
+          Per client 2026-05-08 (Path C): items flagged Ordered in
+          Garment Order Report that don't have a formal PO show up here
+          so the user has one place to receive. */}
+      {markedOrderedItems.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-900/10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                Marked Ordered — Awaiting Check-In
+              </h3>
+              <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 rounded-full">
+                {markedOrderedItems.length}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              From Garment Order Report (no PO)
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-slate-900/50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Customer / Quote</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Style</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Color</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Needed</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Received</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Quick Receive</th>
+                </tr>
+              </thead>
+              <tbody>
+                {markedOrderedItems.map((item) => {
+                  const remaining = Math.max(0, item.total_quantity - item.quantity_received);
+                  const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
+                  const draftValue = receiveQtyDraft[item.id] ?? '';
+                  const draftNum = parseInt(draftValue, 10);
+                  const validDraft = !isNaN(draftNum) && draftNum > 0 && draftNum <= remaining;
+                  return (
+                    <tr key={item.id} className="border-t border-gray-200 dark:border-slate-700">
+                      <td className="px-4 py-2">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {item.customer_name || '—'}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {item.quote_number || '—'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                        <div>{item.style_number || '—'}</div>
+                        {item.style_name && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{item.style_name}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{item.color || '—'}</td>
+                      <td className="px-4 py-2 text-right text-gray-900 dark:text-white">{item.total_quantity}</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={
+                          isPartial
+                            ? 'text-amber-600 dark:text-amber-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300'
+                        }>
+                          {item.quantity_received}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2 justify-end">
+                          <input
+                            type="number"
+                            min="1"
+                            max={remaining}
+                            placeholder={String(remaining)}
+                            value={draftValue}
+                            onChange={(e) =>
+                              setReceiveQtyDraft((prev) => ({ ...prev, [item.id]: e.target.value }))
+                            }
+                            className="w-20 px-2 py-1 text-right text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                          />
+                          <button
+                            onClick={() => {
+                              const qty = parseInt(receiveQtyDraft[item.id] || String(remaining), 10);
+                              if (qty > 0 && qty <= remaining) {
+                                handleQuickReceive(item, qty);
+                              }
+                            }}
+                            disabled={savingReceive[item.id] || (!!draftValue && !validDraft)}
+                            className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {savingReceive[item.id] ? 'Saving...' : 'Receive'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
