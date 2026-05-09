@@ -71,6 +71,12 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const { confirm, prompt } = useConfirmation();
   const { showNotification } = useNotification();
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
+  // T3-A — auto payment link state (2026-05-09). Loaded separately because
+  // invoiceDetailService doesn't surface these columns yet, and a small
+  // direct query keeps the change scoped to this component.
+  const [depositLink, setDepositLink] = useState<{ id: string | null; url: string | null }>({ id: null, url: null });
+  const [balanceLink, setBalanceLink] = useState<{ id: string | null; url: string | null }>({ id: null, url: null });
+  const [linkCopied, setLinkCopied] = useState<'deposit' | 'balance' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
@@ -191,6 +197,26 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         console.log('Raw Data:', data.rawData);
         setInvoice(data);
         setCustomerPhone(data.contact.phone);
+
+        // Pull the auto-payment-link columns directly so we can render
+        // a deposit/balance link section.
+        try {
+          const { data: linkRow } = await supabase
+            .from('printavo_invoices')
+            .select('deposit_payment_link_id, deposit_payment_link_url, balance_payment_link_id, balance_payment_link_url')
+            .eq('id', invoiceId)
+            .maybeSingle();
+          setDepositLink({
+            id: linkRow?.deposit_payment_link_id ?? null,
+            url: linkRow?.deposit_payment_link_url ?? null,
+          });
+          setBalanceLink({
+            id: linkRow?.balance_payment_link_id ?? null,
+            url: linkRow?.balance_payment_link_url ?? null,
+          });
+        } catch (linkErr) {
+          console.warn('Failed to load payment link columns:', linkErr);
+        }
 
         if (data.shippingLabelUrl) {
           setLabelUrl(data.shippingLabelUrl);
@@ -1693,6 +1719,83 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               </div>
             </div>
           </div>
+
+          {/* T3-A — Auto Payment Links section. Renders only when at least
+              one link exists. Deposit link is generated on quote approval
+              when company_settings.auto_send_payment_link is on; balance
+              link is generated when the WO hits Production Complete. */}
+          {(depositLink.url || balanceLink.url) && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                Payment Links
+              </h2>
+              <div className="space-y-3">
+                {depositLink.url && (
+                  <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">Deposit Link</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={depositLink.url}>
+                        {depositLink.url}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={async () => {
+                          if (!depositLink.url) return;
+                          await navigator.clipboard.writeText(depositLink.url);
+                          setLinkCopied('deposit');
+                          setTimeout(() => setLinkCopied(null), 1500);
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded"
+                      >
+                        {linkCopied === 'deposit' ? 'Copied!' : 'Copy'}
+                      </button>
+                      <a
+                        href={depositLink.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-slate-700"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {balanceLink.url && (
+                  <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">Balance Link</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={balanceLink.url}>
+                        {balanceLink.url}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={async () => {
+                          if (!balanceLink.url) return;
+                          await navigator.clipboard.writeText(balanceLink.url);
+                          setLinkCopied('balance');
+                          setTimeout(() => setLinkCopied(null), 1500);
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded"
+                      >
+                        {linkCopied === 'balance' ? 'Copied!' : 'Copy'}
+                      </button>
+                      <a
+                        href={balanceLink.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-slate-700"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Payment History */}
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">

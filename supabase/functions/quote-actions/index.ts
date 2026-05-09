@@ -838,6 +838,81 @@ Deno.serve(async (req: Request) => {
         invoice = newInvoice;
       }
 
+      // T3-A: Auto-create a deposit payment link if the company has the
+      // setting enabled. Customer can pay any amount >= minimum_deposit_percent
+      // of the invoice total (after tax). Link id+url stored on the invoice
+      // row so the UI can show / copy it; webhook records actual payments.
+      // Skip if a deposit link already exists (e.g. re-running approval).
+      try {
+        if (!invoice?.deposit_payment_link_url && (invoice?.total || 0) > 0) {
+          const { data: settings } = await supabaseAdmin
+            .from("company_settings")
+            .select("auto_send_payment_link, minimum_deposit_percent")
+            .eq("id", profile.company_id)
+            .maybeSingle();
+
+          if (settings?.auto_send_payment_link) {
+            const minPct = Math.max(1, Math.min(100, settings.minimum_deposit_percent ?? 50));
+            const totalCents = Math.round(Number(invoice.total) * 100);
+            const minimumCents = Math.round(totalCents * (minPct / 100));
+
+            const linkResp = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                action: "createPaymentLink",
+                companyId: profile.company_id,
+                amount: totalCents,         // preset shown in the input
+                minimumAmount: minimumCents,
+                currency: "usd",
+                customerEmail: invoice.customer_email || quote.customer_email || undefined,
+                description: `Deposit for ${invoice.invoice_number || invoice.id} — ${invoice.customer_name || quote.customer_name || ""}`.trim(),
+                metadata: {
+                  // Existing stripe-webhook checkout.session.completed handler
+                  // (line 568) reads `printavo_invoice_id` to look up the
+                  // invoice and update amount_paid + status. Use that exact
+                  // key so we get the existing recording flow for free.
+                  printavo_invoice_id: invoice.id,
+                  invoice_number: invoice.invoice_number || invoice.id,
+                  payment_type: "deposit",
+                  company_id: profile.company_id,
+                  quote_id: quoteId,
+                  work_order_id: workOrder?.id || "",
+                  customer_email: invoice.customer_email || quote.customer_email || "",
+                  customer_name: invoice.customer_name || quote.customer_name || "",
+                },
+              }),
+            });
+
+            if (linkResp.ok) {
+              const linkJson = await linkResp.json();
+              if (linkJson?.paymentLinkId && linkJson?.url) {
+                await supabaseAdmin
+                  .from("printavo_invoices")
+                  .update({
+                    deposit_payment_link_id: linkJson.paymentLinkId,
+                    deposit_payment_link_url: linkJson.url,
+                  })
+                  .eq("id", invoice.id);
+                invoice.deposit_payment_link_id = linkJson.paymentLinkId;
+                invoice.deposit_payment_link_url = linkJson.url;
+                console.log("Deposit payment link created:", linkJson.paymentLinkId);
+              }
+            } else {
+              const errText = await linkResp.text();
+              console.error("Failed to create deposit payment link:", errText);
+              // Don't fail quote approval if payment link generation fails;
+              // log and continue. Admin can regenerate from the invoice page.
+            }
+          }
+        }
+      } catch (depositErr) {
+        console.error("Deposit payment link block error (non-fatal):", depositErr);
+      }
+
       // Only insert invoice line items if invoice was just created
       if (!existingInvoice && lineItems && lineItems.length > 0) {
         const invLineItems = lineItems.map((item: any) => ({

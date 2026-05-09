@@ -246,17 +246,40 @@ Deno.serve(async (req: Request) => {
       }
 
       case 'createPaymentLink': {
-        const { amount, currency, metadata, customerEmail, description } = data;
+        const { amount, currency, metadata, customerEmail, description, minimumAmount } = data;
+
+        // Two modes:
+        //   1. Fixed amount (legacy): caller sends `amount`. Customer pays
+        //      exactly that amount.
+        //   2. Customer-chooses amount with minimum (T3-A, 2026-05-09):
+        //      caller sends `minimumAmount`. Stripe shows a custom-amount
+        //      input on the payment page with that minimum enforced.
+        //      `amount` (if also sent) is used as the preset/default
+        //      shown in the input.
+        const priceFields: Record<string, any> = {
+          currency: currency || 'usd',
+          'product_data[name]': description || 'Invoice Payment',
+        };
+
+        if (typeof minimumAmount === 'number' && minimumAmount > 0) {
+          // Customer-chosen amount with floor. Stripe expects amounts in
+          // the smallest currency unit (cents for USD).
+          priceFields['custom_unit_amount[enabled]'] = 'true';
+          priceFields['custom_unit_amount[minimum]'] = minimumAmount;
+          if (typeof amount === 'number' && amount >= minimumAmount) {
+            priceFields['custom_unit_amount[preset]'] = amount;
+          } else {
+            priceFields['custom_unit_amount[preset]'] = minimumAmount;
+          }
+        } else {
+          priceFields['unit_amount'] = amount;
+        }
 
         const priceResponse = await callStripeAPI(
           '/prices',
           'POST',
           config.secretKey,
-          {
-            unit_amount: amount,
-            currency: currency || 'usd',
-            'product_data[name]': description || 'Invoice Payment',
-          }
+          priceFields
         );
 
         if (!priceResponse.ok) {
