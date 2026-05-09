@@ -258,11 +258,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
 
       setQuote(quoteData);
 
+      // Match QuoteBuilder's ordering so groups don't swap places between
+      // the editor and the viewer (Jamie reported this on QTE-0059, 2026-05-08).
+      // sort_order is set by QuoteBuilder when the user arranges groups/items;
+      // created_at would put new edits in the wrong place.
       const { data: itemsData, error: itemsError } = await supabase
         .from('quote_line_items')
         .select('*')
         .eq('quote_id', quoteId)
-        .order('created_at');
+        .order('sort_order', { ascending: true });
 
       if (itemsError) throw itemsError;
       setLineItems(itemsData || []);
