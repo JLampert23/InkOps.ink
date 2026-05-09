@@ -19,6 +19,15 @@ export function PortalLogin() {
   }, []);
 
   useEffect(() => {
+    // Don't auto-redirect from a stale localStorage user when a fresh token
+    // is being processed in the URL. handleTokenLogin will redirect itself
+    // once the new token resolves to the right customer. Without this guard
+    // every magic link opened in the same browser session jumped to whoever
+    // was last logged in instead of the link's actual customer
+    // (Jamie reported 2026-05-09).
+    const hasUrlToken = !!new URLSearchParams(window.location.search).get('token');
+    if (hasUrlToken) return;
+
     if (user && user.customer_id) {
       window.location.href = `/portal/customer/${user.customer_id}`;
     }
