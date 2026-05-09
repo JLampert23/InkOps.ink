@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { useNavigationGuard } from '../../contexts/NavigationGuardContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
@@ -192,6 +193,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   const { user, session } = useAuth();
   const { showNotification } = useNotification();
   const { confirm } = useConfirmation();
+  const { registerGuard, clearGuard, navigate } = useNavigationGuard();
   const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -321,6 +323,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   const skipDirtyCheckRef = useRef(true);
+  // Holds the promise resolver used by the navigation guard. The modal's three
+  // buttons resolve this with true (proceed — Save or Continue without saving)
+  // or false (stay — Cancel). Lets the same modal serve handleCancel AND any
+  // in-app nav click (sidebar tab, sub-tab, customers link, settings, etc.).
+  const unsavedResolveRef = useRef<((proceed: boolean) => void) | null>(null);
 
   const createDraftQuote = async () => {
     if (!user || draftCreatedRef.current) return;
@@ -434,6 +441,36 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     itemGroups, fees, discount, discountType, salesTaxRate,
     quoteImprints,
   ]);
+
+  // Register the navigation guard whenever we have unsaved changes so any
+  // in-app nav click (sidebar tab, sub-tab, customers link, etc.) routes
+  // through the same Save / Continue / Cancel modal as the Cancel button.
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      clearGuard();
+      return;
+    }
+    registerGuard(() => {
+      return new Promise<boolean>((resolve) => {
+        unsavedResolveRef.current = resolve;
+        setShowUnsavedChangesModal(true);
+      });
+    });
+    return () => clearGuard();
+  }, [hasUnsavedChanges, registerGuard, clearGuard]);
+
+  // Browser-level guard for refresh / close-tab / back-button-out-of-app.
+  // Modern browsers ignore the returnValue string and show their own dialog;
+  // the in-app nav guard above handles the cases where we can show our own.
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedChanges]);
 
 
 
@@ -2345,31 +2382,42 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     onCancel?.();
   };
 
-  const handleCancel = async () => {
-    if (hasUnsavedChanges) {
-      setShowUnsavedChangesModal(true);
-      return;
-    }
-    await proceedWithCancel();
+  // Cancel button goes through the same nav guard as any other navigation —
+  // if dirty, the registered guard intercepts and shows the modal; if clean,
+  // navigate runs the action immediately. Keeps the entire exit UX consistent.
+  const handleCancel = () => {
+    navigate(async () => {
+      await proceedWithCancel();
+    });
   };
 
+  // Modal "Save" — saves first, then resolves the guard with proceed=true
+  // (success) or false (save failed, stay in builder).
   const handleUnsavedSave = async () => {
     setShowUnsavedChangesModal(false);
     const success = await performSave(false);
     if (success) {
       skipDirtyCheckRef.current = true;
       setHasUnsavedChanges(false);
-      onSave?.();
     }
+    unsavedResolveRef.current?.(success);
+    unsavedResolveRef.current = null;
   };
 
-  const handleUnsavedDiscard = async () => {
+  // Modal "Continue without saving" — resolve true, abandon dirty state.
+  const handleUnsavedDiscard = () => {
     setShowUnsavedChangesModal(false);
-    await proceedWithCancel();
+    skipDirtyCheckRef.current = true;
+    setHasUnsavedChanges(false);
+    unsavedResolveRef.current?.(true);
+    unsavedResolveRef.current = null;
   };
 
+  // Modal "Cancel" — resolve false, stay in the builder, dirty state intact.
   const handleUnsavedKeepEditing = () => {
     setShowUnsavedChangesModal(false);
+    unsavedResolveRef.current?.(false);
+    unsavedResolveRef.current = null;
   };
 
   if (loading) {

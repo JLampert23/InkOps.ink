@@ -6,6 +6,7 @@ import ProductionScheduler from './ProductionScheduler';
 import KanbanCalendar from './KanbanCalendar';
 import { PurchaseOrdersManager } from '../purchase-orders/PurchaseOrdersManager';
 import { supabase } from '../../lib/supabase-client';
+import { useNavigationGuard } from '../../contexts/NavigationGuardContext';
 
 type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'kanban' | 'manage-goods';
 
@@ -19,6 +20,7 @@ interface ProductionDashboardProps {
 }
 
 export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: ProductionDashboardProps) {
+  const { navigate } = useNavigationGuard();
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
   const [contactIdForQuote, setContactIdForQuote] = useState<string | undefined>(initialContactId);
@@ -231,11 +233,11 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
             return (
               <button
                 key={tab.id}
-                onClick={() => {
+                onClick={() => navigate(() => {
                   setActiveTab(tab.id);
-                  const state = { 
-                    productionTab: tab.id, 
-                    quoteView: 'list', 
+                  const state = {
+                    productionTab: tab.id,
+                    quoteView: 'list',
                     workOrderView: 'list',
                     poView: 'list'
                   };
@@ -246,7 +248,7 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
                   );
                   // Fire popstate manually so child components reset to list view
                   window.dispatchEvent(new PopStateEvent('popstate', { state }));
-                }}
+                })}
                 className={`p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
                   isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}
@@ -267,7 +269,7 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
           })}
 
           <button
-            onClick={onNavigateToCustomers}
+            onClick={() => navigate(() => onNavigateToCustomers())}
             className="p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700"
           >
             <div className="flex flex-col items-center gap-1.5">
