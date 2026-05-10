@@ -117,6 +117,64 @@ Deno.serve(async (req: Request) => {
     const action = pathParts[pathParts.length - 1];
     const quoteId = pathParts[pathParts.length - 2];
 
+    // T3-B (2026-05-09) — POST /quotes/:id/resend-artwork-approval
+    // Admin-side action. Customer declined the artwork; admin tweaks the
+    // mockup and clicks "Resend for Artwork Approval" on QuoteDetail.
+    // Resets the quote's artwork_approval_status back to 'pending' and
+    // clears the previous decline so the existing approval link works
+    // again. Logs to quote_activity_log for audit.
+    if (action === "resend-artwork-approval") {
+      const { data: quote, error: fetchError } = await supabase
+        .from("quotes")
+        .select("id, company_id, status, artwork_approval_status")
+        .eq("id", quoteId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!quote) throw new Error("Quote not found");
+      if (quote.status !== "approved") {
+        return new Response(
+          JSON.stringify({ error: "Quote must be approved before artwork can be re-sent" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: updateError } = await supabase
+        .from("quotes")
+        .update({
+          artwork_approval_status: "pending",
+          artwork_declined_at: null,
+          artwork_decline_reason: null,
+          artwork_approval_sent_at: new Date().toISOString(),
+        })
+        .eq("id", quoteId);
+
+      if (updateError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to reset artwork status: " + updateError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await supabase.from("quote_activity_log").insert([{
+        quote_id: quoteId,
+        company_id: profile.company_id,
+        action: "artwork_approval_resent",
+        performed_by: user.id,
+        performed_by_name: profile.full_name || profile.email || "admin",
+        meta: { previous_status: quote.artwork_approval_status },
+      }]);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Artwork approval reset to pending. The customer can re-approve via the existing quote link.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // POST /quotes/:id/duplicate
     if (action === "duplicate") {
       // Get original quote
@@ -721,8 +779,25 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (existingWorkOrder) {
-        console.log("Work order already exists, using existing:", existingWorkOrder.id);
-        workOrder = existingWorkOrder;
+        console.log("Work order already exists — re-approval cascade. Updating top-level fields:", existingWorkOrder.id);
+        // T3-B (2026-05-09) — re-approval cascade. Quote was changed and
+        // re-approved; refresh the WO's high-level fields so it reflects
+        // current quote data. We deliberately do NOT touch the WO's status,
+        // workflow_tracking, completed_at, etc. — those represent production
+        // progress and should survive a re-approval.
+        const { data: updatedWO } = await supabaseAdmin
+          .from("work_orders")
+          .update({
+            customer_name: quote.customer_name,
+            production_due_date: quote.production_due_date,
+            customer_due_date: quote.customer_due_date,
+            total_quantity: totalQuantity,
+            notes: quote.production_notes || quote.notes,
+          })
+          .eq("id", existingWorkOrder.id)
+          .select()
+          .single();
+        workOrder = updatedWO || existingWorkOrder;
       } else {
         const { data: newWorkOrder, error: woError } = await supabaseAdmin
           .from("work_orders")
@@ -777,8 +852,33 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (existingInvoice) {
-        console.log("Invoice already exists, using existing:", existingInvoice.id);
-        invoice = existingInvoice;
+        console.log("Invoice already exists — re-approval cascade. Updating top-level fields:", existingInvoice.id);
+        // T3-B (2026-05-09) — re-approval cascade. Refresh totals + customer
+        // info on the invoice. Do NOT reset amount_paid / amount_outstanding
+        // / status — payments already captured against this invoice must
+        // survive a re-approval. amount_outstanding is recomputed from the
+        // new total minus any payments already recorded.
+        const newTotal = quote.total || 0;
+        const alreadyPaid = parseFloat(existingInvoice.amount_paid || 0);
+        const newOutstanding = Math.max(0, newTotal - alreadyPaid);
+        const { data: updatedInvoice } = await supabaseAdmin
+          .from("printavo_invoices")
+          .update({
+            customer_name: quote.customer_name,
+            customer_email: quote.customer_email,
+            customer_company: quote.customer_company,
+            customer_phone: quote.customer_phone,
+            subtotal: quote.subtotal || 0,
+            tax: quote.tax_amount || 0,
+            total: newTotal,
+            amount_outstanding: newOutstanding,
+            balance_remaining: newOutstanding,
+            due_date: quote.payment_due_date || existingInvoice.due_date,
+          })
+          .eq("id", existingInvoice.id)
+          .select()
+          .single();
+        invoice = updatedInvoice || existingInvoice;
       } else {
         let resolvedCustomerId: string | null = null;
         if (quote.customer_email) {

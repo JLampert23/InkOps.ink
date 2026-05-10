@@ -496,6 +496,32 @@ Deno.serve(async (req: Request) => {
         else approvalStatus = 'responded';
       }
 
+      // T3-B (2026-05-09) — surface artwork approval state at the top level
+      // so the customer-facing page doesn't have to walk imprints/quote
+      // columns to render it. "Has artwork" = any imprint with at least one
+      // mockup composite image. If no artwork, force status to
+      // not_applicable so the UI can grey out / hide the artwork section.
+      const hasArtwork = (imprints || []).some((im: any) => {
+        if (im.mockups && Array.isArray(im.mockups) && im.mockups.length > 0) return true;
+        if (im.artwork_url && im.artwork_url.length > 0) return true;
+        if (im.artwork_images && Array.isArray(im.artwork_images) && im.artwork_images.length > 0) return true;
+        return false;
+      });
+
+      const storedArtworkStatus = approval.quote?.artwork_approval_status || 'pending';
+      const artworkApprovalStatus = hasArtwork ? storedArtworkStatus : 'not_applicable';
+
+      // Flatten mockup composite URLs across imprints for easy rendering.
+      const artworkMockupUrls: string[] = [];
+      (imprints || []).forEach((im: any) => {
+        if (Array.isArray(im.mockups)) {
+          im.mockups.forEach((m: any) => {
+            const url = typeof m === 'string' ? m : m?.url;
+            if (url) artworkMockupUrls.push(url);
+          });
+        }
+      });
+
       return new Response(
         JSON.stringify({
           quote: quoteWithContact,
@@ -505,6 +531,15 @@ Deno.serve(async (req: Request) => {
           approval_status: approvalStatus,
           expires_at: approval.expires_at,
           is_expired: approval.expires_at && new Date(approval.expires_at) < new Date(),
+          artwork: {
+            status: artworkApprovalStatus,
+            decline_reason: approval.quote?.artwork_decline_reason || null,
+            approved_at: approval.quote?.artwork_approved_at || null,
+            declined_at: approval.quote?.artwork_declined_at || null,
+            mockup_urls: artworkMockupUrls,
+            has_artwork: hasArtwork,
+          },
+          quote_decline_reason: approval.quote?.quote_decline_reason || null,
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -515,6 +550,102 @@ Deno.serve(async (req: Request) => {
     if (req.method === "POST") {
       const lastPart = pathParts[pathParts.length - 1];
       const token = pathParts[pathParts.length - 2];
+
+      // T3-B (2026-05-09) — artwork approve/decline endpoint, customer-facing.
+      // Separate from /respond because it can only run AFTER the quote has
+      // already been approved. Body: { approved: boolean, decline_reason?:
+      // string (required when approved=false) }
+      if (lastPart === "respond-artwork") {
+        const body = await req.json();
+
+        if (typeof body.approved !== "boolean") {
+          return new Response(
+            JSON.stringify({ error: "approved field is required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (!body.approved && !body.decline_reason?.trim()) {
+          return new Response(
+            JSON.stringify({ error: "Please provide a reason for declining the artwork" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const { data: approval, error: approvalError } = await supabase
+          .from("quote_approvals")
+          .select("*, quote:quotes(id, status, artwork_approval_status)")
+          .eq("approval_token", token)
+          .maybeSingle();
+
+        if (approvalError || !approval) {
+          return new Response(
+            JSON.stringify({ error: "Invalid approval link" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (approval.quote?.status !== "approved") {
+          return new Response(
+            JSON.stringify({ error: "You must approve the quote before you can act on the artwork" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        if (approval.quote?.artwork_approval_status === "not_applicable") {
+          return new Response(
+            JSON.stringify({ error: "This quote has no artwork to approve" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const now = new Date().toISOString();
+        const updateFields: any = body.approved
+          ? {
+              artwork_approval_status: "approved",
+              artwork_approved_at: now,
+              artwork_declined_at: null,
+              artwork_decline_reason: null,
+            }
+          : {
+              artwork_approval_status: "declined",
+              artwork_declined_at: now,
+              artwork_approved_at: null,
+              artwork_decline_reason: body.decline_reason.trim(),
+            };
+
+        const { error: artUpdateError } = await supabase
+          .from("quotes")
+          .update(updateFields)
+          .eq("id", approval.quote_id);
+
+        if (artUpdateError) {
+          console.error("Artwork status update failed:", artUpdateError);
+          return new Response(
+            JSON.stringify({ error: "Failed to update artwork approval" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        await supabase
+          .from("quote_activity_log")
+          .insert([{
+            quote_id: approval.quote_id,
+            company_id: approval.company_id,
+            action: body.approved ? "artwork_approved_by_customer" : "artwork_declined_by_customer",
+            performed_by: null,
+            performed_by_name: null,
+            meta: {
+              decline_reason: body.approved ? null : body.decline_reason.trim(),
+            },
+          }]);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            artwork_approval_status: updateFields.artwork_approval_status,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       if (lastPart !== "respond") {
         return new Response(
@@ -528,6 +659,15 @@ Deno.serve(async (req: Request) => {
       if (body.approved === undefined) {
         return new Response(
           JSON.stringify({ error: "approved field is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // T3-B (2026-05-09) — required decline reason on quote rejection too.
+      // Per client spec: "When a customer declines artwork and quote they
+      // should be required to give a reason."
+      if (!body.approved && !body.decline_reason?.trim()) {
+        return new Response(
+          JSON.stringify({ error: "Please provide a reason for declining the quote" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -598,6 +738,14 @@ Deno.serve(async (req: Request) => {
 
       if (body.approved) {
         updateFields.converted_at = new Date().toISOString();
+        // Reset stale decline reason if the customer changed their mind on
+        // a re-approval flow.
+        updateFields.quote_decline_reason = null;
+      } else {
+        // T3-B — store the required decline reason for admin visibility.
+        updateFields.quote_decline_reason = body.decline_reason.trim();
+        // Quote is being declined — artwork can never be acted on now.
+        updateFields.artwork_approval_status = "not_applicable";
       }
 
       const { data: updatedQuote, error: quoteUpdateError } = await supabase
