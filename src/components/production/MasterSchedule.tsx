@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, CalendarDays, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, CalendarDays, Loader2, AlertCircle, CheckCircle, X, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, parseISO } from 'date-fns';
 
@@ -18,6 +18,11 @@ interface ScheduleEntry {
   priority_order: number;
   artwork_thumb_url: string | null;
   is_on_master_schedule: boolean;
+  // 2026-05-11 — client asked for Stock Status + Art Status to show on each
+  // imprint in the expanded view. Computed via the same logic as
+  // ProductionScheduler's enrichment so the badge meanings are consistent.
+  stock_status?: 'none' | 'ordered' | 'partial' | 'received';
+  art_status?: 'pending' | 'approved' | 'rejected' | 'none';
 }
 
 interface WorkOrderInfo {
@@ -77,7 +82,72 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
         .order('production_due_date', { ascending: true })
         .order('priority_order', { ascending: true });
 
-      const list: ScheduleEntry[] = entriesData || [];
+      const rawList: ScheduleEntry[] = entriesData || [];
+
+      // Enrich each entry with stock_status + art_status per quote (same
+      // semantics as ProductionScheduler so the badges mean the same thing
+      // on master and on the type tabs).
+      const uniqueQuoteIds = [...new Set(rawList.map(e => e.quote_id).filter(Boolean))] as string[];
+      const stockMap = new Map<string, 'none' | 'ordered' | 'partial' | 'received'>();
+      const artMap = new Map<string, 'pending' | 'approved' | 'rejected' | 'none'>();
+      if (uniqueQuoteIds.length > 0) {
+        const { data: stagingRows } = await supabase
+          .from('garment_requirements_staging')
+          .select('quote_id, is_ordered, total_quantity, quantity_received')
+          .in('quote_id', uniqueQuoteIds);
+
+        const { data: poReceived } = await supabase
+          .from('purchase_order_line_items')
+          .select('quantity_received, purchase_orders!inner(quote_id)')
+          .not('purchase_orders.quote_id', 'is', null)
+          .in('purchase_orders.quote_id', uniqueQuoteIds);
+
+        const { data: quotesData } = await supabase
+          .from('quotes')
+          .select('id, artwork_approval_status')
+          .in('id', uniqueQuoteIds);
+
+        if (stagingRows && stagingRows.length > 0) {
+          const byQuote = new Map<string, { ordered: number; total: number; needed: number; stagingReceived: number }>();
+          stagingRows.forEach((s: any) => {
+            if (!byQuote.has(s.quote_id)) {
+              byQuote.set(s.quote_id, { ordered: 0, total: 0, needed: 0, stagingReceived: 0 });
+            }
+            const q = byQuote.get(s.quote_id)!;
+            if (s.is_ordered) q.ordered += 1;
+            q.total += 1;
+            q.needed += s.total_quantity || 0;
+            q.stagingReceived += s.quantity_received || 0;
+          });
+          const poReceivedByQuote = new Map<string, number>();
+          poReceived?.forEach((r: any) => {
+            const qid = r.purchase_orders?.quote_id;
+            if (qid) poReceivedByQuote.set(qid, (poReceivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
+          });
+          byQuote.forEach((val, qid) => {
+            const totalReceived = val.stagingReceived + (poReceivedByQuote.get(qid) || 0);
+            const allOrdered = val.ordered === val.total && val.total > 0;
+            const someOrdered = val.ordered > 0;
+            if (val.needed > 0 && totalReceived >= val.needed) stockMap.set(qid, 'received');
+            else if (totalReceived > 0) stockMap.set(qid, 'partial');
+            else if (allOrdered || someOrdered) stockMap.set(qid, 'ordered');
+            else stockMap.set(qid, 'none');
+          });
+        }
+
+        quotesData?.forEach((q: any) => {
+          if (q.artwork_approval_status === 'approved') artMap.set(q.id, 'approved');
+          else if (q.artwork_approval_status === 'declined') artMap.set(q.id, 'rejected');
+          else if (q.artwork_approval_status === 'not_applicable' || !q.artwork_approval_status) artMap.set(q.id, 'none');
+          else artMap.set(q.id, 'pending');
+        });
+      }
+
+      const list: ScheduleEntry[] = rawList.map(e => ({
+        ...e,
+        stock_status: e.quote_id ? (stockMap.get(e.quote_id) ?? 'none') : 'none',
+        art_status: e.quote_id ? (artMap.get(e.quote_id) ?? 'none') : 'none',
+      }));
       setEntries(list);
 
       // Pull the related work orders so each row header can show priority,
@@ -283,15 +353,25 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                     return (
                       <tr key={entry.id} className="border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30">
                         <td className="px-3 py-2"></td>
-                        <td className="px-3 py-2 pl-8 text-xs text-gray-700 dark:text-gray-300" colSpan={2}>
+                        <td className="px-3 py-2 pl-8 text-xs text-gray-700 dark:text-gray-300">
                           <span className="inline-block w-3 text-gray-400">⤷</span>
                           <span className="font-medium">{entry.type_of_work}</span>
                           {entry.imprint_number && (
                             <span className="ml-2 text-gray-500 dark:text-gray-400">{entry.imprint_number}</span>
                           )}
                         </td>
+                        {/* Stock Status badge — same semantics as
+                            ProductionScheduler. Red = ordered, yellow =
+                            partial receipt, green = fully received. */}
+                        <td className="px-3 py-2">
+                          <StockStatusBadge status={entry.stock_status || 'none'} />
+                        </td>
+                        {/* Art Status badge */}
+                        <td className="px-3 py-2">
+                          <ArtStatusBadge status={entry.art_status || 'none'} />
+                        </td>
                         <td className="px-3 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{entry.quantity}</td>
-                        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300" colSpan={2}>
+                        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
                           {statusName ? (
                             <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -326,5 +406,65 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
         Click <span className="font-medium">Schedule →</span> on a decoration to move it into its type-specific schedule (Screen Print, Embroidery, etc.). When every decoration on a WO is scheduled, the whole work order drops off this view.
       </div>
     </div>
+  );
+}
+
+// 2026-05-11 — small status pills shown per decoration in the expanded view.
+// Same color semantics as ProductionScheduler so admin learns one mapping.
+function StockStatusBadge({ status }: { status: 'none' | 'ordered' | 'partial' | 'received' }) {
+  if (status === 'received') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+        <CheckCircle className="w-3 h-3" />Received
+      </span>
+    );
+  }
+  if (status === 'ordered') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
+        <CheckCircle className="w-3 h-3" />Ordered
+      </span>
+    );
+  }
+  if (status === 'partial') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full whitespace-nowrap">
+        <Clock className="w-3 h-3" />Partial
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+      —
+    </span>
+  );
+}
+
+function ArtStatusBadge({ status }: { status: 'pending' | 'approved' | 'rejected' | 'none' }) {
+  if (status === 'approved') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+        <CheckCircle className="w-3 h-3" />Approved
+      </span>
+    );
+  }
+  if (status === 'rejected') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
+        <X className="w-3 h-3" />Rejected
+      </span>
+    );
+  }
+  if (status === 'pending') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 rounded-full whitespace-nowrap">
+        <Clock className="w-3 h-3" />Pending
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+      —
+    </span>
   );
 }
