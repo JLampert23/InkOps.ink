@@ -156,6 +156,9 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         .from('production_schedule_entries')
         .select('*')
         .eq('type_of_work', typeOfWork)
+        // 2026-05-11 — exclude entries still parked on the Master Schedule.
+        // They get filtered IN once the admin clicks Schedule on master.
+        .eq('is_on_master_schedule', false)
         .gte('production_due_date', startDate)
         .lte('production_due_date', endDate)
         .order('quote_number', { ascending: true })
