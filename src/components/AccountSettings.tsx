@@ -226,6 +226,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingStripe, setSavingStripe] = useState(false);
   const [testingStripe, setTestingStripe] = useState(false);
   const [stripeTestResult, setStripeTestResult] = useState<any>(null);
+  // T3-A auto payment link settings (2026-05-09).
+  const [autoSendPaymentLink, setAutoSendPaymentLink] = useState(false);
+  const [minimumDepositPercent, setMinimumDepositPercent] = useState(50);
 
   const [twilioAccountSid, setTwilioAccountSid] = useState('');
   const [showTwilioSid, setShowTwilioSid] = useState(false);
@@ -529,6 +532,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCustomerUrl(data.customer_url || '');
         setVerificationStatus(data.customer_url_verification_status || 'unverified');
         setVerificationToken(data.customer_url_verification_token || null);
+        setAutoSendPaymentLink(data.auto_send_payment_link ?? false);
+        setMinimumDepositPercent(data.minimum_deposit_percent ?? 50);
         setStripePublicKey(data.stripe_public_key ? '••••••••••••••••' : '');
         setStripeSecretKey(data.stripe_secret_key ? '••••••••••••••••' : '');
         setStripeWebhookSecret(data.stripe_webhook_secret ? '••••••••••••••••' : '');
@@ -1369,7 +1374,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         encryptedWebhookSecret = result;
       }
 
-      const settingsData: any = {};
+      const settingsData: any = {
+        // T3-A: always include the auto-payment-link toggle + min %, so the
+        // user can change them without having to re-enter Stripe creds.
+        auto_send_payment_link: autoSendPaymentLink,
+        minimum_deposit_percent: Math.max(1, Math.min(100, Number(minimumDepositPercent) || 50)),
+      };
 
       if (encryptedPublicKey) {
         settingsData.stripe_public_key = encryptedPublicKey;
@@ -1381,11 +1391,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       if (encryptedWebhookSecret) {
         settingsData.stripe_webhook_secret = encryptedWebhookSecret;
-      }
-
-      if (Object.keys(settingsData).length === 0) {
-        showNotification('warning', 'No Credentials', 'No Stripe credentials to save');
-        return;
       }
 
       if (!companySettings?.id) {
@@ -5915,6 +5920,52 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       ? 'Webhook secret is saved and encrypted. Enter a new secret to update it.'
                       : 'Your webhook signing secret from Stripe Dashboard → Developers → Webhooks'}
                   </p>
+                </div>
+
+                {/* T3-A — Auto Payment Link settings (2026-05-09).
+                    When enabled, approving a quote auto-creates a Stripe
+                    Payment Link with a customer-chosen amount (minimum %
+                    enforced). Customer can pay any amount >= minimum. */}
+                <div className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg space-y-4 bg-gray-50/40 dark:bg-slate-900/30">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Auto Payment Link</h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Automatically generate and email a Stripe payment link to the customer when a quote is approved. The customer can pay any amount above the minimum deposit you set below.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoSendPaymentLink}
+                      onChange={(e) => setAutoSendPaymentLink(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-900 dark:text-white">
+                      Enable auto payment link on quote approval
+                    </span>
+                  </label>
+                  <div className={autoSendPaymentLink ? '' : 'opacity-50 pointer-events-none'}>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Minimum deposit percent
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={minimumDepositPercent}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!isNaN(v)) setMinimumDepositPercent(v);
+                        }}
+                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">% of grand total (after tax)</span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      e.g. set to 50 to require a 50% deposit. After production is marked Complete, a second payment link is auto-sent for the remaining balance.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">

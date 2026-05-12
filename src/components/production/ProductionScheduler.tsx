@@ -156,6 +156,9 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         .from('production_schedule_entries')
         .select('*')
         .eq('type_of_work', typeOfWork)
+        // 2026-05-11 — exclude entries still parked on the Master Schedule.
+        // They get filtered IN once the admin clicks Schedule on master.
+        .eq('is_on_master_schedule', false)
         .gte('production_due_date', startDate)
         .lte('production_due_date', endDate)
         .order('quote_number', { ascending: true })
@@ -197,13 +200,17 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       // ── Enrich: Stock Status + Art Status ────────────────────────────────
       const uniqueQuoteIds = [...new Set(entriesData.map((e: any) => e.quote_id).filter(Boolean))] as string[];
       if (uniqueQuoteIds.length > 0) {
-        // Staging: determine if garments are ordered / partially ordered
+        // Staging: ordering progress + non-PO receipts (Path C, 2026-05-09).
+        // quantity_received here covers items the user marked Ordered without
+        // a formal PO and then checked in via the Receiving Dashboard's
+        // Quick Receive flow. Together with PO-backed receipts below we get
+        // the true received total per quote.
         const { data: stagingRows } = await supabase
           .from('garment_requirements_staging')
-          .select('quote_id, is_ordered, total_quantity')
+          .select('quote_id, is_ordered, total_quantity, quantity_received')
           .in('quote_id', uniqueQuoteIds);
 
-        // PO receiving: check how many units received per quote
+        // PO receiving: check how many units received per quote (PO path)
         const { data: poReceived } = await supabase
           .from('purchase_order_line_items')
           .select('quantity_received, purchase_orders!inner(quote_id)')
@@ -216,33 +223,50 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
           .select('id, artwork_approval_status')
           .in('id', uniqueQuoteIds);
 
-        // Build stock_status per quote
+        // Build stock_status per quote.
+        // Semantics per client spec (2026-05-08):
+        //   red   = ordered  (marked ordered, no receipts yet)
+        //   yellow = partial (some units received, not all)
+        //   green = received (all units received)
+        // Pre-spec the "partial" state used to mean partial-ordering. Now it
+        // means partial RECEIPT, which is what the colors are supposed to
+        // signal to the floor.
         const stockMap = new Map<string, 'none' | 'ordered' | 'partial' | 'received'>();
         if (stagingRows && stagingRows.length > 0) {
-          const byQuote = new Map<string, { ordered: number; total: number; needed: number }>();
+          const byQuote = new Map<string, { ordered: number; total: number; needed: number; stagingReceived: number }>();
           stagingRows.forEach((s: any) => {
-            if (!byQuote.has(s.quote_id)) byQuote.set(s.quote_id, { ordered: 0, total: 0, needed: 0 });
+            if (!byQuote.has(s.quote_id)) {
+              byQuote.set(s.quote_id, { ordered: 0, total: 0, needed: 0, stagingReceived: 0 });
+            }
             const q = byQuote.get(s.quote_id)!;
             if (s.is_ordered) q.ordered += 1;
             q.total += 1;
             q.needed += s.total_quantity || 0;
+            q.stagingReceived += s.quantity_received || 0;
           });
 
-          // Add received quantities
-          const receivedByQuote = new Map<string, number>();
+          // PO-backed receipts per quote
+          const poReceivedByQuote = new Map<string, number>();
           poReceived?.forEach((r: any) => {
             const qid = r.purchase_orders?.quote_id;
-            if (qid) receivedByQuote.set(qid, (receivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
+            if (qid) poReceivedByQuote.set(qid, (poReceivedByQuote.get(qid) || 0) + (r.quantity_received || 0));
           });
 
           byQuote.forEach((val, qid) => {
-            const received = receivedByQuote.get(qid) || 0;
-            if (val.needed > 0 && received >= val.needed) {
-              stockMap.set(qid, 'received');
-            } else if (val.ordered === val.total && val.total > 0) {
+            const totalReceived = val.stagingReceived + (poReceivedByQuote.get(qid) || 0);
+            const allOrdered = val.ordered === val.total && val.total > 0;
+            const someOrdered = val.ordered > 0;
+
+            if (val.needed > 0 && totalReceived >= val.needed) {
+              stockMap.set(qid, 'received');     // green — fully checked in
+            } else if (totalReceived > 0) {
+              stockMap.set(qid, 'partial');       // yellow — some checked in
+            } else if (allOrdered) {
+              stockMap.set(qid, 'ordered');       // red — ordered, none received yet
+            } else if (someOrdered) {
+              // Partial ordering with no receipts — still effectively waiting
+              // to be ordered, surface as "ordered" red so it's visible.
               stockMap.set(qid, 'ordered');
-            } else if (val.ordered > 0) {
-              stockMap.set(qid, 'partial');
             } else {
               stockMap.set(qid, 'none');
             }
@@ -608,14 +632,14 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Qty
                 </th>
-                {/* 2 hard-coded status columns — Proof Status then Garment Status, after Qty */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-purple-50/50 dark:bg-purple-900/10">
-                  <div>Proof Status</div>
-                  <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Approved / Rejected</div>
-                </th>
+                {/* 2 hard-coded status columns — Stock Status then Art Status, after Qty */}
                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-blue-50/50 dark:bg-blue-900/10">
-                  <div>Garment Status</div>
+                  <div>Stock Status</div>
                   <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Ordered / Partial / Received</div>
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap bg-purple-50/50 dark:bg-purple-900/10">
+                  <div>Art Status</div>
+                  <div className="text-[10px] font-normal normal-case text-gray-400 mt-0.5">Approved / Rejected</div>
                 </th>
                 {workflowSteps.map(step => (
                   <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider relative">
@@ -834,7 +858,27 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quantity}
                     </td>
-                    {/* Proof Status (art/proof) — FIRST hard-coded status column */}
+                    {/* Stock Status — FIRST hard-coded status column */}
+                    <td className="px-3 py-3 text-center bg-blue-50/30 dark:bg-blue-900/5">
+                      {entry.stock_status === 'received' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Received
+                        </span>
+                      ) : entry.stock_status === 'ordered' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded-full whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3" />Ordered
+                        </span>
+                      ) : entry.stock_status === 'partial' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />Partial
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
+                          <Clock className="w-3 h-3" />—
+                        </span>
+                      )}
+                    </td>
+                    {/* Art Status — SECOND hard-coded status column */}
                     <td className="px-3 py-3 text-center bg-purple-50/30 dark:bg-purple-900/5">
                       {entry.art_status === 'approved' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
@@ -851,26 +895,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
                           —
-                        </span>
-                      )}
-                    </td>
-                    {/* Garment Status (stock) — SECOND hard-coded status column */}
-                    <td className="px-3 py-3 text-center bg-blue-50/30 dark:bg-blue-900/5">
-                      {entry.stock_status === 'received' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />Received
-                        </span>
-                      ) : entry.stock_status === 'ordered' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full whitespace-nowrap">
-                          <CheckCircle className="w-3 h-3" />Ordered
-                        </span>
-                      ) : entry.stock_status === 'partial' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />Partial
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-slate-700 rounded-full whitespace-nowrap">
-                          <Clock className="w-3 h-3" />—
                         </span>
                       )}
                     </td>

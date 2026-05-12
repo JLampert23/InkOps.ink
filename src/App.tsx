@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { ConfirmationProvider } from './contexts/ConfirmationContext';
+import { NavigationGuardProvider, useNavigationGuard } from './contexts/NavigationGuardContext';
 import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
 import { HardPaywall } from './components/billing/HardPaywall';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
@@ -269,6 +270,10 @@ function AppContent() {
   const { userProfile, canAccessIntegrations, isAdmin, isSuperAdmin, isUser, isAdminOrAbove, canAccessAccounting, canAccessAccountSettings, canViewPricing } = useRBAC();
   const { showNotification } = useNotification();
   const { darkMode, toggleDarkMode } = useTheme();
+  // Used to gate every user-triggered navigation through any registered guard
+  // (e.g. QuoteBuilder when it has unsaved edits). If no guard is registered
+  // the action runs immediately, so non-dirty paths are unaffected.
+  const { navigate } = useNavigationGuard();
 
   useEffect(() => {
     const hash = TAB_HASH_MAP[activeTab];
@@ -473,7 +478,7 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => navigate(() => setActiveTab(item.id))}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? 'bg-orange-50 dark:bg-blue-600/20 text-orange-700 dark:text-blue-400 shadow-sm'
@@ -535,7 +540,7 @@ function AppContent() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => navigate(() => setActiveTab(item.id))}
                       className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                         isActive
                           ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
@@ -572,7 +577,7 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => navigate(() => setActiveTab(item.id))}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
@@ -605,7 +610,7 @@ function AppContent() {
           )}
           {isSuperAdmin && (
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => navigate(() => setActiveTab('settings'))}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
           >
             <Settings className="w-4 h-4" />
@@ -711,8 +716,10 @@ function AppContent() {
             }>
               <AccountsReceivableReport
                 onNavigateToSettings={(tab) => {
-                  setSettingsInitialTab(tab);
-                  setActiveTab('settings');
+                  navigate(() => {
+                    setSettingsInitialTab(tab);
+                    setActiveTab('settings');
+                  });
                 }}
                 onNavigateToCustomer={handleNavigateToCustomer}
               />
@@ -794,8 +801,10 @@ function AppContent() {
             }>
               <ProductionManagement
                 onNavigateToCustomers={() => {
-                  setActiveTab('customers');
-                  setAccountingExpanded(true);
+                  navigate(() => {
+                    setActiveTab('customers');
+                    setAccountingExpanded(true);
+                  });
                 }}
                 onViewCustomer={handleViewCustomer}
                 initialCustomerId={quoteCustomerId}
@@ -920,7 +929,9 @@ function App() {
         <ThemeProvider>
           <NotificationProvider>
             <ConfirmationProvider>
-              <AuthenticatedApp />
+              <NavigationGuardProvider>
+                <AuthenticatedApp />
+              </NavigationGuardProvider>
             </ConfirmationProvider>
           </NotificationProvider>
         </ThemeProvider>

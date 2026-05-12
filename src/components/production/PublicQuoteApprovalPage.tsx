@@ -9,6 +9,17 @@ interface ApprovalData {
   approval_status: string;
   expires_at: string | null;
   is_expired: boolean;
+  // T3-B (2026-05-09) — artwork approval block surfaced from quote-approval
+  // edge function GET handler.
+  artwork?: {
+    status: 'not_applicable' | 'pending' | 'sent' | 'approved' | 'declined';
+    decline_reason: string | null;
+    approved_at: string | null;
+    declined_at: string | null;
+    mockup_urls: string[];
+    has_artwork: boolean;
+  };
+  quote_decline_reason?: string | null;
 }
 
 function fmt(amount: number | null | undefined): string {
@@ -52,6 +63,12 @@ export default function PublicQuoteApprovalPage() {
   const [approverEmail, setApproverEmail] = useState('');
   const [approverNotes, setApproverNotes] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // T3-B (2026-05-09) — decline-reason modal + artwork action state.
+  // declineModal=null means closed; 'quote' or 'artwork' means open for that
+  // action. declineReason is the user's typed reason — required to submit.
+  const [declineModal, setDeclineModal] = useState<null | 'quote' | 'artwork'>(null);
+  const [declineReason, setDeclineReason] = useState('');
+  const [artworkSubmitting, setArtworkSubmitting] = useState(false);
 
   const token = window.location.pathname.split('/').pop();
 
@@ -84,7 +101,7 @@ export default function PublicQuoteApprovalPage() {
     }
   };
 
-  const handleResponse = async (approved: boolean) => {
+  const handleResponse = async (approved: boolean, reasonOverride?: string) => {
     if (!approverName.trim() || !approverEmail.trim()) {
       setError('Please enter your name and email.');
       return;
@@ -94,8 +111,14 @@ export default function PublicQuoteApprovalPage() {
       setError('Please enter a valid email address.');
       return;
     }
-    const action = approved ? 'approve' : 'reject';
-    if (!confirm(`Are you sure you want to ${action} this quote?`)) return;
+    // T3-B — decline reason required when rejecting. The "Reject Quote"
+    // button opens the decline modal; this handler is then called with the
+    // typed reason.
+    if (!approved && !reasonOverride?.trim()) {
+      setError('Please provide a reason for declining the quote.');
+      return;
+    }
+    if (approved && !confirm('Are you sure you want to approve this quote?')) return;
 
     setSubmitting(true);
     setError(null);
@@ -109,17 +132,59 @@ export default function PublicQuoteApprovalPage() {
           approver_name: approverName.trim(),
           approver_email: approverEmail.trim(),
           notes: approverNotes.trim() || null,
+          decline_reason: !approved ? reasonOverride?.trim() : undefined,
         }),
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => null);
         throw new Error(errData?.error || 'Failed to submit response');
       }
-      setSubmitted(approved ? 'approved' : 'rejected');
+      setDeclineModal(null);
+      setDeclineReason('');
+      // Refetch so the UI immediately reflects new state (and can show the
+      // artwork section if quote just got approved).
+      await loadApprovalData();
+      if (!approved) setSubmitted('rejected');
     } catch (err: any) {
       setError(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // T3-B (2026-05-09) — artwork approve/decline. Available only after the
+  // quote has been approved AND the quote includes artwork. Decline requires
+  // a reason. Refetches data on success so the UI shows the new state.
+  const handleArtworkResponse = async (approved: boolean, reasonOverride?: string) => {
+    if (!approved && !reasonOverride?.trim()) {
+      setError('Please provide a reason for declining the artwork.');
+      return;
+    }
+    if (approved && !confirm('Approve the artwork? Production can begin once approved.')) return;
+
+    setArtworkSubmitting(true);
+    setError(null);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/quote-approval/${token}/respond-artwork`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approved,
+          decline_reason: !approved ? reasonOverride?.trim() : undefined,
+        }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Failed to submit artwork response');
+      }
+      setDeclineModal(null);
+      setDeclineReason('');
+      await loadApprovalData();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setArtworkSubmitting(false);
     }
   };
 
@@ -535,24 +600,155 @@ export default function PublicQuoteApprovalPage() {
               className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-vertical"
             />
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleResponse(true)}
-              disabled={submitting}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-            >
-              {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <><CheckCircle className="h-5 w-5" /> Approve Quote</>}
-            </button>
-            <button
-              onClick={() => handleResponse(false)}
-              disabled={submitting}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
-            >
-              {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <><XCircle className="h-5 w-5" /> Reject Quote</>}
-            </button>
+          {/* T3-B (2026-05-09) — quote + artwork approval buttons live in the
+              SAME section per client spec ("put the artwork approval next to
+              the quote approval"). Quote section first; artwork section
+              underneath, locked until quote is approved. */}
+          <div className="space-y-4">
+            {/* Quote approval row */}
+            {data.quote?.status === 'approved' ? (
+              <div className="flex items-center gap-2 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                <span className="text-sm font-semibold text-emerald-800">Quote approved</span>
+              </div>
+            ) : data.quote?.status === 'rejected' ? (
+              <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-red-600 shrink-0" />
+                  <span className="text-sm font-semibold text-red-800">Quote declined</span>
+                </div>
+                {data.quote_decline_reason && (
+                  <p className="mt-1.5 ml-7 text-xs text-red-700">Reason: {data.quote_decline_reason}</p>
+                )}
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleResponse(true)}
+                  disabled={submitting}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                >
+                  {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <><CheckCircle className="h-5 w-5" /> Approve Quote</>}
+                </button>
+                <button
+                  onClick={() => { setDeclineReason(''); setDeclineModal('quote'); setError(null); }}
+                  disabled={submitting}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                >
+                  <XCircle className="h-5 w-5" /> Reject Quote
+                </button>
+              </div>
+            )}
+
+            {/* Artwork approval row — only render if quote has artwork. */}
+            {data.artwork && data.artwork.status !== 'not_applicable' && (
+              <>
+                {data.artwork.status === 'approved' ? (
+                  <div className="flex items-center gap-2 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <span className="text-sm font-semibold text-emerald-800">Artwork approved</span>
+                  </div>
+                ) : data.artwork.status === 'declined' ? (
+                  <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-600 shrink-0" />
+                      <span className="text-sm font-semibold text-red-800">Artwork declined</span>
+                    </div>
+                    {data.artwork.decline_reason && (
+                      <p className="mt-1.5 ml-7 text-xs text-red-700">Reason: {data.artwork.decline_reason}</p>
+                    )}
+                  </div>
+                ) : data.quote?.status !== 'approved' ? (
+                  // Locked state — quote not yet approved
+                  <div className="flex gap-3 opacity-50">
+                    <button
+                      disabled
+                      title="Approve the quote first"
+                      className="flex-1 bg-gray-300 text-gray-600 font-semibold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 text-sm cursor-not-allowed"
+                    >
+                      <CheckCircle className="h-5 w-5" /> Approve Artwork
+                    </button>
+                    <button
+                      disabled
+                      className="flex-1 bg-gray-300 text-gray-600 font-semibold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 text-sm cursor-not-allowed"
+                    >
+                      <XCircle className="h-5 w-5" /> Decline Artwork
+                    </button>
+                  </div>
+                ) : (
+                  // Quote approved — artwork actions unlocked
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleArtworkResponse(true)}
+                      disabled={artworkSubmitting}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {artworkSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <><CheckCircle className="h-5 w-5" /> Approve Artwork</>}
+                    </button>
+                    <button
+                      onClick={() => { setDeclineReason(''); setDeclineModal('artwork'); setError(null); }}
+                      disabled={artworkSubmitting}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      <XCircle className="h-5 w-5" /> Decline Artwork
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* T3-B — decline reason modal (used for both quote + artwork). Required
+          per client spec: "they should be required to give a reason." */}
+      {declineModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Reason for declining the {declineModal === 'quote' ? 'quote' : 'artwork'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This is required so the team can understand what to change. Please be specific.
+            </p>
+            <textarea
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+              placeholder={declineModal === 'quote'
+                ? 'e.g. pricing too high, wrong quantity, need different product…'
+                : 'e.g. logo too small, wrong color, mockup placement off…'}
+              rows={5}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 resize-vertical"
+              autoFocus
+            />
+            {error && (
+              <p className="mt-2 text-xs text-red-600">{error}</p>
+            )}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => { setDeclineModal(null); setDeclineReason(''); setError(null); }}
+                disabled={submitting || artworkSubmitting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (declineModal === 'quote') {
+                    handleResponse(false, declineReason);
+                  } else {
+                    handleArtworkResponse(false, declineReason);
+                  }
+                }}
+                disabled={(submitting || artworkSubmitting) || !declineReason.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {(submitting || artworkSubmitting) ? 'Submitting…' : 'Submit decline'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightboxUrl && (

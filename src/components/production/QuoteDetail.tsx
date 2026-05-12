@@ -258,11 +258,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
 
       setQuote(quoteData);
 
+      // Match QuoteBuilder's ordering so groups don't swap places between
+      // the editor and the viewer (Jamie reported this on QTE-0059, 2026-05-08).
+      // sort_order is set by QuoteBuilder when the user arranges groups/items;
+      // created_at would put new edits in the wrong place.
       const { data: itemsData, error: itemsError } = await supabase
         .from('quote_line_items')
         .select('*')
         .eq('quote_id', quoteId)
-        .order('created_at');
+        .order('sort_order', { ascending: true });
 
       if (itemsError) throw itemsError;
       setLineItems(itemsData || []);
@@ -481,6 +485,46 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
     }
   };
 
+  // T3-B (2026-05-09) — admin clicks "Resend for Artwork Approval" on a
+  // quote where the customer declined the artwork. Resets artwork status
+  // to pending; the existing public approval link works again so the
+  // customer can re-approve once the admin tweaks the mockup.
+  const handleResendArtworkApproval = async () => {
+    if (!quote) return;
+    const confirmed = await confirm({
+      title: 'Resend for Artwork Approval?',
+      message: 'This resets the artwork approval status. The customer can re-approve via their existing quote link.',
+      confirmLabel: 'Reset & resend',
+      cancelLabel: 'Cancel',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/resend-artwork-approval`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to resend artwork approval');
+      showNotification('success', 'Artwork approval reset', 'Customer can re-approve via the existing link.');
+      // Refresh local quote data so the badge updates
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Resend artwork approval failed:', err);
+      showNotification('error', 'Failed', err.message || 'Could not reset artwork approval');
+    }
+  };
+
   const handleApproveQuote = async () => {
     if (!quote) return;
 
@@ -583,13 +627,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const itemGroups = Object.entries(groupedItems);
 
   const totalQty = items.reduce((sum, item) => {
+    // Match QuoteBuilder.calculateItemsTotal: sizes + total_quantity (additive),
+    // not "one or the other". Older QuoteDetail logic showed 0 whenever
+    // total_quantity was non-zero on a sized item or when sizes were 0 on a CS item
+    // because of falsy fallthrough on the aggregate column.
     const sizeSum = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
            (item.qty_l || 0) + (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
            (item.qty_4xl || 0) + (item.qty_5xl || 0) +
            (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
-    // For CS/non-sized items, fall back to total_quantity
-    return sum + (sizeSum > 0 ? sizeSum : (item.total_quantity || 0));
+    return sum + sizeSum + (item.total_quantity || 0);
   }, 0);
 
   const feesTotal = fees.reduce((sum, fee) => sum + fee.total_price, 0);
@@ -706,14 +753,61 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
       {quote.status === 'rejected' && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-center gap-3">
           <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-          <div>
+          <div className="flex-1">
             <p className="text-red-800 dark:text-red-300 text-sm font-medium">
               This quote was rejected by the customer.
             </p>
+            {(quote as any).quote_decline_reason && (
+              <p className="text-red-700 dark:text-red-400 text-xs mt-1">
+                Reason: {(quote as any).quote_decline_reason}
+              </p>
+            )}
             <p className="text-red-700 dark:text-red-400 text-xs mt-1">
               Click "Edit Quote" to make changes, then "Resend" to send the revised quote for approval.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* T3-B (2026-05-09) — Artwork approval status banner. Renders only
+          when the quote is approved AND artwork status isn't pristine. The
+          "Resend for Artwork Approval" button shows on declined state so the
+          admin can reset after tweaking the mockup. */}
+      {quote.status === 'approved' && (quote as any).artwork_approval_status && (quote as any).artwork_approval_status !== 'pending' && (quote as any).artwork_approval_status !== 'not_applicable' && (
+        <div className={`rounded-lg p-4 flex items-start gap-3 ${
+          (quote as any).artwork_approval_status === 'approved'
+            ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
+            : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
+        }`}>
+          {(quote as any).artwork_approval_status === 'approved' ? (
+            <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          ) : (
+            <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          )}
+          <div className="flex-1">
+            <p className={`text-sm font-medium ${
+              (quote as any).artwork_approval_status === 'approved'
+                ? 'text-emerald-800 dark:text-emerald-300'
+                : 'text-amber-800 dark:text-amber-300'
+            }`}>
+              {(quote as any).artwork_approval_status === 'approved'
+                ? 'Artwork approved by customer.'
+                : 'Customer declined the artwork.'}
+            </p>
+            {(quote as any).artwork_approval_status === 'declined' && (quote as any).artwork_decline_reason && (
+              <p className="text-amber-700 dark:text-amber-400 text-xs mt-1">
+                Reason: {(quote as any).artwork_decline_reason}
+              </p>
+            )}
+          </div>
+          {(quote as any).artwork_approval_status === 'declined' && (
+            <button
+              onClick={handleResendArtworkApproval}
+              className="px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded shrink-0"
+            >
+              Resend for Artwork Approval
+            </button>
+          )}
         </div>
       )}
 
@@ -947,8 +1041,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                                    (item.qty_4xl || 0) + (item.qty_5xl || 0) +
                                    (item.qty_sm || 0) + (item.qty_lxl || 0) +
                                    (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
-                    // For CS/non-sized items, fall back to total_quantity
-                    const totalItems = sizeQty > 0 ? sizeQty : (item.total_quantity || 0);
+                    const csQty = item.total_quantity || 0;
+                    // Items column = sizes + customer-supplied qty (matches QuoteBuilder)
+                    const totalItems = sizeQty + csQty;
 
                     return (
                       <React.Fragment key={item.id}>
@@ -1008,8 +1103,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
                         {item.qty_5xl || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
-                        {/* Qty column: for sized items shows blank (sizes ARE the qty); for CS items shows total_quantity */}
-                      {sizeQty === 0 ? (item.total_quantity || '') : ''}
+                        {/* Qty column = customer-supplied total_quantity (the "Qty"
+                            input in QuoteBuilder). Always show it when set so it
+                            matches what the user entered. Sizes are shown in their
+                            own columns; the Items column to the right shows the sum. */}
+                        {csQty || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
                         {totalItems}

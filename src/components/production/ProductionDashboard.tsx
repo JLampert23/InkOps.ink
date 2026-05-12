@@ -4,8 +4,10 @@ import { QuotesManager } from './QuotesManager';
 import { WorkOrdersManager } from './WorkOrdersManager';
 import ProductionScheduler from './ProductionScheduler';
 import KanbanCalendar from './KanbanCalendar';
+import MasterSchedule from './MasterSchedule';
 import { PurchaseOrdersManager } from '../purchase-orders/PurchaseOrdersManager';
 import { supabase } from '../../lib/supabase-client';
+import { useNavigationGuard } from '../../contexts/NavigationGuardContext';
 
 type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'kanban' | 'manage-goods';
 
@@ -19,12 +21,18 @@ interface ProductionDashboardProps {
 }
 
 export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, initialCustomerId, initialContactId, initialQuoteId, onCustomerIdConsumed }: ProductionDashboardProps) {
+  const { navigate } = useNavigationGuard();
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
   const [contactIdForQuote, setContactIdForQuote] = useState<string | undefined>(initialContactId);
   const [quoteIdToView, setQuoteIdToView] = useState<string | undefined>(initialQuoteId);
   const [typesOfWork, setTypesOfWork] = useState<Array<{ id: string; work_type_name: string }>>([]);
   const [selectedScheduleType, setSelectedScheduleType] = useState<string>('');
+  // Master Schedule is the first tab in the Scheduling section per client
+  // spec (2026-05-09). Tracking it separately from selectedScheduleType so
+  // the Kanban tab (which also reads selectedScheduleType) isn't affected.
+  // Sentinel value 'master' = master schedule active; otherwise = type name.
+  const [schedulingTab, setSchedulingTab] = useState<string>('master');
   const [navigateToWorkOrderId, setNavigateToWorkOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -120,9 +128,6 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
       case 'work-orders':
         return <WorkOrdersManager initialWorkOrderId={navigateToWorkOrderId} />;
       case 'scheduling':
-        const schedulerType = selectedScheduleType === 'all' && typesOfWork.length > 0
-          ? typesOfWork[0].work_type_name
-          : selectedScheduleType;
         return (
           <div className="space-y-4">
             {typesOfWork.length === 0 ? (
@@ -133,15 +138,27 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
               </div>
             ) : (
               <>
-                {/* Type of Work — visible tabs along the top (per client spec, replaces dropdown) */}
+                {/* Master Schedule first tab + Type-of-Work tabs (2026-05-11
+                    per client spec). Master shows all WOs grouped; each type
+                    tab shows the scheduler for that work type. */}
                 <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
                   <div className="flex overflow-x-auto border-b border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setSchedulingTab('master')}
+                      className={`px-6 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
+                        schedulingTab === 'master'
+                          ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700/50'
+                      }`}
+                    >
+                      Master Schedule
+                    </button>
                     {typesOfWork.map((type) => {
-                      const isActive = schedulerType === type.work_type_name;
+                      const isActive = schedulingTab === type.work_type_name;
                       return (
                         <button
                           key={type.id}
-                          onClick={() => setSelectedScheduleType(type.work_type_name)}
+                          onClick={() => setSchedulingTab(type.work_type_name)}
                           className={`px-6 py-3 text-sm font-semibold whitespace-nowrap transition-colors ${
                             isActive
                               ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
@@ -155,9 +172,11 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
                   </div>
                 </div>
 
-                {/* Selected Schedule */}
-                {schedulerType && (
-                  <ProductionScheduler typeOfWork={schedulerType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
+                {/* Active sub-tab content */}
+                {schedulingTab === 'master' ? (
+                  <MasterSchedule onNavigateToWorkOrder={handleNavigateToWorkOrder} />
+                ) : (
+                  <ProductionScheduler typeOfWork={schedulingTab} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
                 )}
               </>
             )}
@@ -231,11 +250,11 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
             return (
               <button
                 key={tab.id}
-                onClick={() => {
+                onClick={() => navigate(() => {
                   setActiveTab(tab.id);
-                  const state = { 
-                    productionTab: tab.id, 
-                    quoteView: 'list', 
+                  const state = {
+                    productionTab: tab.id,
+                    quoteView: 'list',
                     workOrderView: 'list',
                     poView: 'list'
                   };
@@ -246,7 +265,7 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
                   );
                   // Fire popstate manually so child components reset to list view
                   window.dispatchEvent(new PopStateEvent('popstate', { state }));
-                }}
+                })}
                 className={`p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
                   isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}
@@ -267,7 +286,7 @@ export function ProductionDashboard({ onNavigateToCustomers, onViewCustomer, ini
           })}
 
           <button
-            onClick={onNavigateToCustomers}
+            onClick={() => navigate(() => onNavigateToCustomers())}
             className="p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700"
           >
             <div className="flex flex-col items-center gap-1.5">

@@ -530,6 +530,99 @@ export class WorkOrderService {
       return { data: null, error: updateError };
     }
 
+    // T3-A — when a WO flips to Completed, auto-generate the balance
+    // payment link if the company setting is on and there's still an
+    // outstanding balance on the linked invoice. Failures here don't
+    // block the status update.
+    if (isComplete) {
+      try {
+        await this.generateBalancePaymentLink(workOrderId);
+      } catch (e) {
+        console.error('Balance payment link generation failed (non-fatal):', e);
+      }
+    }
+
     return await this.getWorkOrderById(workOrderId);
+  }
+
+  // T3-A — generate the second (balance) Stripe payment link on WO Complete.
+  // FIXED amount = invoice total - amount already paid. No customer-chosen
+  // amount this time; this is a final balance, not a deposit.
+  private static async generateBalancePaymentLink(workOrderId: string): Promise<void> {
+    const { data: wo } = await supabase
+      .from('work_orders')
+      .select('quote_id, company_id')
+      .eq('id', workOrderId)
+      .maybeSingle();
+    if (!wo?.quote_id || !wo?.company_id) return;
+
+    const { data: settings } = await supabase
+      .from('company_settings')
+      .select('auto_send_payment_link')
+      .eq('id', wo.company_id)
+      .maybeSingle();
+    if (!settings?.auto_send_payment_link) return;
+
+    // Find the invoice linked to this quote. printavo_invoices stores the
+    // quote_id on raw_data on creation (see quote-actions approve flow).
+    const { data: invoice } = await supabase
+      .from('printavo_invoices')
+      .select('id, invoice_number, total, amount_paid, customer_email, customer_name, balance_payment_link_url')
+      .eq('company_id', wo.company_id)
+      .filter('raw_data->>quote_id', 'eq', wo.quote_id)
+      .maybeSingle();
+    if (!invoice) return;
+    if (invoice.balance_payment_link_url) return; // already generated
+
+    const total = Number(invoice.total) || 0;
+    const paid = Number(invoice.amount_paid) || 0;
+    const balance = total - paid;
+    if (balance <= 0) return; // nothing to collect
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!supabaseUrl || !session?.access_token) return;
+
+    const linkResp = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        action: 'createPaymentLink',
+        companyId: wo.company_id,
+        amount: Math.round(balance * 100), // cents, FIXED amount
+        currency: 'usd',
+        customerEmail: invoice.customer_email || undefined,
+        description: `Balance for ${invoice.invoice_number || invoice.id} — ${invoice.customer_name || ''}`.trim(),
+        metadata: {
+          // Match webhook handler key — see note in quote-actions duplicate.
+          printavo_invoice_id: invoice.id,
+          invoice_number: invoice.invoice_number || invoice.id,
+          payment_type: 'balance',
+          company_id: wo.company_id,
+          work_order_id: workOrderId,
+          customer_email: invoice.customer_email || '',
+          customer_name: invoice.customer_name || '',
+        },
+      }),
+    });
+
+    if (!linkResp.ok) {
+      console.error('stripe-proxy createPaymentLink (balance) failed:', await linkResp.text());
+      return;
+    }
+
+    const linkJson = await linkResp.json();
+    if (linkJson?.paymentLinkId && linkJson?.url) {
+      await supabase
+        .from('printavo_invoices')
+        .update({
+          balance_payment_link_id: linkJson.paymentLinkId,
+          balance_payment_link_url: linkJson.url,
+        })
+        .eq('id', invoice.id);
+    }
   }
 }
