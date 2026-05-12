@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronRight, CalendarDays, Loader2, AlertCircle, CheckCircle, X, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, parseISO } from 'date-fns';
@@ -36,6 +36,18 @@ interface WorkOrderInfo {
   custom_invoice_status_id: string | null;
 }
 
+interface StepStatus {
+  status_name: string;
+  status_color: string;
+  is_default: boolean;
+}
+
+interface WorkflowStep {
+  id: string; // step_name (matches the key used in step_statuses JSONB)
+  step_name: string;
+  statuses: StepStatus[];
+}
+
 interface MasterScheduleProps {
   onNavigateToWorkOrder?: (workOrderId: string) => void;
 }
@@ -52,6 +64,11 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
   const [customStatusNames, setCustomStatusNames] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [scheduling, setScheduling] = useState<Record<string, boolean>>({});
+  // Workflow steps keyed by work-type name (e.g. "Screen Print" → [steps]).
+  // Each imprint shows the dropdowns for its own type's workflow, mirroring
+  // what the per-type scheduler tabs render. Per client spec 2026-05-11.
+  const [workflowsByType, setWorkflowsByType] = useState<Record<string, WorkflowStep[]>>({});
+  const [editingCell, setEditingCell] = useState<{ entryId: string; stepId: string } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -150,6 +167,44 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
       }));
       setEntries(list);
 
+      // Load workflow steps for every distinct type_of_work present on master.
+      // Same shape ProductionScheduler uses so handleStatusChange writes the
+      // same step_statuses keys (step_name) and the DB trigger reacts to the
+      // same change event.
+      const uniqueTypes = [...new Set(list.map(e => e.type_of_work).filter(Boolean))];
+      if (uniqueTypes.length > 0) {
+        const { data: typeRows } = await supabase
+          .from('type_of_work_settings')
+          .select('id, work_type_name')
+          .in('work_type_name', uniqueTypes);
+        const typeIds = (typeRows || []).map(t => t.id);
+        const typeIdToName: Record<string, string> = {};
+        (typeRows || []).forEach(t => { typeIdToName[t.id] = t.work_type_name; });
+
+        const wfByType: Record<string, WorkflowStep[]> = {};
+        if (typeIds.length > 0) {
+          const { data: workflows } = await supabase
+            .from('work_type_workflows')
+            .select('work_type_id, steps')
+            .in('work_type_id', typeIds);
+          (workflows || []).forEach((wf: any) => {
+            const name = typeIdToName[wf.work_type_id];
+            if (!name) return;
+            const stepArr = Array.isArray(wf.steps) ? wf.steps : [];
+            wfByType[name] = stepArr.map((step: any) => ({
+              id: step.step_name,
+              step_name: step.step_name,
+              statuses: (step.statuses || []).map((s: any) => ({
+                status_name: s.name,
+                status_color: s.color,
+                is_default: s.is_default || false,
+              })),
+            }));
+          });
+        }
+        setWorkflowsByType(wfByType);
+      }
+
       // Pull the related work orders so each row header can show priority,
       // status, totals, etc. without doing a join in the entries query.
       const woIds = [...new Set(list.map(e => e.work_order_id).filter(Boolean))] as string[];
@@ -186,6 +241,37 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Write a single workflow-step status to the entry. DB trigger
+  // enqueue_scheduler_step_status_automation (2026-05-07) handles automation
+  // dispatch — do NOT also call queue_matching_automations here (caused the
+  // 2026-05-08 email spam bug, see ProductionScheduler.tsx for context).
+  const handleStatusChange = async (entryId: string, stepId: string, newStatus: string) => {
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+    const updated = { ...(entry.step_statuses || {}), [stepId]: newStatus };
+    // Optimistic UI
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, step_statuses: updated } : e));
+    setEditingCell(null);
+    try {
+      const { error } = await supabase
+        .from('production_schedule_entries')
+        .update({ step_statuses: updated })
+        .eq('id', entryId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to update step status:', err);
+      // Revert on failure
+      setEntries(prev => prev.map(e => e.id === entryId ? entry : e));
+      alert('Failed to update status. Please try again.');
+    }
+  };
+
+  const getStatusColor = (steps: WorkflowStep[], stepId: string, statusName: string) => {
+    const step = steps.find(s => s.id === stepId);
+    const status = step?.statuses.find(s => s.status_name === statusName);
+    return status?.status_color || '#6B7280';
+  };
 
   const toggleExpand = (workOrderId: string) => {
     setExpanded(prev => {
@@ -308,9 +394,8 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                   : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
 
               return (
-                <>
+                <Fragment key={woKey}>
                   <tr
-                    key={woKey}
                     className="border-t border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30 cursor-pointer"
                     onClick={() => toggleExpand(woKey)}
                   >
@@ -350,51 +435,108 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                     const statusName = wo?.custom_invoice_status_id
                       ? customStatusNames[wo.custom_invoice_status_id]
                       : null;
+                    const steps = workflowsByType[entry.type_of_work] || [];
                     return (
-                      <tr key={entry.id} className="border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30">
-                        <td className="px-3 py-2"></td>
-                        <td className="px-3 py-2 pl-8 text-xs text-gray-700 dark:text-gray-300">
-                          <span className="inline-block w-3 text-gray-400">⤷</span>
-                          <span className="font-medium">{entry.type_of_work}</span>
-                          {entry.imprint_number && (
-                            <span className="ml-2 text-gray-500 dark:text-gray-400">{entry.imprint_number}</span>
-                          )}
-                        </td>
-                        {/* Stock Status badge — same semantics as
-                            ProductionScheduler. Red = ordered, yellow =
-                            partial receipt, green = fully received. */}
-                        <td className="px-3 py-2">
-                          <StockStatusBadge status={entry.stock_status || 'none'} />
-                        </td>
-                        {/* Art Status badge */}
-                        <td className="px-3 py-2">
-                          <ArtStatusBadge status={entry.art_status || 'none'} />
-                        </td>
-                        <td className="px-3 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{entry.quantity}</td>
-                        <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
-                          {statusName ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              {statusName}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 dark:text-gray-500">Pending</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <button
-                            onClick={() => handleScheduleDecoration(entry)}
-                            disabled={scheduling[entry.id]}
-                            className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
-                            title={`Move to ${entry.type_of_work} schedule`}
-                          >
-                            {scheduling[entry.id] ? 'Moving…' : 'Schedule →'}
-                          </button>
-                        </td>
-                      </tr>
+                      <Fragment key={entry.id}>
+                        <tr className="border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30">
+                          <td className="px-3 py-2"></td>
+                          <td className="px-3 py-2 pl-8 text-xs text-gray-700 dark:text-gray-300">
+                            <span className="inline-block w-3 text-gray-400">⤷</span>
+                            <span className="font-medium">{entry.type_of_work}</span>
+                            {entry.imprint_number && (
+                              <span className="ml-2 text-gray-500 dark:text-gray-400">{entry.imprint_number}</span>
+                            )}
+                          </td>
+                          {/* Stock Status badge — same semantics as
+                              ProductionScheduler. Red = ordered, yellow =
+                              partial receipt, green = fully received. */}
+                          <td className="px-3 py-2">
+                            <StockStatusBadge status={entry.stock_status || 'none'} />
+                          </td>
+                          {/* Art Status badge */}
+                          <td className="px-3 py-2">
+                            <ArtStatusBadge status={entry.art_status || 'none'} />
+                          </td>
+                          <td className="px-3 py-2 text-right text-xs text-gray-700 dark:text-gray-300">{entry.quantity}</td>
+                          <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+                            {statusName ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                {statusName}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-500">Pending</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              onClick={() => handleScheduleDecoration(entry)}
+                              disabled={scheduling[entry.id]}
+                              className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
+                              title={`Move to ${entry.type_of_work} schedule`}
+                            >
+                              {scheduling[entry.id] ? 'Moving…' : 'Schedule →'}
+                            </button>
+                          </td>
+                        </tr>
+                        {/* Workflow step dropdowns for this imprint — sourced
+                            from Settings → Types of Work for this type. Click
+                            the pill to change status. Same JSONB key
+                            (step_name) ProductionScheduler writes, so the DB
+                            trigger fires identically. Per client 2026-05-11. */}
+                        {steps.length > 0 && (
+                          <tr className="border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30">
+                            <td className="px-3 pb-3"></td>
+                            <td colSpan={6} className="px-3 pb-3 pl-12">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {steps.map(step => {
+                                  const currentStatus = entry.step_statuses?.[step.id]
+                                    || step.statuses.find(s => s.is_default)?.status_name
+                                    || 'Not Started';
+                                  const statusColor = getStatusColor(steps, step.id, currentStatus);
+                                  const isEditing = editingCell?.entryId === entry.id && editingCell?.stepId === step.id;
+                                  return (
+                                    <div key={step.id} className="flex items-center gap-1.5">
+                                      <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-medium">
+                                        {step.step_name}
+                                      </span>
+                                      {isEditing ? (
+                                        <select
+                                          autoFocus
+                                          value={currentStatus}
+                                          onChange={(e) => handleStatusChange(entry.id, step.id, e.target.value)}
+                                          onBlur={() => setEditingCell(null)}
+                                          className="px-2 py-0.5 text-xs border border-green-500 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                                        >
+                                          {step.statuses.map(s => (
+                                            <option key={s.status_name} value={s.status_name}>{s.status_name}</option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <button
+                                          onClick={() => setEditingCell({ entryId: entry.id, stepId: step.id })}
+                                          className="px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap"
+                                          style={{
+                                            backgroundColor: `${statusColor}20`,
+                                            color: statusColor,
+                                            border: `1px solid ${statusColor}40`,
+                                          }}
+                                          title={`Change ${step.step_name} status`}
+                                        >
+                                          {currentStatus}
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
