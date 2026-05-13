@@ -13,6 +13,7 @@ interface ScheduleEntry {
   quote_number: string | null;
   type_of_work: string;
   production_due_date: string;
+  line_item_id: string | null;
   quantity: number;
   step_statuses: Record<string, string>;
   priority_order: number;
@@ -20,6 +21,10 @@ interface ScheduleEntry {
   is_on_master_schedule: boolean;
   stock_status?: 'none' | 'ordered' | 'partial' | 'received';
   art_status?: 'pending' | 'approved' | 'rejected' | 'none';
+  // 2026-05-13 — line item group label from quote_line_items. Lets us
+  // group imprints in Master by group within a WO, since different groups
+  // can carry different artwork.
+  group_label?: string;
 }
 
 interface WorkOrderInfo {
@@ -66,6 +71,17 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
   const [scheduling, setScheduling] = useState<Record<string, boolean>>({});
   const [workflowsByType, setWorkflowsByType] = useState<Record<string, WorkflowStep[]>>({});
   const [editingCell, setEditingCell] = useState<{ groupKey: string; stepId: string } | null>(null);
+  // 2026-05-13 — when admin clicks Schedule, prompt for the production date
+  // before moving the group off master. Modal carries the (woKey, groupLabel,
+  // typeOfWork) the action targets + the pre-filled default date.
+  const [scheduleModal, setScheduleModal] = useState<{
+    woKey: string;
+    groupLabel: string;
+    typeOfWork: string;
+    woNumber: string;
+    defaultDate: string;
+  } | null>(null);
+  const [scheduleDateInput, setScheduleDateInput] = useState<string>('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -94,6 +110,20 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
         .order('priority_order', { ascending: true });
 
       const rawList: ScheduleEntry[] = entriesData || [];
+
+      // Fetch group_label per line_item_id — used to group imprints in the
+      // expanded view by line-item-group (client 2026-05-13).
+      const lineItemIds = [...new Set(rawList.map(e => e.line_item_id).filter(Boolean))] as string[];
+      const groupLabelByLineItem = new Map<string, string>();
+      if (lineItemIds.length > 0) {
+        const { data: lineItems } = await supabase
+          .from('quote_line_items')
+          .select('id, group_label')
+          .in('id', lineItemIds);
+        (lineItems || []).forEach((li: any) => {
+          groupLabelByLineItem.set(li.id, (li.group_label || '').trim());
+        });
+      }
 
       // Enrich with stock_status + art_status (same semantics as
       // ProductionScheduler).
@@ -157,6 +187,7 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
         ...e,
         stock_status: e.quote_id ? (stockMap.get(e.quote_id) ?? 'none') : 'none',
         art_status: e.quote_id ? (artMap.get(e.quote_id) ?? 'none') : 'none',
+        group_label: e.line_item_id ? (groupLabelByLineItem.get(e.line_item_id) || '') : '',
       }));
       setEntries(list);
 
@@ -218,21 +249,29 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
     loadData();
   }, [loadData]);
 
-  // Write step status to ALL entries that share (work_order_id, type_of_work).
-  // Per client 2026-05-13: "if there's a front and a back and they're both
-  // screen printing I only have to change one status per type of imprint".
+  // Write step status to ALL entries that share (work_order_id, group_label,
+  // type_of_work). Per client 2026-05-13: "if there's a front and a back and
+  // they're both screen printing I only have to change one status per type of
+  // imprint" — extended to also keep different line-item groups independent
+  // since "different line item groups can have different artwork".
   // The DB trigger enqueue_scheduler_step_status_automation handles
   // automation dispatch; do NOT also call queue_matching_automations here
   // (see ProductionScheduler.tsx for the 2026-05-08 email spam bug).
   const handleGroupStatusChange = async (groupKey: string, stepId: string, newStatus: string) => {
-    const [woId, typeOfWork] = parseGroupKey(groupKey);
-    const groupEntries = entries.filter(e => (e.work_order_id || 'unassigned') === woId && e.type_of_work === typeOfWork);
+    const [woId, groupLabel, typeOfWork] = parseGroupKey(groupKey);
+    const groupEntries = entries.filter(e =>
+      (e.work_order_id || 'unassigned') === woId
+      && (e.group_label || '') === groupLabel
+      && e.type_of_work === typeOfWork
+    );
     if (groupEntries.length === 0) return;
 
     const snapshot = groupEntries.map(e => ({ id: e.id, step_statuses: e.step_statuses }));
 
     setEntries(prev => prev.map(e => {
-      if ((e.work_order_id || 'unassigned') === woId && e.type_of_work === typeOfWork) {
+      if ((e.work_order_id || 'unassigned') === woId
+        && (e.group_label || '') === groupLabel
+        && e.type_of_work === typeOfWork) {
         return { ...e, step_statuses: { ...(e.step_statuses || {}), [stepId]: newStatus } };
       }
       return e;
@@ -273,23 +312,53 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
     });
   };
 
-  // Move every imprint of (work_order_id, type_of_work) off master and into
-  // its type-specific tab in one click. Per client 2026-05-13: type-level
-  // schedule action, not per-imprint.
-  const handleScheduleGroup = async (woId: string, typeOfWork: string) => {
-    const groupKey = makeGroupKey(woId, typeOfWork);
-    const groupEntries = entries.filter(e => (e.work_order_id || 'unassigned') === woId && e.type_of_work === typeOfWork);
-    if (groupEntries.length === 0) return;
+  // Open the schedule-date modal (client 2026-05-13: prompt for date when
+  // Schedule is clicked instead of moving immediately).
+  const openScheduleModal = (woKey: string, groupLabel: string, typeOfWork: string, woNumber: string) => {
+    const groupEntries = entries.filter(e =>
+      (e.work_order_id || 'unassigned') === woKey
+      && (e.group_label || '') === groupLabel
+      && e.type_of_work === typeOfWork
+    );
+    const defaultDate = groupEntries[0]?.production_due_date || format(new Date(), 'yyyy-MM-dd');
+    setScheduleModal({ woKey, groupLabel, typeOfWork, woNumber, defaultDate });
+    setScheduleDateInput(defaultDate);
+  };
 
+  // Confirm the schedule modal: write the chosen production_due_date to every
+  // entry in (woKey, groupLabel, typeOfWork) and flip is_on_master_schedule
+  // off so it leaves master and lands on its type tab on the chosen date.
+  const confirmSchedule = async () => {
+    if (!scheduleModal) return;
+    const { woKey, groupLabel, typeOfWork } = scheduleModal;
+    const groupEntries = entries.filter(e =>
+      (e.work_order_id || 'unassigned') === woKey
+      && (e.group_label || '') === groupLabel
+      && e.type_of_work === typeOfWork
+    );
+    if (groupEntries.length === 0) {
+      setScheduleModal(null);
+      return;
+    }
+    if (!scheduleDateInput) {
+      alert('Pick a production date first.');
+      return;
+    }
+
+    const groupKey = makeGroupKey(woKey, groupLabel, typeOfWork);
     setScheduling(prev => ({ ...prev, [groupKey]: true }));
     try {
       const ids = groupEntries.map(e => e.id);
       const { error } = await supabase
         .from('production_schedule_entries')
-        .update({ is_on_master_schedule: false })
+        .update({
+          is_on_master_schedule: false,
+          production_due_date: scheduleDateInput,
+        })
         .in('id', ids);
       if (error) throw error;
       setEntries(prev => prev.filter(e => !ids.includes(e.id)));
+      setScheduleModal(null);
     } catch (err) {
       console.error('Failed to schedule group:', err);
       alert('Failed to schedule. Please try again.');
@@ -385,11 +454,22 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
               const woArt = aggregateArt(groupEntries);
               const imprintTypes = [...new Set(groupEntries.map(e => e.type_of_work))];
 
-              // Sub-group entries by type_of_work for the expanded view.
-              const byType = imprintTypes.map(t => ({
-                type: t,
-                items: groupEntries.filter(e => e.type_of_work === t),
-              }));
+              // Sub-group entries by (group_label, type_of_work) for the
+              // expanded view. Within each WO we get one row per
+              // (line-item-group, decoration type). Per client 2026-05-13:
+              // line item groups stay separate so artwork can differ.
+              const subGroupMap = new Map<string, { groupLabel: string; type: string; items: ScheduleEntry[] }>();
+              for (const e of groupEntries) {
+                const gl = (e.group_label || '').trim();
+                const t = e.type_of_work;
+                const key = `${gl}::${t}`;
+                if (!subGroupMap.has(key)) subGroupMap.set(key, { groupLabel: gl, type: t, items: [] });
+                subGroupMap.get(key)!.items.push(e);
+              }
+              const byGroup = Array.from(subGroupMap.values()).sort((a, b) => {
+                if (a.groupLabel !== b.groupLabel) return a.groupLabel.localeCompare(b.groupLabel);
+                return a.type.localeCompare(b.type);
+              });
 
               return (
                 <Fragment key={woKey}>
@@ -439,19 +519,21 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                     </td>
                   </tr>
 
-                  {/* Expanded: one row per (WO, type_of_work). All imprints
-                      of that type share a single set of step pills. */}
-                  {isExpanded && byType.map(group => {
-                    const allSteps = workflowsByType[group.type] || [];
+                  {/* Expanded: one row per (line-item-group, type_of_work).
+                      All imprints of that combo share a single set of step
+                      pills. Different line item groups stay separate per
+                      client 2026-05-13 (so they can carry different art). */}
+                  {isExpanded && byGroup.map(sub => {
+                    const allSteps = workflowsByType[sub.type] || [];
                     // Hide "Production Status" — set on the production floor
                     // via the per-type Scheduler tab, not on Master.
                     const visibleSteps = allSteps.filter(s =>
                       s.step_name.trim().toLowerCase() !== 'production status'
                     );
-                    const groupKey = makeGroupKey(woKey, group.type);
+                    const groupKey = makeGroupKey(woKey, sub.groupLabel, sub.type);
                     const isScheduling = !!scheduling[groupKey];
-                    const totalGroupQty = group.items.reduce((sum, i) => sum + (i.quantity || 0), 0);
-                    const imprintLabels = group.items
+                    const totalGroupQty = sub.items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+                    const imprintLabels = sub.items
                       .map(i => i.imprint_number)
                       .filter(Boolean)
                       .join(', ');
@@ -459,23 +541,27 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                     // The status displayed on the group row uses the first
                     // entry's value (all entries in the group are kept in
                     // sync via handleGroupStatusChange).
-                    const representative = group.items[0];
+                    const representative = sub.items[0];
+                    const groupLabelDisplay = sub.groupLabel || 'Default Group';
 
                     return (
                       <tr key={groupKey} className="border-t border-gray-100 dark:border-slate-800 bg-gray-50/40 dark:bg-slate-900/30">
                         <td className="px-3 py-3"></td>
                         <td colSpan={8} className="px-3 py-3">
                           <div className="flex flex-col gap-2">
-                            {/* Header line: type, imprints, qty, schedule btn */}
+                            {/* Header line: group, type, imprints, qty, schedule btn */}
                             <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-baseline gap-3 min-w-0">
+                              <div className="flex items-baseline gap-3 min-w-0 flex-wrap">
                                 <span className="inline-block w-3 text-gray-400">⤷</span>
+                                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/30 rounded-full whitespace-nowrap">
+                                  {groupLabelDisplay}
+                                </span>
                                 <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                                  {group.type}
+                                  {sub.type}
                                 </span>
                                 {imprintLabels && (
                                   <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                    {group.items.length} imprint{group.items.length === 1 ? '' : 's'}: {imprintLabels}
+                                    {sub.items.length} imprint{sub.items.length === 1 ? '' : 's'}: {imprintLabels}
                                   </span>
                                 )}
                                 <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -483,19 +569,20 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                                 </span>
                               </div>
                               <button
-                                onClick={() => handleScheduleGroup(woKey, group.type)}
+                                onClick={() => openScheduleModal(woKey, sub.groupLabel, sub.type, woNumber)}
                                 disabled={isScheduling}
                                 className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 whitespace-nowrap"
-                                title={`Move all ${group.type} imprints to the ${group.type} schedule`}
+                                title={`Schedule ${groupLabelDisplay} · ${sub.type}`}
                               >
                                 {isScheduling ? 'Moving…' : 'Schedule →'}
                               </button>
                             </div>
 
-                            {/* Step pills, laid out like the per-type
-                                Scheduler. STEP NAME (small caps) + status
+                            {/* Step pills — STEP NAME (small caps) + status
                                 pill. One change updates every imprint in
-                                the group. */}
+                                this (group, type) bucket. Pill text is
+                                gray-900 in light mode for readability
+                                (client 2026-05-13). */}
                             {visibleSteps.length > 0 && (
                               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pl-6">
                                 {visibleSteps.map(step => {
@@ -524,13 +611,12 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                                       ) : (
                                         <button
                                           onClick={() => setEditingCell({ groupKey, stepId: step.id })}
-                                          className="px-2.5 py-0.5 text-xs font-medium rounded-full whitespace-nowrap"
+                                          className="px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap text-gray-900 dark:text-white"
                                           style={{
-                                            backgroundColor: `${statusColor}20`,
-                                            color: statusColor,
-                                            border: `1px solid ${statusColor}40`,
+                                            backgroundColor: `${statusColor}33`,
+                                            border: `1px solid ${statusColor}80`,
                                           }}
-                                          title={`Change ${step.step_name} status (applies to all ${group.type} imprints in this WO)`}
+                                          title={`Change ${step.step_name} status (applies to all imprints in this ${groupLabelDisplay} · ${sub.type} bucket)`}
                                         >
                                           {currentStatus}
                                         </button>
@@ -554,22 +640,72 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
 
       <div className="px-4 py-2.5 border-t border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/30 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
         <AlertCircle className="w-3.5 h-3.5" />
-        Click <span className="font-medium">Schedule →</span> on a decoration type to move every imprint of that type into its type-specific schedule. When every type on a WO is scheduled, the work order drops off this view.
+        Click <span className="font-medium">Schedule →</span> to pick a production date and move every imprint of that group to its type-specific schedule. When every group on a WO is scheduled, the work order drops off this view.
       </div>
+
+      {/* Schedule date prompt — client 2026-05-13. Picks the production date
+          before flipping the entries off master. */}
+      {scheduleModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setScheduleModal(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+              Schedule {scheduleModal.typeOfWork}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <span className="font-medium">{scheduleModal.woNumber}</span>
+              {' · '}
+              <span className="font-medium">{scheduleModal.groupLabel || 'Default Group'}</span>
+            </p>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Production Date
+            </label>
+            <input
+              type="date"
+              value={scheduleDateInput}
+              onChange={(e) => setScheduleDateInput(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+              autoFocus
+            />
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+              All imprints in this group will be moved to the {scheduleModal.typeOfWork} schedule under this date.
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setScheduleModal(null)}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-600 rounded hover:bg-gray-50 dark:hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSchedule}
+                className="px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded"
+              >
+                Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Group-key helpers: encode (woId, typeOfWork) as a single string so we can
-// use it as an editing-cell handle and a scheduling-loading key without
-// nested maps.
-function makeGroupKey(woId: string, typeOfWork: string): string {
-  return `${woId}::${typeOfWork}`;
+// Group-key helpers: encode (woId, groupLabel, typeOfWork) as a single string
+// so we can use it as an editing-cell handle and a scheduling-loading key
+// without nested maps. Separator '::' is safe since group_label and
+// type_of_work are user-entered text but unlikely to contain that sequence.
+function makeGroupKey(woId: string, groupLabel: string, typeOfWork: string): string {
+  return `${woId}::${groupLabel}::${typeOfWork}`;
 }
-function parseGroupKey(key: string): [string, string] {
-  const idx = key.indexOf('::');
-  if (idx < 0) return [key, ''];
-  return [key.slice(0, idx), key.slice(idx + 2)];
+function parseGroupKey(key: string): [string, string, string] {
+  const parts = key.split('::');
+  return [parts[0] || '', parts[1] || '', parts[2] || ''];
 }
 
 // Worst-case stock across all imprints in a WO. If anything is short, surface
