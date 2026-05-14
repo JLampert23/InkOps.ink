@@ -74,6 +74,9 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
   // flow. Same UX as the PO receive modal; just operates on
   // garment_requirements_staging rows instead of PO line items.
   const [receiveModalTarget, setReceiveModalTarget] = useState<MarkedOrderedItem | null>(null);
+  // 2026-05-15 — search for the Marked Ordered table. Filters client-side
+  // across WO#, customer, quote, style, style name, color, supplier.
+  const [markedOrderedSearch, setMarkedOrderedSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -559,21 +562,51 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
           Per client 2026-05-08 (Path C): items flagged Ordered in
           Garment Order Report that don't have a formal PO show up here
           so the user has one place to receive. */}
-      {markedOrderedItems.length > 0 && (
+      {markedOrderedItems.length > 0 && (() => {
+        // 2026-05-15 — client asked for search in the receiving module.
+        // Filter client-side across the visible columns + WO#.
+        const needle = markedOrderedSearch.trim().toLowerCase();
+        const filteredMarked = needle === ''
+          ? markedOrderedItems
+          : markedOrderedItems.filter((item) => {
+              const hay = [
+                item.work_order_number,
+                item.customer_name,
+                item.quote_number,
+                item.style_number,
+                item.style_name,
+                item.color,
+                item.supplier_name,
+              ].filter(Boolean).join(' ').toLowerCase();
+              return hay.includes(needle);
+            });
+        return (
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-900/10 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 bg-amber-50/50 dark:bg-amber-900/10 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                 Marked Ordered — Awaiting Check-In
               </h3>
               <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 rounded-full">
-                {markedOrderedItems.length}
+                {filteredMarked.length}{filteredMarked.length !== markedOrderedItems.length ? ` / ${markedOrderedItems.length}` : ''}
               </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              From Garment Order Report (no PO)
-            </p>
+            <div className="flex items-center gap-3 flex-1 justify-end">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search WO / customer / style / color…"
+                  value={markedOrderedSearch}
+                  onChange={(e) => setMarkedOrderedSearch(e.target.value)}
+                  className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                From Garment Order Report (no PO)
+              </p>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -589,7 +622,14 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                 </tr>
               </thead>
               <tbody>
-                {markedOrderedItems.map((item) => {
+                {filteredMarked.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No items match "{markedOrderedSearch}".
+                    </td>
+                  </tr>
+                )}
+                {filteredMarked.map((item) => {
                   const remaining = Math.max(0, item.total_quantity - item.quantity_received);
                   const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
                   const draftValue = receiveQtyDraft[item.id] ?? '';
@@ -675,7 +715,8 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
             </table>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Search */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
