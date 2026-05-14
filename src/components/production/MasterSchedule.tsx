@@ -568,7 +568,7 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                     // entry's value (all entries in the group are kept in
                     // sync via handleGroupStatusChange).
                     const representative = sub.items[0];
-                    const groupLabelDisplay = sub.groupLabel || 'Default Group';
+                    const groupLabelDisplay = sub.groupLabel || 'Group 1';
 
                     return (
                       <tr key={groupKey} className="border-t border-gray-100 dark:border-slate-800 bg-gray-50/40 dark:bg-slate-900/30">
@@ -686,7 +686,7 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               <span className="font-medium">{scheduleModal.woNumber}</span>
               {' · '}
-              <span className="font-medium">{scheduleModal.groupLabel || 'Default Group'}</span>
+              <span className="font-medium">{scheduleModal.groupLabel || 'Group 1'}</span>
             </p>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Production Date
