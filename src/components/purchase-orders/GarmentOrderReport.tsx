@@ -463,10 +463,22 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     if (!companyId) return;
     try {
       const now = new Date().toISOString();
-      // Update any existing staging rows for this style+color.
+      // 2026-05-14 — also flow the report's total_needed onto the staging
+      // row so the Receiving Dashboard (Quick Receive) knows how many units
+      // to expect. Previously the qty wasn't carrying over and Receiving
+      // showed "Needed: 0", per client feedback.
+      const qtyNeeded = garment.total_needed || 0;
+
+      // Update any existing staging rows for this style+color. We bring
+      // total_quantity along too — there are legacy rows where the cascade
+      // inserted with 0, and there's no harm in normalising on Mark Ordered.
       const { data: updated, error: updateError } = await supabase
         .from('garment_requirements_staging')
-        .update({ is_ordered: true, ordered_at: now })
+        .update({
+          is_ordered: true,
+          ordered_at: now,
+          total_quantity: qtyNeeded,
+        })
         .eq('company_id', companyId)
         .eq('style_number', garment.style_number)
         .eq('color', garment.color)
@@ -475,7 +487,8 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       if (updateError) throw updateError;
 
       // If no staging row exists yet (quote was approved without auto-PO
-      // creation), insert one so the flag persists across refreshes.
+      // creation, or the cascade skipped items without item_number), insert
+      // one so the flag persists across refreshes AND total_quantity is set.
       if (!updated || updated.length === 0) {
         const firstJob = garment.jobs[0];
         if (!firstJob?.quote_id) {
@@ -490,7 +503,9 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
             work_order_id: firstJob.work_order_id || null,
             supplier_name: garment.supplier === 'Unknown' ? null : garment.supplier,
             style_number: garment.style_number,
+            style_name: garment.product_name || null,
             color: garment.color,
+            total_quantity: qtyNeeded,
             is_ordered: true,
             ordered_at: now,
           }]);

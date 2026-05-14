@@ -45,6 +45,9 @@ interface MarkedOrderedItem {
   supplier_name: string | null;
   customer_name?: string;
   quote_number?: string;
+  // 2026-05-14 — show WO# on the Receiving row so admin knows which work
+  // order each pending receipt belongs to.
+  work_order_number?: string;
 }
 
 export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboardProps) {
@@ -185,6 +188,18 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       return;
     }
 
+    // Pull WO numbers for any rows that have work_order_id (one query
+    // instead of N joins) so the table can show WO# alongside the quote.
+    const woIds = [...new Set((data || []).map((r: any) => r.work_order_id).filter(Boolean))] as string[];
+    const woNumberById = new Map<string, string>();
+    if (woIds.length > 0) {
+      const { data: wos } = await supabase
+        .from('work_orders')
+        .select('id, work_order_number')
+        .in('id', woIds);
+      (wos || []).forEach((w: any) => woNumberById.set(w.id, w.work_order_number));
+    }
+
     setMarkedOrderedItems(
       (data || []).map((row: any) => ({
         id: row.id,
@@ -199,6 +214,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         supplier_name: row.supplier_name,
         customer_name: row.quotes?.customer_name,
         quote_number: row.quotes?.quote_number,
+        work_order_number: row.work_order_id ? woNumberById.get(row.work_order_id) : undefined,
       }))
     );
   };
@@ -549,6 +565,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-slate-900/50">
                 <tr>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Work Order</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Customer / Quote</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Style</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Color</th>
@@ -566,6 +583,9 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                   const validDraft = !isNaN(draftNum) && draftNum > 0 && draftNum <= remaining;
                   return (
                     <tr key={item.id} className="border-t border-gray-200 dark:border-slate-700">
+                      <td className="px-4 py-2 text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                        {item.work_order_number || '—'}
+                      </td>
                       <td className="px-4 py-2">
                         <div className="font-medium text-gray-900 dark:text-white">
                           {item.customer_name || '—'}
