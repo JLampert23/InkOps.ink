@@ -468,16 +468,26 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       // to expect. Previously the qty wasn't carrying over and Receiving
       // showed "Needed: 0", per client feedback.
       const qtyNeeded = garment.total_needed || 0;
+      // Build a flat {size: needed} map from the report row's size data
+      // so the size-level receive modal has a breakdown to render against.
+      // Skip sizes with 0 needed to keep the popup clean.
+      const sizesNeeded: Record<string, number> = {};
+      Object.entries(garment.sizes || {}).forEach(([size, data]) => {
+        const needed = (data as any)?.needed || 0;
+        if (needed > 0) sizesNeeded[size] = needed;
+      });
 
       // Update any existing staging rows for this style+color. We bring
-      // total_quantity along too — there are legacy rows where the cascade
-      // inserted with 0, and there's no harm in normalising on Mark Ordered.
+      // total_quantity AND sizes along too — there are legacy rows where
+      // the cascade inserted with 0/empty, and there's no harm in
+      // normalising on Mark Ordered.
       const { data: updated, error: updateError } = await supabase
         .from('garment_requirements_staging')
         .update({
           is_ordered: true,
           ordered_at: now,
           total_quantity: qtyNeeded,
+          sizes: Object.keys(sizesNeeded).length > 0 ? sizesNeeded : undefined,
         })
         .eq('company_id', companyId)
         .eq('style_number', garment.style_number)
@@ -506,6 +516,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
             style_name: garment.product_name || null,
             color: garment.color,
             total_quantity: qtyNeeded,
+            sizes: Object.keys(sizesNeeded).length > 0 ? sizesNeeded : {},
             is_ordered: true,
             ordered_at: now,
           }]);
