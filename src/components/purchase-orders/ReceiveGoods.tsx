@@ -231,7 +231,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           variance_notes: '',
         }));
 
-      const { error } = await ReceivingService.processReceiving(
+      const { data, error } = await ReceivingService.processReceiving(
         poId,
         user.id,
         receivingLineItems,
@@ -239,6 +239,17 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       );
 
       if (error) throw error;
+
+      // 2026-05-14 — process_receiving returns jsonb {success, error, message}
+      // from inside the RPC. If success=false (e.g. vendor confirmation
+      // required, or any caught exception inside the function), the outer
+      // 'error' is null but the actual save was rolled back. Previously
+      // this codepath swallowed those failures and showed a fake success
+      // toast. Surface the real message now.
+      const result = data as any;
+      if (result && result.success === false) {
+        throw new Error(result.message || result.error || 'Receiving failed (no message returned)');
+      }
 
       alert('Goods received successfully!');
       onSuccess();
