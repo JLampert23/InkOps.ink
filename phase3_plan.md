@@ -19,7 +19,7 @@ All deployed to `InkOps-Production`.
 
 | Client doc item | Internal id | Status |
 |-----------------|-------------|--------|
-| "Inkops branded password reset email" (unnumbered #1) | T1-D | ✅ Done |
+| "Inkops branded password reset email" (unnumbered #1) | T1-D | ✅ Done (closeout 2026-05-14: added `/reset-password` route + PASSWORD_RECOVERY handler + branded email HTML at `supabase/email-templates/reset-password.html`. Email template must be pasted into Supabase Dashboard → Auth → Email Templates → Reset Password.) |
 | "Quote terms / invoice terms on customer-facing PDFs and emails" (unnumbered #2) | T1-C | ✅ Done |
 | "Scheduler sorting — This / Next / Last week" (#3) | T2-A | ✅ Done |
 | "Add contact name to the invoice" (small #1) | T1-B | ✅ Done |

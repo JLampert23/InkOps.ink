@@ -20,6 +20,7 @@ import { PortalLogin } from './components/portal/PortalLogin';
 import { PortalPasswordSetup } from './components/portal/PortalPasswordSetup';
 import { PortalForgotPassword } from './components/portal/PortalForgotPassword';
 import { PortalResetPassword } from './components/portal/PortalResetPassword';
+import { ResetPassword } from './components/ResetPassword';
 import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
 import { NotificationBell } from './components/NotificationBell';
 import { hideInitialLoader } from './utils/loader';
@@ -849,6 +850,21 @@ function App() {
   const isPortalPage = path.startsWith('/portal');
   const isDirectCustomerPage = path.match(/^\/customer\/([^/]+)/);
   const isFeaturesPage = path === '/features' || path === '/features/';
+  // 2026-05-14 — admin password recovery landing (Phase 3.1 T1-D).
+  // Supabase's resetPasswordForEmail redirects here with a recovery
+  // token in the URL hash. Render standalone (outside AuthProvider) so
+  // the recovery session doesn't immediately get treated as a regular
+  // sign-in and bounce the user into the app.
+  const isResetPasswordPage = path === '/reset-password' || path === '/reset-password/';
+
+  if (isResetPasswordPage) {
+    hideInitialLoader();
+    return (
+      <ThemeProvider>
+        <ResetPassword />
+      </ThemeProvider>
+    );
+  }
 
   if (isFeaturesPage) {
     hideInitialLoader();
