@@ -12,6 +12,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { format, isAfter, isBefore, isToday, parseISO } from 'date-fns';
+import { ReceiveMarkedOrderedModal } from './ReceiveMarkedOrderedModal';
 
 interface PurchaseOrder {
   id: string;
@@ -48,6 +49,10 @@ interface MarkedOrderedItem {
   // 2026-05-14 — show WO# on the Receiving row so admin knows which work
   // order each pending receipt belongs to.
   work_order_number?: string;
+  // Per-size breakdown of what was ordered and what's been received so
+  // far. Drives the size-level receive modal.
+  sizes?: Record<string, number> | null;
+  quantity_received_by_size?: Record<string, number> | null;
 }
 
 export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboardProps) {
@@ -60,9 +65,15 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
   // record receipts. (Path C from the 2026-05-08 client decision.)
   const [markedOrderedItems, setMarkedOrderedItems] = useState<MarkedOrderedItem[]>([]);
   // Per-row in-progress qty input for the Quick Receive form. Keyed by
-  // staging row id so each row's input is independent.
+  // staging row id so each row's input is independent. (Legacy fallback
+  // only — used when a staging row has no size breakdown. Modern rows
+  // open the size-level modal instead.)
   const [receiveQtyDraft, setReceiveQtyDraft] = useState<Record<string, string>>({});
   const [savingReceive, setSavingReceive] = useState<Record<string, boolean>>({});
+  // 2026-05-14 — modal target for the size-level Mark Ordered receive
+  // flow. Same UX as the PO receive modal; just operates on
+  // garment_requirements_staging rows instead of PO line items.
+  const [receiveModalTarget, setReceiveModalTarget] = useState<MarkedOrderedItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,6 +180,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         id, quote_id, work_order_id,
         style_number, style_name, color,
         total_quantity, quantity_received,
+        sizes, quantity_received_by_size,
         ordered_at, supplier_name,
         is_po_created, is_received,
         quotes!garment_requirements_staging_quote_id_fkey (
@@ -215,6 +227,8 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         customer_name: row.quotes?.customer_name,
         quote_number: row.quotes?.quote_number,
         work_order_number: row.work_order_id ? woNumberById.get(row.work_order_id) : undefined,
+        sizes: row.sizes || null,
+        quantity_received_by_size: row.quantity_received_by_size || null,
       }))
     );
   };
@@ -613,29 +627,45 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2 justify-end">
-                          <input
-                            type="number"
-                            min="1"
-                            max={remaining}
-                            placeholder={String(remaining)}
-                            value={draftValue}
-                            onChange={(e) =>
-                              setReceiveQtyDraft((prev) => ({ ...prev, [item.id]: e.target.value }))
-                            }
-                            className="w-20 px-2 py-1 text-right text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                          />
-                          <button
-                            onClick={() => {
-                              const qty = parseInt(receiveQtyDraft[item.id] || String(remaining), 10);
-                              if (qty > 0 && qty <= remaining) {
-                                handleQuickReceive(item, qty);
-                              }
-                            }}
-                            disabled={savingReceive[item.id] || (!!draftValue && !validDraft)}
-                            className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {savingReceive[item.id] ? 'Saving...' : 'Receive'}
-                          </button>
+                          {/* If the staging row has a per-size breakdown,
+                              open the size-level modal (matches the PO
+                              receive UX per client 2026-05-14). Legacy
+                              rows without a `sizes` breakdown keep the
+                              old single-input Quick Receive form. */}
+                          {item.sizes && Object.keys(item.sizes).length > 0 ? (
+                            <button
+                              onClick={() => setReceiveModalTarget(item)}
+                              className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                            >
+                              Receive
+                            </button>
+                          ) : (
+                            <>
+                              <input
+                                type="number"
+                                min="1"
+                                max={remaining}
+                                placeholder={String(remaining)}
+                                value={draftValue}
+                                onChange={(e) =>
+                                  setReceiveQtyDraft((prev) => ({ ...prev, [item.id]: e.target.value }))
+                                }
+                                className="w-20 px-2 py-1 text-right text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                              />
+                              <button
+                                onClick={() => {
+                                  const qty = parseInt(receiveQtyDraft[item.id] || String(remaining), 10);
+                                  if (qty > 0 && qty <= remaining) {
+                                    handleQuickReceive(item, qty);
+                                  }
+                                }}
+                                disabled={savingReceive[item.id] || (!!draftValue && !validDraft)}
+                                className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {savingReceive[item.id] ? 'Saving...' : 'Receive'}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -981,6 +1011,41 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
           </table>
         </div>
       </div>
+
+      {/* Size-level Mark Ordered receive modal — 2026-05-14 */}
+      {receiveModalTarget && (
+        <ReceiveMarkedOrderedModal
+          item={{
+            id: receiveModalTarget.id,
+            quote_id: receiveModalTarget.quote_id,
+            work_order_id: receiveModalTarget.work_order_id,
+            work_order_number: receiveModalTarget.work_order_number,
+            style_number: receiveModalTarget.style_number,
+            style_name: receiveModalTarget.style_name,
+            color: receiveModalTarget.color,
+            total_quantity: receiveModalTarget.total_quantity,
+            quantity_received: receiveModalTarget.quantity_received,
+            sizes: receiveModalTarget.sizes || null,
+            quantity_received_by_size: receiveModalTarget.quantity_received_by_size || null,
+            customer_name: receiveModalTarget.customer_name,
+            quote_number: receiveModalTarget.quote_number,
+          }}
+          onClose={() => setReceiveModalTarget(null)}
+          onSuccess={async () => {
+            // Refresh the marked-ordered list so partials show the new
+            // counter and fully-received rows drop off.
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('company_id')
+              .eq('id', user?.id || '')
+              .maybeSingle();
+            if (profile?.company_id) {
+              await loadMarkedOrderedItems(profile.company_id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
