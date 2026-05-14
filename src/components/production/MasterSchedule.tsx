@@ -111,10 +111,27 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
 
       const rawList: ScheduleEntry[] = entriesData || [];
 
-      // Fetch group_label per line_item_id — used to group imprints in the
-      // expanded view by line-item-group (client 2026-05-13).
+      // Fetch group_label per imprint — used to separate imprints in the
+      // expanded view by line-item-group (client 2026-05-14, QTE-0062 bug:
+      // multiple groups were collapsing into one Screen Print row).
+      //
+      // Authoritative source is quote_imprints.group_label (added in
+      // migration 20260126235522). Fall back to the parent line item's
+      // group_label (quote_line_items.group_label) if the imprint's value
+      // is empty — covers legacy imprints created before that migration.
+      const imprintIds = [...new Set(rawList.map(e => e.imprint_id).filter(Boolean))] as string[];
       const lineItemIds = [...new Set(rawList.map(e => e.line_item_id).filter(Boolean))] as string[];
+      const groupLabelByImprint = new Map<string, string>();
       const groupLabelByLineItem = new Map<string, string>();
+      if (imprintIds.length > 0) {
+        const { data: imprintRows } = await supabase
+          .from('quote_imprints')
+          .select('id, group_label')
+          .in('id', imprintIds);
+        (imprintRows || []).forEach((r: any) => {
+          groupLabelByImprint.set(r.id, (r.group_label || '').trim());
+        });
+      }
       if (lineItemIds.length > 0) {
         const { data: lineItems } = await supabase
           .from('quote_line_items')
@@ -183,12 +200,21 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
         });
       }
 
-      const list: ScheduleEntry[] = rawList.map(e => ({
-        ...e,
-        stock_status: e.quote_id ? (stockMap.get(e.quote_id) ?? 'none') : 'none',
-        art_status: e.quote_id ? (artMap.get(e.quote_id) ?? 'none') : 'none',
-        group_label: e.line_item_id ? (groupLabelByLineItem.get(e.line_item_id) || '') : '',
-      }));
+      const list: ScheduleEntry[] = rawList.map(e => {
+        // Resolve the imprint's group label. Prefer quote_imprints.group_label
+        // (authoritative since 2026-01-26 migration); fall back to the parent
+        // line item's group_label for legacy imprints; empty string means
+        // "default group" (rendered as a single bucket).
+        const fromImprint = e.imprint_id ? (groupLabelByImprint.get(e.imprint_id) || '') : '';
+        const fromLineItem = e.line_item_id ? (groupLabelByLineItem.get(e.line_item_id) || '') : '';
+        const groupLabel = fromImprint || fromLineItem || '';
+        return {
+          ...e,
+          stock_status: e.quote_id ? (stockMap.get(e.quote_id) ?? 'none') : 'none',
+          art_status: e.quote_id ? (artMap.get(e.quote_id) ?? 'none') : 'none',
+          group_label: groupLabel,
+        };
+      });
       setEntries(list);
 
       // Load workflow steps for every distinct type_of_work present.
