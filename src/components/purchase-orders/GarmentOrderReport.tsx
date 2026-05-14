@@ -1010,9 +1010,22 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           {groupBy === 'customer' && <Users className="w-4 h-4" />}
                           {groupBy === 'job' && <FileText className="w-4 h-4" />}
                           <span>{groupKey}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            ({items.length} {items.length === 1 ? 'line' : 'lines'})
-                          </span>
+                          {/* 2026-05-14 — client asked to show the WO
+                              numbers tied to this group instead of just a
+                              line count, so admin can see at a glance which
+                              jobs the garment feeds into. */}
+                          {(() => {
+                            const woNumbers = Array.from(new Set(
+                              items.flatMap(g => g.jobs.map(j => j.work_order_number).filter(Boolean))
+                            )) as string[];
+                            return (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {woNumbers.length > 0
+                                  ? `(${woNumbers.join(', ')})`
+                                  : `(${items.length} ${items.length === 1 ? 'line' : 'lines'})`}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>

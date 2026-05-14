@@ -559,10 +559,12 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                     const groupKey = makeGroupKey(woKey, sub.groupLabel, sub.type);
                     const isScheduling = !!scheduling[groupKey];
                     const totalGroupQty = sub.items.reduce((sum, i) => sum + (i.quantity || 0), 0);
-                    const imprintLabels = sub.items
-                      .map(i => i.imprint_number)
-                      .filter(Boolean)
-                      .join(', ');
+                    // 2026-05-14 — render each imprint number as its own
+                    // clickable button so admin can jump straight to the WO
+                    // from any imprint label (client ask).
+                    const imprintLinks = sub.items
+                      .map(i => ({ id: i.id, number: i.imprint_number, woId: i.work_order_id }))
+                      .filter(i => i.number);
 
                     // The status displayed on the group row uses the first
                     // entry's value (all entries in the group are kept in
@@ -585,9 +587,24 @@ export default function MasterSchedule({ onNavigateToWorkOrder }: MasterSchedule
                                 <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                                   {sub.type}
                                 </span>
-                                {imprintLabels && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                    {sub.items.length} imprint{sub.items.length === 1 ? '' : 's'}: {imprintLabels}
+                                {imprintLinks.length > 0 && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {sub.items.length} imprint{sub.items.length === 1 ? '' : 's'}:{' '}
+                                    {imprintLinks.map((imp, idx) => (
+                                      <Fragment key={imp.id}>
+                                        {idx > 0 && ', '}
+                                        {imp.woId && onNavigateToWorkOrder ? (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); onNavigateToWorkOrder(imp.woId!); }}
+                                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                          >
+                                            {imp.number}
+                                          </button>
+                                        ) : (
+                                          <span>{imp.number}</span>
+                                        )}
+                                      </Fragment>
+                                    ))}
                                   </span>
                                 )}
                                 <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
