@@ -4,6 +4,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
 import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2, Mail } from 'lucide-react';
 import { format } from 'date-fns';
+import { SendQuoteModal } from './SendQuoteModal';
 
 interface QuotesListProps {
   onSelectQuote: (quoteId: string) => void;
@@ -29,6 +30,11 @@ interface Quote {
   followup_count: number | null;
   last_followup_sent_at: string | null;
   next_followup_due_at: string | null;
+  // 2026-05-19 — surface artwork-declined state on the quote row so the
+  // admin doesn't have to open the detail page to discover it. Per
+  // client: "when quote is approved and artwork is declined i need a
+  // way to know that".
+  artwork_approval_status: string | null;
 }
 
 export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, onViewCustomer }: QuotesListProps) {
@@ -41,6 +47,12 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [sendingFollowup, setSendingFollowup] = useState<string | null>(null);
+  // 2026-05-19 — Send Quote modal triggered from the row action icons.
+  // Previously only sent/pending quotes had a "Send Follow-Up" icon —
+  // drafts had no way to send without first opening Edit. Per client:
+  // add a Send button on unsent quotes that opens the same Send modal
+  // used inside QuoteDetail.
+  const [sendQuoteFor, setSendQuoteFor] = useState<Quote | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -86,6 +98,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
           followup_count,
           last_followup_sent_at,
           next_followup_due_at,
+          artwork_approval_status,
           customer_contacts(full_name)
         `)
         .order('created_at', { ascending: false });
@@ -487,10 +500,34 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-                          <StatusIcon className="w-3.5 h-3.5" />
-                          {statusConfig.label}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                            <StatusIcon className="w-3.5 h-3.5" />
+                            {statusConfig.label}
+                          </span>
+                          {/* 2026-05-19 — flag artwork-declined on the row
+                              so the admin sees it without opening the
+                              detail page. Approved quote + declined art is
+                              the case Jamie called out specifically. */}
+                          {quote.status === 'approved' && quote.artwork_approval_status === 'declined' && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                              title="The customer approved the quote but declined the artwork. Open the quote to see the decline reason and resend after fixes."
+                            >
+                              <XCircle className="w-3 h-3" />
+                              Art declined
+                            </span>
+                          )}
+                          {quote.status === 'approved' && quote.artwork_approval_status === 'pending' && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                              title="Artwork is still awaiting customer approval"
+                            >
+                              <Clock className="w-3 h-3" />
+                              Art pending
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="text-sm font-semibold text-gray-900 dark:text-white">${(quote.total ?? 0).toFixed(2)}</div>
@@ -537,6 +574,18 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
+                          {/* 2026-05-19 — Send button on unsent quotes
+                              (draft/rejected). Sent/pending quotes
+                              already get the Mail follow-up icon above. */}
+                          {(quote.status === 'draft' || quote.status === 'rejected') && (
+                            <button
+                              onClick={() => setSendQuoteFor(quote)}
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                              title={quote.status === 'rejected' ? 'Resend Quote' : 'Send Quote'}
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDuplicate(quote.id)}
                             disabled={duplicating === quote.id}
@@ -578,6 +627,23 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
             </div>
           )}
         </div>
+      )}
+
+      {/* Send Quote modal — 2026-05-19, triggered from row Send icon */}
+      {sendQuoteFor && (
+        <SendQuoteModal
+          quoteId={sendQuoteFor.id}
+          quoteNumber={sendQuoteFor.quote_number || ''}
+          customerName={sendQuoteFor.customer_name || ''}
+          customerEmail={sendQuoteFor.customer_email || ''}
+          customerPhone={''}
+          totalAmount={sendQuoteFor.total || 0}
+          onClose={() => setSendQuoteFor(null)}
+          onSuccess={() => {
+            setSendQuoteFor(null);
+            loadQuotes();
+          }}
+        />
       )}
     </div>
   );

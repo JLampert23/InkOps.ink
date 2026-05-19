@@ -157,19 +157,107 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // 2026-05-19 — actually send the customer an email notifying them
+      // the artwork is ready for re-review. Previously this endpoint only
+      // reset DB state and silently relied on the customer revisiting
+      // their existing approval link, which clients reasonably
+      // interpreted as "broken" since they expected an email.
+      let emailSent = false;
+      let emailErrorMessage: string | null = null;
+      try {
+        // Find the most recent approval token for this quote so we can
+        // include the live URL in the email.
+        const { data: latestApproval } = await supabase
+          .from("quote_approvals")
+          .select("approval_token, expires_at")
+          .eq("quote_id", quoteId)
+          .eq("company_id", profile.company_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestApproval?.approval_token) {
+          // Resolve recipient — prefer the contact email if a contact is
+          // attached, fall back to the quote-level customer_email.
+          const { data: fullQuote } = await supabase
+            .from("quotes")
+            .select("customer_name, customer_email, contact_id, quote_number, total")
+            .eq("id", quoteId)
+            .maybeSingle();
+
+          let recipientEmail = fullQuote?.customer_email || "";
+          if (fullQuote?.contact_id) {
+            const { data: contact } = await supabase
+              .from("customer_contacts")
+              .select("email")
+              .eq("id", fullQuote.contact_id)
+              .maybeSingle();
+            if (contact?.email) recipientEmail = contact.email;
+          }
+
+          if (!recipientEmail) {
+            emailErrorMessage = "No recipient email on file for this quote";
+          } else {
+            const approvalUrl = `https://inkops.ink/quote-approval/${latestApproval.approval_token}`;
+            const subject = `Artwork updated for quote ${fullQuote?.quote_number || ""} — please re-review`;
+            const html = `
+              <p>Hello ${fullQuote?.customer_name || "valued customer"},</p>
+              <p>The artwork for quote <strong>${fullQuote?.quote_number || ""}</strong> has been updated based on your feedback and is ready for your review.</p>
+              <p>
+                <a href="${approvalUrl}" style="background-color:#3b82f6;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block;">
+                  Review &amp; Approve Artwork
+                </a>
+              </p>
+              <p>Thank you!</p>
+            `;
+
+            const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+              method: "POST",
+              headers: {
+                "Authorization": authHeader!,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                to: recipientEmail,
+                subject,
+                html,
+                company_id: profile.company_id,
+              }),
+            });
+
+            if (emailResponse.ok) {
+              emailSent = true;
+            } else {
+              const errorText = await emailResponse.text();
+              emailErrorMessage = `send-email returned ${emailResponse.status}: ${errorText.slice(0, 200)}`;
+              console.error("Resend-artwork-approval email failed:", emailErrorMessage);
+            }
+          }
+        } else {
+          emailErrorMessage = "No approval token on file — send the quote for approval at least once before resending artwork";
+        }
+      } catch (err) {
+        emailErrorMessage = err instanceof Error ? err.message : "Unknown email send error";
+        console.error("Resend-artwork-approval email exception:", err);
+      }
+
       await supabase.from("quote_activity_log").insert([{
         quote_id: quoteId,
         company_id: profile.company_id,
         action: "artwork_approval_resent",
         performed_by: user.id,
         performed_by_name: profile.full_name || profile.email || "admin",
-        meta: { previous_status: quote.artwork_approval_status },
+        meta: { previous_status: quote.artwork_approval_status, email_sent: emailSent, email_error: emailErrorMessage },
       }]);
 
       return new Response(
         JSON.stringify({
           success: true,
-          message: "Artwork approval reset to pending. The customer can re-approve via the existing quote link.",
+          email_sent: emailSent,
+          email_error: emailErrorMessage,
+          message: emailSent
+            ? "Artwork approval reset to pending and customer has been emailed a re-review link."
+            : `Artwork approval reset to pending, but the email did not go out: ${emailErrorMessage || "unknown error"}. Customer can still re-approve via the existing quote link.`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -689,12 +777,29 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Update quote status to sent ONLY if we succeeded without throwing an error
+      // Update quote status to sent ONLY if we succeeded without throwing an error.
+      //
+      // 2026-05-19 — also reset the artwork approval state on every send so a
+      // declined-then-resent quote shows the artwork section again. The
+      // public respond endpoint flips artwork_approval_status to
+      // 'not_applicable' when the customer declines the quote (since the
+      // artwork can't be acted on against a rejected quote). Without this
+      // reset, a fresh send leaves the flag stuck and the customer-facing
+      // approval page hides the artwork block. We also clear the matching
+      // decline-reason / timestamps so the customer-facing UI doesn't show
+      // a stale "Artwork declined" banner on a clean resend.
       await supabaseAdmin
         .from("quotes")
         .update({
           status: "sent",
           sent_at: new Date().toISOString(),
+          artwork_approval_status: "pending",
+          artwork_approval_sent_at: new Date().toISOString(),
+          artwork_decline_reason: null,
+          artwork_declined_at: null,
+          artwork_approved_at: null,
+          quote_decline_reason: null,
+          rejected_at: null,
         })
         .eq("id", quoteId);
 
