@@ -23,9 +23,14 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { POSelectionModal } from './POSelectionModal';
 
+// 2026-05-19 — client asked for youth sizes first (smallest first
+// overall), then adult smallest-to-largest. Order drives every
+// per-size loop + the column order in the report table.
+// quote_line_items only has size columns up to qty_5xl, so 6XL is not
+// listed here even though Jamie's spec mentioned it.
 const ALL_SIZES = [
-  'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL',
   'YXS', 'YS', 'YM', 'YL', 'YXL',
+  'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL',
 ];
 
 interface SizeData {
