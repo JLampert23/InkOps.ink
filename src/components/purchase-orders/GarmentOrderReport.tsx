@@ -100,9 +100,17 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; company_name: string }>>([]);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; visible: boolean }>({
+  const [toast, setToast] = useState<{
+    message: string;
+    visible: boolean;
+    // 2026-05-19 — optional CTA so the admin can jump straight to the
+    // Receiving tab after Mark Ordered, instead of guessing where to go
+    // next ("how do I receive these now?" — client feedback).
+    action?: { label: string; onClick: () => void } | null;
+  }>({
     message: '',
     visible: false,
+    action: null,
   });
   const [poModal, setPOModal] = useState<{
     isOpen: boolean;
@@ -130,9 +138,11 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     applyFilters();
   }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly, showReviewOnly, showItemsOnPO, hideFullyOnPO]);
 
-  const showToast = (message: string) => {
-    setToast({ message, visible: true });
-    setTimeout(() => setToast({ message: '', visible: false }), 4000);
+  const showToast = (message: string, action?: { label: string; onClick: () => void } | null) => {
+    setToast({ message, visible: true, action: action ?? null });
+    // Action toasts linger a bit longer since the user might click them.
+    const timeoutMs = action ? 7000 : 4000;
+    setTimeout(() => setToast({ message: '', visible: false, action: null }), timeoutMs);
   };
 
   const loadData = async () => {
@@ -348,6 +358,17 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     });
 
     const garmentList = Array.from(garmentMap.values()).map((row) => {
+      // 2026-05-19 — when the admin has flagged the row as ordered via
+      // Mark Ordered, treat "remaining to be ordered" as zero across
+      // every size. Previously the per-size remaining was `needed -
+      // received`, which made the column meaningful only for receipt
+      // tracking; marking a row Ordered left it stuck at full need
+      // qty, contradicting the admin's "I've placed this order"
+      // signal. Reported by client 2026-05-19.
+      if (row.is_ordered) {
+        Object.values(row.sizes).forEach((sd) => { sd.remaining = 0; });
+        return { ...row, total_remaining: 0 };
+      }
       let totalRemaining = 0;
       Object.values(row.sizes).forEach((sd) => {
         sd.remaining = Math.max(0, sd.needed - sd.received);
@@ -530,7 +551,10 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
             : g
         )
       );
-      showToast(`✓ ${garment.style_number} ${garment.color} marked as ordered`);
+      showToast(
+        `✓ ${garment.style_number} ${garment.color} marked as ordered`,
+        onNavigate ? { label: 'Go to Receiving', onClick: () => onNavigate('receiving') } : null,
+      );
     } catch (err) {
       console.error('Error marking as ordered:', err);
       showToast('Failed to update — please try again.');
@@ -777,6 +801,17 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
           <div className="flex items-center gap-3 px-5 py-3 bg-green-600 text-white rounded-lg shadow-xl">
             <CheckCircle className="w-5 h-5 flex-shrink-0" />
             <span className="font-medium">{toast.message}</span>
+            {toast.action && (
+              <button
+                onClick={() => {
+                  toast.action?.onClick();
+                  setToast({ message: '', visible: false, action: null });
+                }}
+                className="ml-2 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-semibold whitespace-nowrap"
+              >
+                {toast.action.label} →
+              </button>
+            )}
           </div>
         </div>
       )}

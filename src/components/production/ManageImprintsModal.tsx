@@ -975,11 +975,22 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                     className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
                   >
                     <option value="">Select pricing matrix</option>
-                    {priceMatrices.map((matrix) => (
-                      <option key={matrix.id} value={matrix.id}>
-                        {matrix.name} ({matrix.matrix_type})
-                      </option>
-                    ))}
+                    {/* 2026-05-19 — filter matrices to those matching the
+                        selected type of work so Screen Print rows don't show
+                        DTF / Embroidery matrices in the dropdown (client
+                        feedback). When no type is selected yet, show all so
+                        the dropdown isn't empty. Case-insensitive match. */}
+                    {priceMatrices
+                      .filter((matrix) => {
+                        const t = (currentImprint.type_of_work || '').trim().toLowerCase();
+                        if (!t) return true;
+                        return (matrix.matrix_type || '').trim().toLowerCase() === t;
+                      })
+                      .map((matrix) => (
+                        <option key={matrix.id} value={matrix.id}>
+                          {matrix.name} ({matrix.matrix_type})
+                        </option>
+                      ))}
                   </select>
                 </div>
 

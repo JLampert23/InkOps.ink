@@ -2920,50 +2920,67 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                 </button>
                               )}
                             </div>
-                            {showProductDropdown && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && productSearchResults.length > 0 && (
-                              <div
-                                ref={dropdownRef}
-                                className="absolute z-50 left-0 top-full mt-1 w-[600px] max-h-96 overflow-auto bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg shadow-xl"
-                              >
-                                <div className="p-2 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                    {productSearchResults.length} product(s) found
-                                  </p>
-                                </div>
-                                {productSearchResults.map((product, pIdx) => (
-                                  <div key={pIdx} className="border-b border-gray-200 dark:border-slate-700 last:border-0">
-                                    <div className="max-h-64 overflow-y-auto">
-                                      {product.colors.map((color, cIdx) => (
-                                        <button
-                                          key={cIdx}
-                                          type="button"
-                                          onClick={() => selectProductColor(product, cIdx)}
-                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors border-b border-gray-100 dark:border-slate-700 last:border-0"
-                                        >
-                                          <div className="flex items-start justify-between gap-2">
-                                            <p className="text-xs text-gray-900 dark:text-white flex-1">
-                                              {product.brand} - {product.style} - {color.name} - {product.description} - {product.style}
-                                              <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 uppercase text-[10px]">
-                                                {product.supplier}
-                                              </span>
-                                            </p>
-                                          </div>
-                                        </button>
-                                      ))}
-                                      {product.colors.length === 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => selectProductColor(product, -1)}
-                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 text-xs text-gray-600 dark:text-gray-400"
-                                        >
-                                          Select without color
-                                        </button>
-                                      )}
-                                    </div>
+                            {showProductDropdown && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && productSearchResults.length > 0 && (() => {
+                              // 2026-05-19 — flatten supplier-grouped results into ONE list so
+                              // searching e.g. "64000" doesn't render SSActivewear and SanMar as
+                              // separate blocks. Each row keeps its supplier badge for context.
+                              // Z-index bumped to 100 to clear the Fees panel that was clipping
+                              // the bottom of the dropdown. Reported by client 2026-05-19.
+                              const flatRows: Array<{
+                                product: typeof productSearchResults[number];
+                                colorIdx: number;
+                                color: any | null;
+                              }> = [];
+                              productSearchResults.forEach((product) => {
+                                if (product.colors.length === 0) {
+                                  flatRows.push({ product, colorIdx: -1, color: null });
+                                } else {
+                                  product.colors.forEach((color, cIdx) => {
+                                    flatRows.push({ product, colorIdx: cIdx, color });
+                                  });
+                                }
+                              });
+                              return (
+                                <div
+                                  ref={dropdownRef}
+                                  className="absolute z-[100] left-0 top-full mt-1 w-[600px] max-h-96 overflow-auto bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg shadow-xl"
+                                >
+                                  <div className="p-2 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 sticky top-0">
+                                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                      {flatRows.length} result{flatRows.length === 1 ? '' : 's'} across {productSearchResults.length} product{productSearchResults.length === 1 ? '' : 's'}
+                                    </p>
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                  {flatRows.map((row, rIdx) => (
+                                    row.color ? (
+                                      <button
+                                        key={rIdx}
+                                        type="button"
+                                        onClick={() => selectProductColor(row.product, row.colorIdx)}
+                                        className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors border-b border-gray-100 dark:border-slate-700 last:border-0"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <p className="text-xs text-gray-900 dark:text-white flex-1">
+                                            {row.product.brand} - {row.product.style} - {row.color.name} - {row.product.description}
+                                            <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 uppercase text-[10px]">
+                                              {row.product.supplier}
+                                            </span>
+                                          </p>
+                                        </div>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        key={rIdx}
+                                        type="button"
+                                        onClick={() => selectProductColor(row.product, -1)}
+                                        className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 text-xs text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-slate-700 last:border-0"
+                                      >
+                                        {row.product.brand} - {row.product.style} ({row.product.supplier}) — select without color
+                                      </button>
+                                    )
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="p-0 border border-gray-300 dark:border-slate-800">
                             <input

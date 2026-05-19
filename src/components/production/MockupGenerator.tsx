@@ -557,6 +557,31 @@ export default function MockupGenerator({
             setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
             setGarmentDescription(lineItems[0].description || '');
           }
+        } else if (garmentStyle || garmentFrontImageUrl) {
+          // 2026-05-19 — DB returned nothing because the line items haven't
+          // been persisted yet (admin added a style and opened the mockup
+          // generator without saving the quote first). Build a synthetic
+          // single-style entry from the parent props so the sidebar and
+          // canvas both work without forcing a save first. Reported by
+          // client 2026-05-19.
+          const fallbackStyle = {
+            lineItemId: '',
+            style: garmentStyle || '',
+            color: garmentColor || '',
+            description: garmentStyle || '',
+            itemNumber: garmentStyle || '',
+            frontImage: garmentFrontImageUrl || '',
+            rearImage: garmentBackImageUrl || '',
+            sideImage: '',
+            lifestyleImage: '',
+            imagesData: null,
+          };
+          setGarmentStyles([fallbackStyle]);
+          const sanitizedUrl = sanitizeImageUrl(garmentFrontImageUrl);
+          if (sanitizedUrl) {
+            setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
+            setGarmentDescription(garmentStyle || '');
+          }
         }
 
         // Load imprints for this group or quote
