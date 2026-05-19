@@ -295,6 +295,10 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
       matchesStatus = ['draft', 'sent', 'pending'].includes(quote.status);
     } else if (statusFilter === 'approved') {
       matchesStatus = ['approved', 'converted'].includes(quote.status);
+    } else if (statusFilter === 'art_declined') {
+      // 2026-05-19 — Art Declined box filters to approved quotes whose
+      // artwork the customer declined. These need fresh mockups.
+      matchesStatus = quote.status === 'approved' && quote.artwork_approval_status === 'declined';
     } else {
       matchesStatus = quote.status === statusFilter;
     }
@@ -308,6 +312,10 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
     sent: quotes.filter(q => q.status === 'sent').length,
     approved: quotes.filter(q => ['approved', 'converted'].includes(q.status)).length,
     rejected: quotes.filter(q => q.status === 'rejected').length,
+    // 2026-05-19 — surface count of approved quotes whose artwork was
+    // declined so the admin can see at-a-glance how many need fresh
+    // mockups. Per client.
+    artDeclined: quotes.filter(q => q.status === 'approved' && q.artwork_approval_status === 'declined').length,
   };
 
   return (
@@ -336,10 +344,14 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-2">
+      {/* 2026-05-19 — stat boxes packed to the left (flex-wrap, fixed
+          minimum width) instead of stretched evenly across the full row,
+          and a new Art Declined box for visibility on approved-quote-
+          artwork-rejected jobs. Per client. */}
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setStatusFilter('active')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
             statusFilter === 'active'
               ? 'border-gray-900 dark:border-white ring-2 ring-gray-900 dark:ring-white'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -350,7 +362,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('draft')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
             statusFilter === 'draft'
               ? 'border-gray-600 dark:border-gray-400 ring-2 ring-gray-600 dark:ring-gray-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -361,7 +373,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('sent')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
             statusFilter === 'sent'
               ? 'border-blue-600 dark:border-blue-400 ring-2 ring-blue-600 dark:ring-blue-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -372,7 +384,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('approved')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
             statusFilter === 'approved'
               ? 'border-green-600 dark:border-green-400 ring-2 ring-green-600 dark:ring-green-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -383,7 +395,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('rejected')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
             statusFilter === 'rejected'
               ? 'border-red-600 dark:border-red-400 ring-2 ring-red-600 dark:ring-red-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -391,6 +403,18 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         >
           <div className="text-xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
           <div className="text-xs text-gray-600 dark:text-gray-400">Rejected</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('art_declined')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+            statusFilter === 'art_declined'
+              ? 'border-red-600 dark:border-red-400 ring-2 ring-red-600 dark:ring-red-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+          title="Approved quotes whose artwork was declined by the customer"
+        >
+          <div className="text-xl font-bold text-red-600 dark:text-red-400">{stats.artDeclined}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Art Declined</div>
         </button>
       </div>
 

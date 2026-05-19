@@ -198,7 +198,21 @@ Deno.serve(async (req: Request) => {
           if (!recipientEmail) {
             emailErrorMessage = "No recipient email on file for this quote";
           } else {
-            const approvalUrl = `https://inkops.ink/quote-approval/${latestApproval.approval_token}`;
+            // 2026-05-19 — embed the company subdomain in the URL path so
+            // customers see who the quote is from (`.../quote-approval/
+            // toddssportinggoods/<token>`) instead of a generic inkops
+            // link. The frontend route grabs the token via .pop() so the
+            // extra path segment is purely cosmetic. Falls back to the
+            // old format when no subdomain is configured.
+            const { data: companyForUrl } = await supabase
+              .from("company_settings")
+              .select("inkops_subdomain")
+              .eq("id", profile.company_id)
+              .maybeSingle();
+            const subdomain = (companyForUrl?.inkops_subdomain || "").trim().toLowerCase();
+            const approvalUrl = subdomain
+              ? `https://inkops.ink/quote-approval/${subdomain}/${latestApproval.approval_token}`
+              : `https://inkops.ink/quote-approval/${latestApproval.approval_token}`;
             const subject = `Artwork updated for quote ${fullQuote?.quote_number || ""} — please re-review`;
             const html = `
               <p>Hello ${fullQuote?.customer_name || "valued customer"},</p>
@@ -558,9 +572,20 @@ Deno.serve(async (req: Request) => {
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL - always use inkops subdomain format
-      // Ensure the URL is valid for the current platform configuration without relying on wildcard Netlify setup
-      const approvalUrl = `https://inkops.ink/quote-approval/${approvalToken}`;
+      // Generate public approval URL.
+      //
+      // 2026-05-19 — embed the company's inkops_subdomain as a path
+      // segment so the URL shows who the quote is from (e.g.
+      // https://inkops.ink/quote-approval/toddssportinggoods/<token>)
+      // instead of a generic inkops link. The PublicQuoteApprovalPage
+      // grabs the token via window.location.pathname.split('/').pop(),
+      // so the extra segment is purely cosmetic + has no effect on the
+      // actual token resolution. Falls back to the old format when no
+      // subdomain is configured.
+      const sendSubdomain = (companySettings?.inkops_subdomain || '').trim().toLowerCase();
+      const approvalUrl = sendSubdomain
+        ? `https://inkops.ink/quote-approval/${sendSubdomain}/${approvalToken}`
+        : `https://inkops.ink/quote-approval/${approvalToken}`;
 
       // Send email if delivery method includes email
       if (deliveryMethod === 'email' || deliveryMethod === 'both') {

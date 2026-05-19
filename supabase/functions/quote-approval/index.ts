@@ -416,6 +416,89 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 2026-05-19 — email the company admin every time a customer
+    // responds (quote approve/decline OR artwork approve/decline). The
+    // customer-facing endpoints are public so we use the service-role
+    // JWT to call send-email; send-email accepts any structurally valid
+    // service_role JWT (see 2026-05-07 crisis fix).
+    //
+    // Pulls the recipient from company_settings.company_email. Silently
+    // skips if no admin email is configured — we don't want to fail the
+    // customer's approval submission because the admin's mailbox is
+    // misconfigured.
+    async function notifyAdminOfCustomerResponse(
+      companyId: string,
+      payload: {
+        kind: 'quote' | 'artwork';
+        approved: boolean;
+        quote_number: string | null;
+        customer_name: string | null;
+        approver_name?: string | null;
+        approver_email?: string | null;
+        decline_reason?: string | null;
+        total?: number | null;
+      },
+    ): Promise<void> {
+      try {
+        const { data: settings } = await supabase
+          .from('company_settings')
+          .select('company_email, company_name, inkops_subdomain')
+          .eq('id', companyId)
+          .maybeSingle();
+        const to = (settings?.company_email || '').trim();
+        if (!to) {
+          console.warn('notifyAdminOfCustomerResponse: no company_email configured, skipping notification');
+          return;
+        }
+        const verb = payload.approved ? 'approved' : 'declined';
+        const kindLabel = payload.kind === 'artwork' ? 'Artwork' : 'Quote';
+        const accentColor = payload.approved ? '#10b981' : '#dc2626';
+        const subject = `${kindLabel} ${verb} — ${payload.quote_number || 'quote'} (${payload.customer_name || 'customer'})`;
+        const declineBlock = !payload.approved && payload.decline_reason
+          ? `<tr><td style="padding:8px 0;color:#475569;">Reason:</td><td style="padding:8px 0;color:#0f172a;">${payload.decline_reason}</td></tr>`
+          : '';
+        const approverBlock = payload.approver_name || payload.approver_email
+          ? `<tr><td style="padding:8px 0;color:#475569;">Responded by:</td><td style="padding:8px 0;color:#0f172a;">${payload.approver_name || ''} ${payload.approver_email ? `&lt;${payload.approver_email}&gt;` : ''}</td></tr>`
+          : '';
+        const totalBlock = payload.total != null
+          ? `<tr><td style="padding:8px 0;color:#475569;">Quote total:</td><td style="padding:8px 0;color:#0f172a;">$${payload.total.toFixed(2)}</td></tr>`
+          : '';
+        const html = `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">
+            <h2 style="margin:0 0 12px 0;color:${accentColor};">${kindLabel} ${verb}</h2>
+            <p style="margin:0 0 16px 0;color:#475569;">
+              ${payload.customer_name || 'A customer'} has ${verb} the ${payload.kind} on quote
+              <strong>${payload.quote_number || ''}</strong>.
+            </p>
+            <table style="width:100%;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;font-size:14px;">
+              ${approverBlock}
+              ${totalBlock}
+              ${declineBlock}
+            </table>
+            <p style="margin:16px 0 0 0;color:#94a3b8;font-size:12px;">
+              ${settings?.company_name ? `${settings.company_name} · ` : ''}InkOps
+            </p>
+          </div>
+        `;
+        const res = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ to, subject, html, company_id: companyId }),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          console.error('notifyAdminOfCustomerResponse: send-email returned', res.status, txt.slice(0, 200));
+        }
+      } catch (err) {
+        // Notification failures are non-fatal — log and move on so the
+        // customer's submission isn't blocked by a mail issue.
+        console.error('notifyAdminOfCustomerResponse: exception', err);
+      }
+    }
+
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
 
@@ -573,7 +656,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: approval, error: approvalError } = await supabase
           .from("quote_approvals")
-          .select("*, quote:quotes(id, status, artwork_approval_status)")
+          .select("*, quote:quotes(id, status, artwork_approval_status, quote_number, customer_name)")
           .eq("approval_token", token)
           .maybeSingle();
 
@@ -638,6 +721,16 @@ Deno.serve(async (req: Request) => {
             },
           }]);
 
+        // 2026-05-19 — admin notification email so the company knows the
+        // customer responded without having to check the app.
+        await notifyAdminOfCustomerResponse(approval.company_id, {
+          kind: 'artwork',
+          approved: !!body.approved,
+          quote_number: approval.quote?.quote_number || null,
+          customer_name: approval.quote?.customer_name || null,
+          decline_reason: body.approved ? null : (body.decline_reason?.trim() || null),
+        });
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -680,7 +773,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: approval, error: approvalError } = await supabase
         .from("quote_approvals")
-        .select("*")
+        .select("*, quote:quotes(id, quote_number, customer_name, total, status)")
         .eq("approval_token", token)
         .maybeSingle();
 
@@ -788,6 +881,19 @@ Deno.serve(async (req: Request) => {
             ip_address: ipAddress,
           },
         }]);
+
+      // 2026-05-19 — admin notification email so the company knows the
+      // customer responded to the quote without having to check the app.
+      await notifyAdminOfCustomerResponse(approval.company_id, {
+        kind: 'quote',
+        approved: !!body.approved,
+        quote_number: approval.quote?.quote_number || null,
+        customer_name: approval.quote?.customer_name || null,
+        approver_name: body.approver_name || null,
+        approver_email: body.approver_email || null,
+        decline_reason: body.approved ? null : (body.decline_reason?.trim() || null),
+        total: approval.quote?.total ?? null,
+      });
 
       let workOrderResult = null;
       let invoiceResult = null;
