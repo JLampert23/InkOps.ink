@@ -561,6 +561,29 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         </div>
       </div>
 
+      {/* 2026-05-20 — empty-state placeholder for the marked-ordered
+          section. Without this, when there are zero marked-ordered
+          items the section just vanishes and the admin (Jamie) is
+          left scrolling past the stats wondering where the check-in
+          UI went. Routes them to the right path (PO Receive button
+          on the table below) so the distinction between
+          marked-ordered and on-a-PO is obvious. */}
+      {markedOrderedItems.length === 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-5">
+          <div className="flex items-start gap-3">
+            <Package className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+              <p className="font-medium text-gray-900 dark:text-white mb-1">No marked-ordered items waiting check-in.</p>
+              <p>
+                Items appear here when you click <span className="font-medium">Mark Ordered</span> on the Garment Report (no PO created).
+                Anything already on a Purchase Order belongs in <span className="font-medium">Open Purchase Orders</span> below —
+                click the green <span className="font-medium">Receive</span> button next to each PO to check those in.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Marked Ordered (no PO) — Quick Receive section.
           Per client 2026-05-08 (Path C): items flagged Ordered in
           Garment Order Report that don't have a formal PO show up here
