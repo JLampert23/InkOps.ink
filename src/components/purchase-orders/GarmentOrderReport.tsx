@@ -1167,11 +1167,25 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center gap-1 flex-wrap">
                               {garment.is_ordered ? (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded font-semibold">
                                     <CheckCircle className="w-4 h-4" />
                                     Ordered
                                   </span>
+                                  {/* 2026-05-20 — persistent "Check in"
+                                      shortcut so the path from Mark Ordered
+                                      → Receiving is obvious even after the
+                                      toast disappears (client kept asking
+                                      "where do I go to receive?"). */}
+                                  {onNavigate && (
+                                    <button
+                                      onClick={() => onNavigate('receiving')}
+                                      className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded transition-colors"
+                                      title="Go to Receiving Dashboard to check in this item when it arrives"
+                                    >
+                                      Check in →
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handleUnmarkOrdered(garment)}
                                     className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-300 dark:border-red-700 rounded transition-colors"

@@ -519,8 +519,23 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         </p>
       </div>
 
-      {/* Stats Overview */}
+      {/* 2026-05-20 — replaced "Overdue POs" stat card with "Items to
+          Check In" per client. The marked-ordered table below is the
+          primary work surface here; surface its count up top so the
+          admin can see at-a-glance how many items are waiting. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-amber-300 dark:border-amber-700 p-4 ring-1 ring-amber-300 dark:ring-amber-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Items to Check In</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+                {markedOrderedItems.length}
+              </p>
+            </div>
+            <Package className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+          </div>
+        </div>
+
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -530,18 +545,6 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
               </p>
             </div>
             <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Overdue POs</p>
-              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
-                {overduePOs.length}
-              </p>
-            </div>
-            <AlertTriangle className="w-8 h-8 text-orange-600 dark:text-orange-400" />
           </div>
         </div>
 
@@ -876,108 +879,58 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Arriving Today */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
-          <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Closed Purchase Orders</h3>
-              <span className="ml-auto px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm font-medium rounded">
-                {closedPOs.length}
-              </span>
-            </div>
-          </div>
-          <div className="p-4">
-            {closedPOs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p>No closed purchase orders</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {closedPOs.map((po) => (
-                  <div
-                    key={po.id}
-                    className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{po.po_number}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{po.vendor_name}</p>
-                      </div>
-                      <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                        {po.status === 'closed' ? 'CLOSED' : po.status === 'sent' ? 'SENT' : 'FULLY RECEIVED'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="text-gray-600 dark:text-gray-400">
-                        <span className="font-medium">{po.received_items}</span> / {po.total_items} items received
-                      </div>
-                      <button
-                        onClick={() => onViewPO(po.id)}
-                        className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
-                      >
-                        View
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* 2026-05-20 — removed "Overdue Deliveries" section per client.
+          The Marked Ordered ("Items to Check In") table at the top is
+          the primary work surface here; Overdue Deliveries was prime
+          real estate that displaced the check-in workflow. Closed
+          Purchase Orders kept as a single full-width archive card. */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Closed Purchase Orders</h3>
+            <span className="ml-auto px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm font-medium rounded">
+              {closedPOs.length}
+            </span>
           </div>
         </div>
-
-        {/* Overdue POs */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
-          <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Overdue Deliveries</h3>
+        <div className="p-4">
+          {closedPOs.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+              <p>No closed purchase orders</p>
             </div>
-          </div>
-          <div className="p-4">
-            {overduePOs.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-green-500" />
-                <p>No overdue purchase orders</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {overduePOs.map((po) => (
-                  <div
-                    key={po.id}
-                    className="border border-orange-200 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-900/10 rounded-lg p-3"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{po.po_number}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{po.vendor_name}</p>
-                        {po.expected_delivery_date && (
-                          <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            {getDaysOverdue(po.expected_delivery_date)} days overdue
-                          </p>
-                        )}
-                      </div>
-                      {getStatusBadge(po.receiving_status)}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {closedPOs.map((po) => (
+                <div
+                  key={po.id}
+                  className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{po.po_number}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{po.vendor_name}</p>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="text-gray-600 dark:text-gray-400">
-                        <span className="font-medium">{po.received_items}</span> / {po.total_items} items received
-                      </div>
-                      <button
-                        onClick={() => onReceivePO(po.id)}
-                        className="px-3 py-1.5 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm"
-                      >
-                        Receive
-                      </button>
-                    </div>
+                    <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      {po.status === 'closed' ? 'CLOSED' : po.status === 'sent' ? 'SENT' : 'FULLY RECEIVED'}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">{po.received_items}</span> / {po.total_items} items received
+                    </div>
+                    <button
+                      onClick={() => onViewPO(po.id)}
+                      className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

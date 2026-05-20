@@ -344,14 +344,14 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </div>
       </div>
 
-      {/* 2026-05-19 — stat boxes packed to the left (flex-wrap, fixed
-          minimum width) instead of stretched evenly across the full row,
-          and a new Art Declined box for visibility on approved-quote-
-          artwork-rejected jobs. Per client. */}
-      <div className="flex flex-wrap gap-2">
+      {/* 2026-05-20 — stretch the stat row full width (grid-cols-6)
+          per latest client feedback. Yesterday's "pack to left"
+          (flex-wrap + min-w) left dead space on the right side once
+          there were only 6 boxes total. */}
+      <div className="grid grid-cols-6 gap-2">
         <button
           onClick={() => setStatusFilter('active')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
             statusFilter === 'active'
               ? 'border-gray-900 dark:border-white ring-2 ring-gray-900 dark:ring-white'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -362,7 +362,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('draft')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
             statusFilter === 'draft'
               ? 'border-gray-600 dark:border-gray-400 ring-2 ring-gray-600 dark:ring-gray-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -373,7 +373,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('sent')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
             statusFilter === 'sent'
               ? 'border-blue-600 dark:border-blue-400 ring-2 ring-blue-600 dark:ring-blue-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -384,7 +384,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('approved')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
             statusFilter === 'approved'
               ? 'border-green-600 dark:border-green-400 ring-2 ring-green-600 dark:ring-green-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -395,7 +395,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('rejected')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
             statusFilter === 'rejected'
               ? 'border-red-600 dark:border-red-400 ring-2 ring-red-600 dark:ring-red-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
@@ -406,7 +406,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote, 
         </button>
         <button
           onClick={() => setStatusFilter('art_declined')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all min-w-[140px] ${
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
             statusFilter === 'art_declined'
               ? 'border-red-600 dark:border-red-400 ring-2 ring-red-600 dark:ring-red-400'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
