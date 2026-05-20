@@ -203,10 +203,15 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       return;
     }
 
-    // Pull WO numbers for any rows that have work_order_id (one query
-    // instead of N joins) so the table can show WO# alongside the quote.
+    // Pull WO numbers two ways:
+    // 1) By work_order_id (preferred — fast direct lookup)
+    // 2) By quote_id (fallback for staging rows where the cascade
+    //    trigger or Mark Ordered insert didn't populate work_order_id —
+    //    client reported rows showing "—" instead of WO# on 2026-05-20)
     const woIds = [...new Set((data || []).map((r: any) => r.work_order_id).filter(Boolean))] as string[];
+    const quoteIds = [...new Set((data || []).map((r: any) => r.quote_id).filter(Boolean))] as string[];
     const woNumberById = new Map<string, string>();
+    const woNumberByQuote = new Map<string, string>();
     if (woIds.length > 0) {
       const { data: wos } = await supabase
         .from('work_orders')
@@ -214,25 +219,38 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         .in('id', woIds);
       (wos || []).forEach((w: any) => woNumberById.set(w.id, w.work_order_number));
     }
+    if (quoteIds.length > 0) {
+      const { data: wosByQuote } = await supabase
+        .from('work_orders')
+        .select('quote_id, work_order_number')
+        .in('quote_id', quoteIds);
+      (wosByQuote || []).forEach((w: any) => {
+        if (w.quote_id) woNumberByQuote.set(w.quote_id, w.work_order_number);
+      });
+    }
 
     setMarkedOrderedItems(
-      (data || []).map((row: any) => ({
-        id: row.id,
-        quote_id: row.quote_id,
-        work_order_id: row.work_order_id,
-        style_number: row.style_number,
-        style_name: row.style_name,
-        color: row.color,
-        total_quantity: row.total_quantity || 0,
-        quantity_received: row.quantity_received || 0,
-        ordered_at: row.ordered_at,
-        supplier_name: row.supplier_name,
-        customer_name: row.quotes?.customer_name,
-        quote_number: row.quotes?.quote_number,
-        work_order_number: row.work_order_id ? woNumberById.get(row.work_order_id) : undefined,
-        sizes: row.sizes || null,
-        quantity_received_by_size: row.quantity_received_by_size || null,
-      }))
+      (data || []).map((row: any) => {
+        const fromWoId = row.work_order_id ? woNumberById.get(row.work_order_id) : undefined;
+        const fromQuoteId = row.quote_id ? woNumberByQuote.get(row.quote_id) : undefined;
+        return {
+          id: row.id,
+          quote_id: row.quote_id,
+          work_order_id: row.work_order_id,
+          style_number: row.style_number,
+          style_name: row.style_name,
+          color: row.color,
+          total_quantity: row.total_quantity || 0,
+          quantity_received: row.quantity_received || 0,
+          ordered_at: row.ordered_at,
+          supplier_name: row.supplier_name,
+          customer_name: row.quotes?.customer_name,
+          quote_number: row.quotes?.quote_number,
+          work_order_number: fromWoId || fromQuoteId,
+          sizes: row.sizes || null,
+          quantity_received_by_size: row.quantity_received_by_size || null,
+        };
+      })
     );
   };
 
@@ -612,7 +630,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                Marked Ordered — Awaiting Check-In
+                Awaiting Check-In
               </h3>
               <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 rounded-full">
                 {filteredMarked.length}{filteredMarked.length !== markedOrderedItems.length ? ` / ${markedOrderedItems.length}` : ''}
@@ -655,88 +673,108 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                     </td>
                   </tr>
                 )}
-                {filteredMarked.map((item) => {
-                  const remaining = Math.max(0, item.total_quantity - item.quantity_received);
-                  const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
-                  const draftValue = receiveQtyDraft[item.id] ?? '';
-                  const draftNum = parseInt(draftValue, 10);
-                  const validDraft = !isNaN(draftNum) && draftNum > 0 && draftNum <= remaining;
-                  return (
-                    <tr key={item.id} className="border-t border-gray-200 dark:border-slate-700">
-                      <td className="px-4 py-2 text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                        {item.work_order_number || '—'}
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {item.customer_name || '—'}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {item.quote_number || '—'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                        <div>{item.style_number || '—'}</div>
-                        {item.style_name && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{item.style_name}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{item.color || '—'}</td>
-                      <td className="px-4 py-2 text-right text-gray-900 dark:text-white">{item.total_quantity}</td>
-                      <td className="px-4 py-2 text-right">
-                        <span className={
-                          isPartial
-                            ? 'text-amber-600 dark:text-amber-400 font-medium'
-                            : 'text-gray-700 dark:text-gray-300'
-                        }>
-                          {item.quantity_received}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2 justify-end">
-                          {/* If the staging row has a per-size breakdown,
-                              open the size-level modal (matches the PO
-                              receive UX per client 2026-05-14). Legacy
-                              rows without a `sizes` breakdown keep the
-                              old single-input Quick Receive form. */}
-                          {item.sizes && Object.keys(item.sizes).length > 0 ? (
-                            <button
-                              onClick={() => setReceiveModalTarget(item)}
-                              className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded"
-                            >
-                              Receive
-                            </button>
-                          ) : (
-                            <>
-                              <input
-                                type="number"
-                                min="1"
-                                max={remaining}
-                                placeholder={String(remaining)}
-                                value={draftValue}
-                                onChange={(e) =>
-                                  setReceiveQtyDraft((prev) => ({ ...prev, [item.id]: e.target.value }))
-                                }
-                                className="w-20 px-2 py-1 text-right text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                              />
-                              <button
-                                onClick={() => {
-                                  const qty = parseInt(receiveQtyDraft[item.id] || String(remaining), 10);
-                                  if (qty > 0 && qty <= remaining) {
-                                    handleQuickReceive(item, qty);
-                                  }
-                                }}
-                                disabled={savingReceive[item.id] || (!!draftValue && !validDraft)}
-                                className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {savingReceive[item.id] ? 'Saving...' : 'Receive'}
-                              </button>
-                            </>
+                {/* 2026-05-20 — group rows by the date the item was marked
+                    ordered (client ask). filteredMarked is already sorted
+                    by ordered_at desc from loadMarkedOrderedItems(), so we
+                    just emit a date header whenever the key changes. */}
+                {(() => {
+                  let lastDateKey: string | null = null;
+                  const rows: React.ReactNode[] = [];
+                  filteredMarked.forEach((item) => {
+                    const dateKey = item.ordered_at
+                      ? format(parseISO(item.ordered_at), 'yyyy-MM-dd')
+                      : 'unknown';
+                    const dateLabel = item.ordered_at
+                      ? format(parseISO(item.ordered_at), 'EEEE, MMM d, yyyy')
+                      : 'Date not recorded';
+                    if (dateKey !== lastDateKey) {
+                      rows.push(
+                        <tr key={`hdr-${dateKey}`} className="bg-amber-50/40 dark:bg-amber-900/15">
+                          <td colSpan={7} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                            Marked ordered · {dateLabel}
+                          </td>
+                        </tr>
+                      );
+                      lastDateKey = dateKey;
+                    }
+                    const remaining = Math.max(0, item.total_quantity - item.quantity_received);
+                    const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
+                    const draftValue = receiveQtyDraft[item.id] ?? '';
+                    const draftNum = parseInt(draftValue, 10);
+                    const validDraft = !isNaN(draftNum) && draftNum > 0 && draftNum <= remaining;
+                    rows.push(
+                      <tr key={item.id} className="border-t border-gray-200 dark:border-slate-700">
+                        <td className="px-4 py-2 text-gray-900 dark:text-white font-medium whitespace-nowrap">
+                          {item.work_order_number || '—'}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {item.customer_name || '—'}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {item.quote_number || '—'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                          <div>{item.style_number || '—'}</div>
+                          {item.style_name && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{item.style_name}</div>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{item.color || '—'}</td>
+                        <td className="px-4 py-2 text-right text-gray-900 dark:text-white">{item.total_quantity}</td>
+                        <td className="px-4 py-2 text-right">
+                          <span className={
+                            isPartial
+                              ? 'text-amber-600 dark:text-amber-400 font-medium'
+                              : 'text-gray-700 dark:text-gray-300'
+                          }>
+                            {item.quantity_received}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-2 justify-end">
+                            {item.sizes && Object.keys(item.sizes).length > 0 ? (
+                              <button
+                                onClick={() => setReceiveModalTarget(item)}
+                                className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                              >
+                                Receive
+                              </button>
+                            ) : (
+                              <>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={remaining}
+                                  placeholder={String(remaining)}
+                                  value={draftValue}
+                                  onChange={(e) =>
+                                    setReceiveQtyDraft((prev) => ({ ...prev, [item.id]: e.target.value }))
+                                  }
+                                  className="w-20 px-2 py-1 text-right text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                                />
+                                <button
+                                  onClick={() => {
+                                    const qty = parseInt(receiveQtyDraft[item.id] || String(remaining), 10);
+                                    if (qty > 0 && qty <= remaining) {
+                                      handleQuickReceive(item, qty);
+                                    }
+                                  }}
+                                  disabled={savingReceive[item.id] || (!!draftValue && !validDraft)}
+                                  className="px-3 py-1 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {savingReceive[item.id] ? 'Saving...' : 'Receive'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                  return rows;
+                })()}
               </tbody>
             </table>
           </div>
