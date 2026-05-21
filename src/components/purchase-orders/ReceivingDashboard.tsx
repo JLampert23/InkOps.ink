@@ -31,6 +31,10 @@ interface PurchaseOrder {
 interface ReceivingDashboardProps {
   onReceivePO: (poId: string) => void;
   onViewPO: (poId: string) => void;
+  // 2026-05-21 — let the Awaiting Check-In rows link the WO# to the
+  // work order detail screen so admin can jump straight to a job from
+  // the receiving list (client ask).
+  onNavigateToWorkOrder?: (workOrderId: string) => void;
 }
 
 interface MarkedOrderedItem {
@@ -55,7 +59,7 @@ interface MarkedOrderedItem {
   quantity_received_by_size?: Record<string, number> | null;
 }
 
-export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboardProps) {
+export function ReceivingDashboard({ onReceivePO, onViewPO, onNavigateToWorkOrder }: ReceivingDashboardProps) {
   const [closedPOs, setClosedPOs] = useState<PurchaseOrder[]>([]);
   const [overduePOs, setOverduePOs] = useState<PurchaseOrder[]>([]);
   const [openPOs, setOpenPOs] = useState<PurchaseOrder[]>([]);
@@ -673,39 +677,29 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                     </td>
                   </tr>
                 )}
-                {/* 2026-05-20 — group rows by the date the item was marked
-                    ordered (client ask). filteredMarked is already sorted
-                    by ordered_at desc from loadMarkedOrderedItems(), so we
-                    just emit a date header whenever the key changes. */}
-                {(() => {
-                  let lastDateKey: string | null = null;
-                  const rows: React.ReactNode[] = [];
-                  filteredMarked.forEach((item) => {
-                    const dateKey = item.ordered_at
-                      ? format(parseISO(item.ordered_at), 'yyyy-MM-dd')
-                      : 'unknown';
-                    const dateLabel = item.ordered_at
-                      ? format(parseISO(item.ordered_at), 'EEEE, MMM d, yyyy')
-                      : 'Date not recorded';
-                    if (dateKey !== lastDateKey) {
-                      rows.push(
-                        <tr key={`hdr-${dateKey}`} className="bg-amber-50/40 dark:bg-amber-900/15">
-                          <td colSpan={7} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-                            Marked ordered · {dateLabel}
-                          </td>
-                        </tr>
-                      );
-                      lastDateKey = dateKey;
-                    }
-                    const remaining = Math.max(0, item.total_quantity - item.quantity_received);
-                    const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
-                    const draftValue = receiveQtyDraft[item.id] ?? '';
-                    const draftNum = parseInt(draftValue, 10);
-                    const validDraft = !isNaN(draftNum) && draftNum > 0 && draftNum <= remaining;
-                    rows.push(
-                      <tr key={item.id} className="border-t border-gray-200 dark:border-slate-700">
+                {/* 2026-05-21 — undid yesterday's date grouping; client
+                    asked to combine all days back into a single flat
+                    list ('combine the days into one recieving ui'). */}
+                {filteredMarked.map((item) => {
+                  const remaining = Math.max(0, item.total_quantity - item.quantity_received);
+                  const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
+                  const draftValue = receiveQtyDraft[item.id] ?? '';
+                  const draftNum = parseInt(draftValue, 10);
+                  const validDraft = !isNaN(draftNum) && draftNum > 0 && draftNum <= remaining;
+                  return (
+                    <tr key={item.id} className="border-t border-gray-200 dark:border-slate-700">
                         <td className="px-4 py-2 text-gray-900 dark:text-white font-medium whitespace-nowrap">
-                          {item.work_order_number || '—'}
+                          {item.work_order_number && item.work_order_id && onNavigateToWorkOrder ? (
+                            <button
+                              onClick={() => onNavigateToWorkOrder(item.work_order_id!)}
+                              className="text-blue-600 dark:text-blue-400 hover:underline"
+                              title={`Open ${item.work_order_number}`}
+                            >
+                              {item.work_order_number}
+                            </button>
+                          ) : (
+                            <span>{item.work_order_number || '—'}</span>
+                          )}
                         </td>
                         <td className="px-4 py-2">
                           <div className="font-medium text-gray-900 dark:text-white">
@@ -772,9 +766,8 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                         </td>
                       </tr>
                     );
-                  });
-                  return rows;
-                })()}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -46,6 +46,12 @@ export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersM
   const handleViewDetail = (poId: string) => {
     setSelectedPoId(poId);
     setCurrentView('detail');
+    // 2026-05-21 — also force the Purchase Orders tab. The PO detail
+    // view only renders when activeTab === 'purchase-orders', so when
+    // the View button is clicked from a different tab (e.g. Receiving
+    // Dashboard) the state flips but nothing renders. Client reported
+    // "VIEW BUTTON ON THE PO DOES NOT WORK" — this is why.
+    setActiveTab('purchase-orders');
     window.history.pushState(
       { poView: 'detail', poId },
       '',
@@ -248,6 +254,7 @@ export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersM
           <ReceivingDashboard
             onReceivePO={handleReceivePO}
             onViewPO={handleViewDetail}
+            onNavigateToWorkOrder={onNavigateToWorkOrder}
           />
         )}
       </div>
