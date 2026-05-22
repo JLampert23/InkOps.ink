@@ -664,7 +664,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO, onNavigateToWorkOrde
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Customer / Quote</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Style</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-400">Color</th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Needed</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Ordered</th>
                   <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Received</th>
                   <th className="px-4 py-2 text-right font-medium text-gray-600 dark:text-gray-400">Quick Receive</th>
                 </tr>
@@ -677,10 +677,40 @@ export function ReceivingDashboard({ onReceivePO, onViewPO, onNavigateToWorkOrde
                     </td>
                   </tr>
                 )}
-                {/* 2026-05-21 — undid yesterday's date grouping; client
-                    asked to combine all days back into a single flat
-                    list ('combine the days into one recieving ui'). */}
-                {filteredMarked.map((item) => {
+                {/* 2026-05-22 — re-instated date grouping. Client clarified:
+                    "i never said to remove the dates. i want them in order
+                    by date". Sorted newest-first to match the screenshot
+                    he approved. */}
+                {(() => {
+                  const groups = new Map<string, MarkedOrderedItem[]>();
+                  filteredMarked.forEach((item) => {
+                    const key = item.ordered_at ? item.ordered_at.slice(0, 10) : 'unknown';
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key)!.push(item);
+                  });
+                  const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+                    if (a === 'unknown') return 1;
+                    if (b === 'unknown') return -1;
+                    return b.localeCompare(a);
+                  });
+                  return sortedKeys.flatMap((key) => {
+                    const items = groups.get(key)!;
+                    const label = key === 'unknown'
+                      ? 'MARKED ORDERED - DATE UNKNOWN'
+                      : `MARKED ORDERED - ${new Date(key + 'T00:00:00').toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        }).toUpperCase()}`;
+                    const headerRow = (
+                      <tr key={`hdr-${key}`} className="bg-amber-50/40 dark:bg-amber-900/10">
+                        <td colSpan={7} className="px-4 py-1.5 text-xs font-semibold tracking-wide text-amber-700 dark:text-amber-400">
+                          {label}
+                        </td>
+                      </tr>
+                    );
+                    const rows = items.map((item) => {
                   const remaining = Math.max(0, item.total_quantity - item.quantity_received);
                   const isPartial = item.quantity_received > 0 && item.quantity_received < item.total_quantity;
                   const draftValue = receiveQtyDraft[item.id] ?? '';
@@ -766,7 +796,10 @@ export function ReceivingDashboard({ onReceivePO, onViewPO, onNavigateToWorkOrde
                         </td>
                       </tr>
                     );
-                })}
+                    });
+                    return [headerRow, ...rows];
+                  });
+                })()}
               </tbody>
             </table>
           </div>
