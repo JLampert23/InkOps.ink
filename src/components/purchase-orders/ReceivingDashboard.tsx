@@ -766,7 +766,6 @@ export function ReceivingDashboard({ onReceivePO, onViewPO, onNavigateToWorkOrde
                         </td>
                       </tr>
                     );
-                  );
                 })}
               </tbody>
             </table>
