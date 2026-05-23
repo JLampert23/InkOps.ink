@@ -1206,6 +1206,26 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         const sampleUnitPrice = totalImprintPrice + sampleGarmentCost;
         const hasImprints = groupImprints.length > 0;
 
+        // 2026-05-23 — surface imprints that silently stayed at $0 because
+        // they have no price matrix. Without this Jamie saw "FULL FRONT
+        // $0.00" in the breakdown after clicking Update Price and assumed
+        // the button was broken — it ran, but the imprint just had nothing
+        // to compute from.
+        const missingMatrix = groupImprints.filter(
+          (imp: any) => !imp.price_matrix_id
+        );
+        if (missingMatrix.length > 0) {
+          const labels = missingMatrix
+            .map((imp: any) => `${imp.location || 'Imprint'} (${imp.type_of_work || '—'})`)
+            .join(', ');
+          showNotification(
+            'warning',
+            'Decoration price is $0',
+            `These imprints have no pricing matrix selected: ${labels}. Open Imprint(s) to assign one.`
+          );
+          return;
+        }
+
         let msg = '';
         if (failedStyles.length > 0) {
           msg = `Prices updated. Note: Could not fetch live pricing for: ${failedStyles.join(', ')}`;

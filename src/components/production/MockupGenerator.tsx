@@ -121,6 +121,11 @@ export default function MockupGenerator({
     imagesData: any;
   }>>([]);
   const [activeGarmentIndex, setActiveGarmentIndex] = useState(0);
+  // 2026-05-23 — bumped on every garment-thumbnail click so the preload
+  // useEffect re-runs even when the user clicks the already-active garment.
+  // Without this the first click on the pre-selected thumbnail was a no-op
+  // (URL state didn't change) and the canvas stayed on "Loading garment…".
+  const [garmentLoadVersion, setGarmentLoadVersion] = useState(0);
   const [imprints, setImprints] = useState<Array<{
     id: string;
     imprint_number: string;
@@ -1267,6 +1272,26 @@ export default function MockupGenerator({
 
       let currentProofId = proofId;
 
+      // 2026-05-23 — defensive: if React state didn't track a proofId
+      // (QuoteBuilder doesn't pass one in, and the on-open lookup chain
+      // relies on imprintId/lineItemId props that also aren't passed),
+      // look up any existing proof for the imprint we resolved on open.
+      // Without this, every save was INSERTing a fresh proof and the
+      // mockups array kept growing, giving Jamie duplicate thumbnails.
+      if (!currentProofId && selectedImprintId && selectedImprintId.trim()) {
+        const { data: existingProofs } = await supabase
+          .from('proofs')
+          .select('id')
+          .eq('imprint_id', selectedImprintId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (existingProofs && existingProofs.length > 0) {
+          currentProofId = existingProofs[0].id;
+          setProofId(currentProofId);
+          console.log('MockupGenerator: Reusing existing proof for imprint:', currentProofId);
+        }
+      }
+
       if (!currentProofId) {
         console.log('MockupGenerator: Creating new proof record...');
         const { data: newProof, error: proofError } = await supabase
@@ -1380,13 +1405,16 @@ export default function MockupGenerator({
             console.log('MockupGenerator: Found existing imprint, current mockups:', existingImprint.mockups);
             const existingMockups = existingImprint.mockups || [];
 
-            // If we're editing an existing proof, replace the mockup with this proof_id
-            if (proofId) {
-              console.log('MockupGenerator: Editing existing proof, replacing mockup with proof_id:', proofId);
+            // 2026-05-23 — use currentProofId (the local just resolved/inserted
+            // above) instead of the proofId state. The state set above won't have
+            // applied to this render yet, so reading proofId here was always
+            // false on a fresh-save → fell through to the append branch.
+            if (currentProofId) {
+              console.log('MockupGenerator: Editing existing proof, replacing mockup with proof_id:', currentProofId);
 
               // Find and replace the mockup with matching proof_id
               const mockupIndex = existingMockups.findIndex((mockup: any) =>
-                (typeof mockup === 'object' && mockup?.proof_id === proofId)
+                (typeof mockup === 'object' && mockup?.proof_id === currentProofId)
               );
 
               let updatedMockups;
@@ -1515,10 +1543,11 @@ export default function MockupGenerator({
 
               let updatedMockups;
 
-              // If editing an existing proof, replace it; otherwise add new
-              if (proofId) {
+              // 2026-05-23 — same fix as above: use currentProofId, not the
+              // stale proofId state.
+              if (currentProofId) {
                 const mockupIndex = existingMockups.findIndex((mockup: any) =>
-                  (typeof mockup === 'object' && mockup?.proof_id === proofId)
+                  (typeof mockup === 'object' && mockup?.proof_id === currentProofId)
                 );
 
                 if (mockupIndex !== -1) {
@@ -1899,7 +1928,7 @@ export default function MockupGenerator({
 
   useEffect(() => {
     preloadGarmentImage();
-  }, [garmentImageUrl]);
+  }, [garmentImageUrl, garmentLoadVersion]);
 
   useEffect(() => {
     preloadArtworkImages();
@@ -2603,8 +2632,12 @@ export default function MockupGenerator({
                             setActiveGarmentIndex(index);
                             const sanitizedUrl = sanitizeImageUrl(garmentStyle.frontImage);
                             if (sanitizedUrl) {
+                              // Force a redraw even if the URL hasn't changed
+                              // (clicking the already-active garment was a no-op).
+                              garmentImageCache.current = null;
                               setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
                               setGarmentDescription(garmentStyle.description);
+                              setGarmentLoadVersion((v) => v + 1);
                             }
                           }}
                         >
