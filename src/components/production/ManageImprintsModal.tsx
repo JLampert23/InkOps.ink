@@ -920,11 +920,30 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                   </label>
                   <select
                     value={currentImprint.type_of_work}
-                    onChange={(e) => setCurrentImprint({
-                      ...currentImprint,
-                      type_of_work: e.target.value,
-                      thread_ink_color: ''
-                    })}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      // 2026-05-23 — auto-select the first matching price matrix
+                      // (and its first column) when the user picks a type of
+                      // work. Without this the matrix dropdown stays empty,
+                      // recalc skips the imprint, and decoration shows $0 on
+                      // the unit-price breakdown (Jamie reported missing
+                      // Full Front screen-print charge).
+                      const t = newType.trim().toLowerCase();
+                      const firstMatching = priceMatrices.find(
+                        (m) => (m.matrix_type || '').trim().toLowerCase() === t
+                      );
+                      const firstColumn = firstMatching?.columns?.[0] || '';
+                      setCurrentImprint({
+                        ...currentImprint,
+                        type_of_work: newType,
+                        thread_ink_color: '',
+                        price_matrix_id: firstMatching?.id || null,
+                        matrix: firstMatching?.name || '',
+                        pricing_matrix_column: firstColumn,
+                        num_colors: firstColumn ? extractNumColors(firstColumn) : 1,
+                      });
+                      setSelectedMatrixColumns(firstMatching?.columns || []);
+                    }}
                     className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded text-gray-900 dark:text-white text-sm"
                   >
                     <option value="">Select type of work</option>
