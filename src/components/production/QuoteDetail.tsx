@@ -16,6 +16,65 @@ function decodeHtmlEntities(text: string): string {
   return textarea.value;
 }
 
+// 2026-05-24 — friendly Activity History renderer. The raw `action` and
+// `meta` fields are dev-facing ("updated" + `{"new_status":"draft"}`
+// JSON), which client called out: "looks like u are talking to a dev".
+// Translate to plain English; drop the JSON block.
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  sent: 'Sent',
+  pending_approval: 'Pending Approval',
+  approved: 'Approved',
+  declined: 'Declined',
+  converted: 'Converted to Work Order',
+  archived: 'Archived',
+  art_declined: 'Art Declined',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  created: 'Quote created',
+  updated: 'Quote saved',
+  quote_edited: 'Quote edited',
+  status_changed: 'Status changed',
+  sent: 'Quote sent to customer',
+  quote_sent: 'Quote sent to customer',
+  approved: 'Approved by customer',
+  declined: 'Declined by customer',
+  converted: 'Converted to work order',
+  archived: 'Archived',
+  unarchived: 'Unarchived',
+  deleted: 'Deleted',
+  artwork_approved: 'Artwork approved by customer',
+  artwork_declined: 'Artwork declined by customer',
+  payment_received: 'Payment received',
+};
+
+const titleCase = (s: string) =>
+  s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const prettyStatus = (s: string) => STATUS_LABELS[s] ?? titleCase(s);
+
+function formatActivity(log: { action?: string; meta?: any }): {
+  label: string;
+  description: string | null;
+} {
+  const action = log.action || 'updated';
+  const meta = log.meta || {};
+  const label = ACTION_LABELS[action] ?? titleCase(action);
+
+  let description: string | null = null;
+
+  if (meta.old_status && meta.new_status && meta.old_status !== meta.new_status) {
+    description = `Status changed from ${prettyStatus(meta.old_status)} to ${prettyStatus(meta.new_status)}`;
+  } else if (meta.amount && meta.currency) {
+    description = `Amount: ${meta.currency.toUpperCase()} ${Number(meta.amount).toFixed(2)}`;
+  } else if (meta.note) {
+    description = String(meta.note);
+  }
+
+  return { label, description };
+}
+
 interface QuoteDetailProps {
   quoteId: string;
   onBack: () => void;
@@ -1436,32 +1495,35 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
           {showActivity && (
             <div className="space-y-4">
               {activityLogs.length > 0 ? (
-                activityLogs.map((log) => (
-                  <div key={log.id} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                      <div className="w-px h-full bg-gray-300 dark:bg-slate-600 my-1 pb-4"></div>
-                    </div>
-                    <div className="flex-1 pb-4">
-                      <div className="flex items-baseline justify-between">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          {log.action}
-                        </p>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {format(new Date(log.performed_at), 'MMM d, h:mm a')}
-                        </span>
+                activityLogs.map((log) => {
+                  const { label, description } = formatActivity(log);
+                  return (
+                    <div key={log.id} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
+                        <div className="w-px h-full bg-gray-300 dark:bg-slate-600 my-1 pb-4"></div>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                        by {log.performed_by_name || 'System'}
-                      </p>
-                      {log.meta && Object.keys(log.meta).length > 0 && (
-                        <pre className="mt-2 text-xs bg-gray-100 dark:bg-slate-700/50 p-2 rounded text-gray-600 dark:text-gray-400 overflow-x-auto">
-                          {JSON.stringify(log.meta, null, 2)}
-                        </pre>
-                      )}
+                      <div className="flex-1 pb-4">
+                        <div className="flex items-baseline justify-between">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {label}
+                          </p>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {format(new Date(log.performed_at), 'MMM d, h:mm a')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                          by {log.performed_by_name || 'System'}
+                        </p>
+                        {description && (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                            {description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-gray-500 italic">No activity recorded yet.</p>
               )}
