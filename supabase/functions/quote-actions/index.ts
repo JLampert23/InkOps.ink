@@ -951,10 +951,18 @@ Deno.serve(async (req: Request) => {
       }
 
       // Only insert work order line items if they don't already exist
-      if (!existingWorkOrder && lineItems && lineItems.length > 0) {
-        const woLineItems = lineItems
-          .filter((item: any) => item.line_type === "item" || !item.line_type)
-          .map((item: any) => ({
+      // 2026-05-29 — sync WO line items on re-approval too. Before today
+      // we only inserted when the WO was first created, so quote edits
+      // (qty changes, added line items, etc.) silently never reached the
+      // WO. Match by line_number, update existing, insert new. Orphans
+      // are left alone — production may already be in progress on them.
+      if (lineItems && lineItems.length > 0) {
+        const garmentLines = lineItems.filter(
+          (item: any) => item.line_type === "item" || !item.line_type,
+        );
+
+        if (!existingWorkOrder) {
+          const woLineItems = garmentLines.map((item: any) => ({
             work_order_id: workOrder.id,
             company_id: profile.company_id,
             line_number: item.line_number,
@@ -966,9 +974,51 @@ Deno.serve(async (req: Request) => {
             sizes: buildSizesJson(item),
             notes: item.notes,
           }));
+          const { error: woliError } = await supabaseAdmin
+            .from("work_order_line_items")
+            .insert(woLineItems);
+          if (woliError) console.error("WO line items error:", woliError.message);
+        } else {
+          // Re-approval — pull existing rows and merge by line_number.
+          const { data: existingWoLines } = await supabaseAdmin
+            .from("work_order_line_items")
+            .select("id, line_number")
+            .eq("work_order_id", workOrder.id);
+          const existingByLine = new Map<number, string>();
+          (existingWoLines || []).forEach((row: any) => {
+            if (row.line_number != null) existingByLine.set(row.line_number, row.id);
+          });
 
-        const { error: woliError } = await supabaseAdmin.from("work_order_line_items").insert(woLineItems);
-        if (woliError) console.error("WO line items error:", woliError.message);
+          for (const item of garmentLines) {
+            const fields = {
+              description: item.description || item.item_number || "",
+              style_number: item.item_number,
+              color: item.color,
+              quantity: sumQty(item) || item.quantity || 0,
+              sizes: buildSizesJson(item),
+              notes: item.notes,
+            };
+            const existingId = existingByLine.get(item.line_number);
+            if (existingId) {
+              const { error: updErr } = await supabaseAdmin
+                .from("work_order_line_items")
+                .update(fields)
+                .eq("id", existingId);
+              if (updErr) console.error("WO line item update error:", updErr.message);
+            } else {
+              const { error: insErr } = await supabaseAdmin
+                .from("work_order_line_items")
+                .insert([{
+                  work_order_id: workOrder.id,
+                  company_id: profile.company_id,
+                  line_number: item.line_number,
+                  item_type: "garment",
+                  ...fields,
+                }]);
+              if (insErr) console.error("WO line item insert error:", insErr.message);
+            }
+          }
+        }
       }
 
       // Check if invoice already exists
@@ -1169,8 +1219,55 @@ Deno.serve(async (req: Request) => {
         item.line_type === "item" || !item.line_type
       ) || [];
 
-      // Only insert garment requirements if work order was just created
-      if (!existingWorkOrder) {
+      // 2026-05-29 — sync garment staging on re-approval too. On fresh
+      // approval, insert all. On re-approval, merge by (style_number, color):
+      // update qty/sizes/cost on matches, insert new style+color combos that
+      // weren't there before. Leave orphan rows alone — they may have been
+      // marked ordered or received already.
+      if (existingWorkOrder) {
+        const { data: existingStaging } = await supabaseAdmin
+          .from("garment_requirements_staging")
+          .select("id, style_number, color")
+          .eq("work_order_id", workOrder.id);
+        const key = (s: string | null | undefined, c: string | null | undefined) =>
+          `${(s || "").trim().toLowerCase()}||${(c || "").trim().toLowerCase()}`;
+        const stagingByKey = new Map<string, string>();
+        (existingStaging || []).forEach((row: any) =>
+          stagingByKey.set(key(row.style_number, row.color), row.id),
+        );
+
+        for (const garment of garmentLineItems) {
+          const totalQty = sumQty(garment) || garment.quantity || 0;
+          const fields = {
+            style_name: garment.description,
+            sizes: buildSizesJson(garment),
+            total_quantity: totalQty,
+            unit_cost: garment.wholesale_price || garment.garment_unit_price || 0,
+            supplier_name: garment.supplier_name,
+            supplier_type: garment.supplier_name ? "distributor" : null,
+          };
+          const existingId = stagingByKey.get(key(garment.item_number, garment.color));
+          if (existingId) {
+            const { error: updErr } = await supabaseAdmin
+              .from("garment_requirements_staging")
+              .update(fields)
+              .eq("id", existingId);
+            if (updErr) console.error("Garment staging update error:", updErr.message);
+          } else {
+            const { error: insErr } = await supabaseAdmin
+              .from("garment_requirements_staging")
+              .insert([{
+                company_id: profile.company_id,
+                quote_id: quoteId,
+                work_order_id: workOrder.id,
+                style_number: garment.item_number,
+                color: garment.color,
+                ...fields,
+              }]);
+            if (insErr) console.error("Garment staging insert error:", insErr.message);
+          }
+        }
+      } else {
         for (const garment of garmentLineItems) {
           const totalQty = sumQty(garment) || garment.quantity || 0;
           await supabaseAdmin.from("garment_requirements_staging").insert([{
@@ -1189,48 +1286,38 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // 2026-05-29 — also backfill schedule entries on re-approval when the
-      // work order exists but no entries do. Jamie reported QTE-0038 was
-      // approved but never appeared on the Master Scheduler: the WO had
-      // been created in an earlier state and imprints were added later, so
-      // the original !existingWorkOrder guard meant we never created the
-      // entries. Keep the original "only on first create" intent — but
-      // also backfill the zero-entry case so the quote actually shows up.
-      let shouldCreateScheduleEntries = !existingWorkOrder && imprints && imprints.length > 0;
-      if (!shouldCreateScheduleEntries && existingWorkOrder && imprints && imprints.length > 0) {
-        const { count: existingEntryCount } = await supabaseAdmin
-          .from("production_schedule_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("work_order_id", workOrder.id);
-        if ((existingEntryCount || 0) === 0) {
-          shouldCreateScheduleEntries = true;
-          console.log(`Re-approval cascade: WO ${workOrder.id} has no schedule entries — backfilling from ${imprints.length} imprint(s).`);
-        }
-      }
-
-      if (shouldCreateScheduleEntries) {
+      // 2026-05-29 — re-approval schedule entry sync. On fresh approval,
+      // bulk-insert. On re-approval, update existing entries with the
+      // current quote data (qty, due date, customer, artwork) and insert
+      // entries for any newly-added imprints. Never delete or touch
+      // step_statuses / scheduler_column — those represent production
+      // progress and must survive re-approval. Replaces the earlier
+      // "only backfill if zero entries" behaviour.
+      if (imprints && imprints.length > 0) {
         const today = new Date().toISOString().split('T')[0];
         const quoteDueDate = quote.production_due_date || quote.customer_due_date || today;
         const dueDate = quoteDueDate >= today ? quoteDueDate : today;
-        const totalQtyAll = lineItems?.reduce((sum: number, li: any) => sum + (sumQty(li) || li.quantity || 0), 0) || 0;
+        const totalQtyAll = lineItems?.reduce(
+          (sum: number, li: any) => sum + (sumQty(li) || li.quantity || 0),
+          0,
+        ) || 0;
 
-        console.log(`Creating ${imprints.length} schedule entries for quote ${quote.quote_number}`);
-
-        const scheduleEntries = imprints.map((imp: any, idx: number) => {
-          let artworkThumbUrl = null;
-          if (imp.artwork_url) {
-            artworkThumbUrl = imp.artwork_url;
-          } else if (imp.artwork_images && Array.isArray(imp.artwork_images) && imp.artwork_images.length > 0) {
-            artworkThumbUrl = imp.artwork_images[0];
-          } else if (imp.mockups && Array.isArray(imp.mockups) && imp.mockups.length > 0) {
-            // mockups is a JSONB array: [{file_url: "...", url: "..."}, ...]
-            const first = imp.mockups[0];
-            artworkThumbUrl = (first?.file_url && first.file_url !== '') ? first.file_url
-                           : (first?.url && first.url !== '') ? first.url
-                           : null;
+        const resolveArtworkUrl = (imp: any): string | null => {
+          if (imp.artwork_url) return imp.artwork_url;
+          if (imp.artwork_images && Array.isArray(imp.artwork_images) && imp.artwork_images.length > 0) {
+            return imp.artwork_images[0];
           }
+          if (imp.mockups && Array.isArray(imp.mockups) && imp.mockups.length > 0) {
+            const first = imp.mockups[0];
+            return (first?.file_url && first.file_url !== '') ? first.file_url
+                 : (first?.url && first.url !== '') ? first.url
+                 : null;
+          }
+          return null;
+        };
 
-          return {
+        if (!existingWorkOrder) {
+          const scheduleEntries = imprints.map((imp: any, idx: number) => ({
             company_id: profile.company_id,
             quote_id: quoteId,
             work_order_id: workOrder.id,
@@ -1245,23 +1332,77 @@ Deno.serve(async (req: Request) => {
             colors: imp.thread_ink_color || null,
             step_statuses: {},
             priority_order: idx,
-            artwork_thumb_url: artworkThumbUrl,
-          };
-        });
+            artwork_thumb_url: resolveArtworkUrl(imp),
+          }));
+          const { error: schedError } = await supabaseAdmin
+            .from("production_schedule_entries")
+            .insert(scheduleEntries);
+          if (schedError) {
+            console.error("CRITICAL: Failed to create schedule entries:", schedError);
+            throw new Error(`Failed to create schedule entries: ${schedError.message}`);
+          }
+          console.log(`Created ${scheduleEntries.length} schedule entries for ${quote.quote_number}`);
+        } else {
+          // Re-approval — merge by imprint_id.
+          const { data: existingEntries } = await supabaseAdmin
+            .from("production_schedule_entries")
+            .select("id, imprint_id")
+            .eq("work_order_id", workOrder.id);
+          const entryByImprint = new Map<string, string>();
+          (existingEntries || []).forEach((row: any) => {
+            if (row.imprint_id) entryByImprint.set(row.imprint_id, row.id);
+          });
 
-        console.log("Schedule entries to insert:", JSON.stringify(scheduleEntries, null, 2));
-
-        const { data: insertedSchedule, error: schedError } = await supabaseAdmin
-          .from("production_schedule_entries")
-          .insert(scheduleEntries)
-          .select();
-
-        if (schedError) {
-          console.error("CRITICAL: Failed to create schedule entries:", schedError);
-          throw new Error(`Failed to create schedule entries: ${schedError.message}`);
+          let updated = 0;
+          let inserted = 0;
+          for (let idx = 0; idx < imprints.length; idx++) {
+            const imp: any = imprints[idx];
+            const artworkThumbUrl = resolveArtworkUrl(imp);
+            const existingId = entryByImprint.get(imp.id);
+            if (existingId) {
+              const { error: updErr } = await supabaseAdmin
+                .from("production_schedule_entries")
+                .update({
+                  type_of_work: imp.type_of_work || "Screen Print",
+                  imprint_number: imp.imprint_number || `IMP-${idx + 1}`,
+                  production_due_date: dueDate,
+                  quantity: totalQtyAll,
+                  customer_name: quote.customer_name,
+                  quote_number: quote.quote_number,
+                  colors: imp.thread_ink_color || null,
+                  artwork_thumb_url: artworkThumbUrl,
+                  // priority_order intentionally not touched — user may
+                  // have reordered cards on the board.
+                })
+                .eq("id", existingId);
+              if (updErr) console.error("Schedule entry update error:", updErr.message);
+              else updated++;
+            } else {
+              const { error: insErr } = await supabaseAdmin
+                .from("production_schedule_entries")
+                .insert([{
+                  company_id: profile.company_id,
+                  quote_id: quoteId,
+                  work_order_id: workOrder.id,
+                  imprint_id: imp.id,
+                  type_of_work: imp.type_of_work || "Screen Print",
+                  imprint_number: imp.imprint_number || `IMP-${idx + 1}`,
+                  production_due_date: dueDate,
+                  quantity: totalQtyAll,
+                  customer_name: quote.customer_name,
+                  quote_number: quote.quote_number,
+                  scheduler_column: "Unscheduled",
+                  colors: imp.thread_ink_color || null,
+                  step_statuses: {},
+                  priority_order: idx,
+                  artwork_thumb_url: artworkThumbUrl,
+                }]);
+              if (insErr) console.error("Schedule entry insert error:", insErr.message);
+              else inserted++;
+            }
+          }
+          console.log(`Re-approval sync for ${quote.quote_number}: ${updated} entries updated, ${inserted} inserted.`);
         }
-
-        console.log(`Successfully created ${insertedSchedule?.length || 0} schedule entries`);
       }
 
       // Check if billing queue entry already exists
