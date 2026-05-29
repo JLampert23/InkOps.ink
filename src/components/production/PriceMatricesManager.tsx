@@ -137,7 +137,12 @@ export function PriceMatricesManager() {
         rowLabels.push(quantity);
 
         columnIndices.forEach((colIdx, colPosition) => {
-          const value = parseFloat(row[colIdx]);
+          // 2026-05-29 — strip currency and thousands separators before
+          // parseFloat. Jamie's CSV (Screen Printing matrix) had values
+          // like "$7.19" — parseFloat stops at non-numeric chars so it
+          // returned NaN for every cell and the grid rendered blank.
+          const raw = (row[colIdx] || '').replace(/[$,\s]/g, '');
+          const value = parseFloat(raw);
           if (!isNaN(value)) {
             cells[`${rowIdx}-${colPosition}`] = value;
           }
