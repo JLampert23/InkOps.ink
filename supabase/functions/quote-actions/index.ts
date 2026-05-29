@@ -1189,8 +1189,26 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Only insert schedule entries if work order was just created
-      if (!existingWorkOrder && imprints && imprints.length > 0) {
+      // 2026-05-29 — also backfill schedule entries on re-approval when the
+      // work order exists but no entries do. Jamie reported QTE-0038 was
+      // approved but never appeared on the Master Scheduler: the WO had
+      // been created in an earlier state and imprints were added later, so
+      // the original !existingWorkOrder guard meant we never created the
+      // entries. Keep the original "only on first create" intent — but
+      // also backfill the zero-entry case so the quote actually shows up.
+      let shouldCreateScheduleEntries = !existingWorkOrder && imprints && imprints.length > 0;
+      if (!shouldCreateScheduleEntries && existingWorkOrder && imprints && imprints.length > 0) {
+        const { count: existingEntryCount } = await supabaseAdmin
+          .from("production_schedule_entries")
+          .select("id", { count: "exact", head: true })
+          .eq("work_order_id", workOrder.id);
+        if ((existingEntryCount || 0) === 0) {
+          shouldCreateScheduleEntries = true;
+          console.log(`Re-approval cascade: WO ${workOrder.id} has no schedule entries — backfilling from ${imprints.length} imprint(s).`);
+        }
+      }
+
+      if (shouldCreateScheduleEntries) {
         const today = new Date().toISOString().split('T')[0];
         const quoteDueDate = quote.production_due_date || quote.customer_due_date || today;
         const dueDate = quoteDueDate >= today ? quoteDueDate : today;

@@ -1185,7 +1185,15 @@ function GroupImprintsSection({ groupLabel, itemGroups, quoteImprints, quoteNumb
               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {imprint.mockups!.map((mockup: any, mIdx: number) => {
-                    const url = typeof mockup === 'string' ? mockup : mockup?.url;
+                    // 2026-05-29 — match QuoteDetail's mockup-URL fallback chain.
+                    // WorkOrderDetail was only reading mockup.url, so mockups
+                    // stored as {file_url} or {composite_image_url} from the
+                    // legacy proof-upload path rendered as blank thumbs on the
+                    // WO. Jamie reported: "When i navigate to the corrosponding
+                    // work order i do not see the mock ups."
+                    const url = typeof mockup === 'string'
+                      ? mockup
+                      : (mockup?.file_url || mockup?.url || mockup?.composite_image_url || mockup?.garment_image_url);
                     if (!url) return null;
                     return (
                       <div key={`m-${mIdx}`} className="aspect-square">
