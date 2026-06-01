@@ -557,10 +557,16 @@ export default function MockupGenerator({
           setGarmentStyles(styles);
 
           // Set the initial garment image from the first item
-          const sanitizedUrl = sanitizeImageUrl(lineItems[0].garment_front_image_url);
+          // 2026-06-01 — also fall back to parent-passed props if the DB row
+          // is missing an image (race: new item saved but image fields not
+          // populated yet, OR the user added a style without uploading an
+          // image). Without this fallback, MG opens with a blank canvas and
+          // the user has to click around to recover.
+          const sanitizedUrl = sanitizeImageUrl(lineItems[0].garment_front_image_url)
+                            || sanitizeImageUrl(garmentFrontImageUrl);
           if (sanitizedUrl) {
             setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
-            setGarmentDescription(lineItems[0].description || '');
+            setGarmentDescription(lineItems[0].description || garmentStyle || '');
           }
         } else if (garmentStyle || garmentFrontImageUrl) {
           // 2026-05-19 — DB returned nothing because the line items haven't
@@ -2650,7 +2656,13 @@ export default function MockupGenerator({
                                           e.stopPropagation();
                                           const sanitizedUrl = sanitizeImageUrl(imageUrl);
                                           if (sanitizedUrl) {
-                                            setGarmentImageUrl(sanitizedUrl);
+                                            // 2026-06-01 — mirror the garment-card click pattern: bust the
+                                            // cached image and bump load version so the canvas always redraws.
+                                            // Without this, clicking a View thumbnail whose URL equals the
+                                            // current garmentImageUrl is a silent no-op (React skips render).
+                                            garmentImageCache.current = null;
+                                            setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
+                                            setGarmentLoadVersion((v) => v + 1);
                                           }
                                         }}
                                         className={`relative w-14 h-14 rounded border overflow-hidden transition-all hover:scale-105 flex-shrink-0 ${
