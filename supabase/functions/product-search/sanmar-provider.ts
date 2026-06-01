@@ -593,13 +593,17 @@ async function transformSanMarData(
       }
 
       // PRIORITY 2: Fall back to CDN color name matching
+      // 2026-06-01 — SanMar's Media API stores color as the short vendor code
+      // (e.g. "HTHRROYAL"), not the long colorName ("Heather Royal"). Try the
+      // vendor code as a fallback lookup key so swatches match the right color.
       if (!imageUrl && hasCdn) {
-        const cdnEntry = cdnImages![colorKey];
+        const vendorKey = (color.vendorColorCode || "").toLowerCase().trim();
+        const cdnEntry = cdnImages![colorKey] || (vendorKey ? cdnImages![vendorKey] : undefined);
         if (cdnEntry) {
           imageUrl = cdnEntry.front || cdnEntry.all?.[0] || "";
           rearImageUrl = cdnEntry.back || "";
           sideImageUrl = cdnEntry.side || "";
-          console.log(`[SanMar] CDN matched by color "${colorKey}": front=${!!imageUrl}, rear=${!!rearImageUrl}, side=${!!sideImageUrl}`);
+          console.log(`[SanMar] CDN matched by colorKey "${colorKey}" or vendorKey "${vendorKey}": front=${!!imageUrl}, rear=${!!rearImageUrl}, side=${!!sideImageUrl}`);
         }
       }
 
@@ -620,12 +624,16 @@ async function transformSanMarData(
         }
 
         // Then try color name matching
+        // 2026-06-01 — also compare against vendorColorCode since Media API
+        // returns short codes (e.g. "HTHRROYAL") in img.color, not long names.
         if (colorImages.length === 0) {
+          const vendorCode = (color.vendorColorCode || "").toLowerCase().trim();
           colorImages = mediaImages.filter((img: any) => {
             const imgColor = (img.color || "").toLowerCase().trim();
-            if (!imgColor || !colorName) return false;
-            if (imgColor === colorName) return true;
+            if (!imgColor) return false;
+            if (colorName && imgColor === colorName) return true;
             if (normalizeColorKey(img.color) === colorKey) return true;
+            if (vendorCode && imgColor === vendorCode) return true;
             return false;
           });
         }
