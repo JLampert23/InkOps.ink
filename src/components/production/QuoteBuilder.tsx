@@ -3564,6 +3564,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           garmentFrontImageUrl={firstItem?.garment_front_image_url || ''}
           garmentBackImageUrl={firstItem?.garment_back_image_url || firstItem?.garment_rear_image_url || ''}
           groupLabel={showMockupForGroup}
+          localLineItems={mockupGroup?.items}
           onClose={() => setShowMockupForGroup(null)}
           onSave={async () => {
             // Reload imprints to get updated mockups (but keep modal open)
