@@ -556,14 +556,26 @@ export default function MockupGenerator({
 
           setGarmentStyles(styles);
 
-          // Set the initial garment image from the first item
-          // 2026-06-01 — also fall back to parent-passed props if the DB row
-          // is missing an image (race: new item saved but image fields not
-          // populated yet, OR the user added a style without uploading an
-          // image). Without this fallback, MG opens with a blank canvas and
-          // the user has to click around to recover.
-          const sanitizedUrl = sanitizeImageUrl(lineItems[0].garment_front_image_url)
-                            || sanitizeImageUrl(garmentFrontImageUrl);
+          // Set the initial garment image from the first item.
+          // 2026-06-01 v2 — first fix only checked the dedicated
+          // garment_front_image_url field. Jamie's repro showed the View
+          // thumbnails were populated (so garment_images_data.frontImages
+          // had URLs) but the canvas was blank because the dedicated field
+          // was empty. Walk every image source so we get something to draw.
+          const firstStyle: any = styles[0] || {};
+          const firstImagesData: any = firstStyle.imagesData || {};
+          const initialUrlCandidate: string =
+            lineItems[0].garment_front_image_url
+            || firstImagesData.frontImages?.[0]
+            || firstStyle.rearImage
+            || firstImagesData.rearImages?.[0]
+            || firstStyle.sideImage
+            || firstImagesData.sideImages?.[0]
+            || firstImagesData.lifestyleImages?.[0]
+            || firstImagesData.otherImages?.[0]
+            || garmentFrontImageUrl
+            || '';
+          const sanitizedUrl = sanitizeImageUrl(initialUrlCandidate);
           if (sanitizedUrl) {
             setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
             setGarmentDescription(lineItems[0].description || garmentStyle || '');
