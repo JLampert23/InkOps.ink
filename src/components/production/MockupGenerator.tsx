@@ -35,6 +35,20 @@ interface MockupGeneratorProps {
   imprintId?: string;
   imprintLocation?: string;
   imprintTypeOfWork?: string;
+  // 2026-06-01 v3 — parent passes its full local line-items list so MG can
+  // surface unsaved items in the sidebar. Without this MG only ever sees the
+  // DB rows, so a brand-new item the user just added is invisible until save.
+  localLineItems?: Array<{
+    id?: string;
+    item_number?: string;
+    color?: string;
+    description?: string;
+    garment_front_image_url?: string;
+    garment_rear_image_url?: string;
+    garment_side_image_url?: string;
+    garment_lifestyle_image_url?: string;
+    garment_images_data?: any;
+  }>;
   onClose: () => void;
   onSave?: () => void;
 }
@@ -91,6 +105,7 @@ export default function MockupGenerator({
   imprintId,
   imprintLocation,
   imprintTypeOfWork,
+  localLineItems,
   onClose,
   onSave,
 }: MockupGeneratorProps) {
@@ -554,6 +569,30 @@ export default function MockupGenerator({
             imagesData: cleanImagesData(item.garment_images_data),
           }));
 
+          // 2026-06-01 v3 — append any local (unsaved) items the parent passed
+          // in that aren't already in the DB results. Without this the right
+          // sidebar only shows saved items; anything the user just added in
+          // QuoteBuilder is invisible until they save the quote first.
+          const dbIds = new Set(styles.map(s => s.lineItemId));
+          if (localLineItems && localLineItems.length > 0) {
+            for (const local of localLineItems) {
+              if (local.id && dbIds.has(local.id)) continue;
+              if (!local.item_number && !local.garment_front_image_url) continue;
+              styles.push({
+                lineItemId: local.id || '',
+                style: local.item_number || '',
+                color: local.color || '',
+                description: local.description || '',
+                itemNumber: local.item_number || '',
+                frontImage: local.garment_front_image_url || '',
+                rearImage: local.garment_rear_image_url || '',
+                sideImage: local.garment_side_image_url || '',
+                lifestyleImage: local.garment_lifestyle_image_url || '',
+                imagesData: cleanImagesData(local.garment_images_data),
+              });
+            }
+          }
+
           setGarmentStyles(styles);
 
           // Set the initial garment image from the first item.
@@ -580,30 +619,53 @@ export default function MockupGenerator({
             setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
             setGarmentDescription(lineItems[0].description || garmentStyle || '');
           }
-        } else if (garmentStyle || garmentFrontImageUrl) {
+        } else if ((localLineItems && localLineItems.length > 0) || garmentStyle || garmentFrontImageUrl) {
           // 2026-05-19 — DB returned nothing because the line items haven't
           // been persisted yet (admin added a style and opened the mockup
-          // generator without saving the quote first). Build a synthetic
-          // single-style entry from the parent props so the sidebar and
-          // canvas both work without forcing a save first. Reported by
-          // client 2026-05-19.
-          const fallbackStyle = {
-            lineItemId: '',
-            style: garmentStyle || '',
-            color: garmentColor || '',
-            description: garmentStyle || '',
-            itemNumber: garmentStyle || '',
-            frontImage: garmentFrontImageUrl || '',
-            rearImage: garmentBackImageUrl || '',
-            sideImage: '',
-            lifestyleImage: '',
-            imagesData: null,
-          };
-          setGarmentStyles([fallbackStyle]);
-          const sanitizedUrl = sanitizeImageUrl(garmentFrontImageUrl);
+          // generator without saving the quote first). Build synthetic style
+          // entries from local items (preferred — covers multi-item groups)
+          // or fall back to the single firstItem props.
+          // 2026-06-01 v3 — extended to use the full localLineItems array so
+          // multi-item unsaved groups show every item, not just the first.
+          let fallbackStyles: any[] = [];
+          if (localLineItems && localLineItems.length > 0) {
+            fallbackStyles = localLineItems
+              .filter(li => li.item_number || li.garment_front_image_url)
+              .map(li => ({
+                lineItemId: li.id || '',
+                style: li.item_number || '',
+                color: li.color || '',
+                description: li.description || li.item_number || '',
+                itemNumber: li.item_number || '',
+                frontImage: li.garment_front_image_url || '',
+                rearImage: li.garment_rear_image_url || '',
+                sideImage: li.garment_side_image_url || '',
+                lifestyleImage: li.garment_lifestyle_image_url || '',
+                imagesData: li.garment_images_data || null,
+              }));
+          }
+          if (fallbackStyles.length === 0) {
+            fallbackStyles = [{
+              lineItemId: '',
+              style: garmentStyle || '',
+              color: garmentColor || '',
+              description: garmentStyle || '',
+              itemNumber: garmentStyle || '',
+              frontImage: garmentFrontImageUrl || '',
+              rearImage: garmentBackImageUrl || '',
+              sideImage: '',
+              lifestyleImage: '',
+              imagesData: null,
+            }];
+          }
+          setGarmentStyles(fallbackStyles);
+          const firstFallback = fallbackStyles[0];
+          const sanitizedUrl = sanitizeImageUrl(firstFallback.frontImage)
+                            || sanitizeImageUrl(firstFallback.rearImage)
+                            || sanitizeImageUrl(garmentFrontImageUrl);
           if (sanitizedUrl) {
             setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
-            setGarmentDescription(garmentStyle || '');
+            setGarmentDescription(firstFallback.description || garmentStyle || '');
           }
         }
 
@@ -924,10 +986,16 @@ export default function MockupGenerator({
 
       console.log('MockupGenerator: Final loaded type_of_work:', loadedTypeOfWork);
 
-      // Final fallback: if no garment image was loaded from any source, use the prop
+      // Final fallback: if no garment image was loaded from any source, use the prop.
+      // 2026-06-01 v3 — previously this set the URL raw with no proxy and no
+      // cache-bust, so the canvas often stayed blank on initial open even though
+      // a URL was set. Mirror the click-handler pattern so the canvas always
+      // redraws, and proxy the URL so it matches what every other code path uses.
       if (!garmentImageUrl && garmentFrontImageUrl) {
         console.log('MockupGenerator: Final fallback - using garmentFrontImageUrl prop:', garmentFrontImageUrl);
-        setGarmentImageUrl(garmentFrontImageUrl);
+        garmentImageCache.current = null;
+        setGarmentImageUrl(proxySanMarImageUrl(garmentFrontImageUrl));
+        setGarmentLoadVersion((v) => v + 1);
       }
     } catch (error) {
       console.error('MockupGenerator: Failed to load proof data:', error);
