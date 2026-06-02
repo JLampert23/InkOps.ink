@@ -573,11 +573,17 @@ export default function MockupGenerator({
           // in that aren't already in the DB results. Without this the right
           // sidebar only shows saved items; anything the user just added in
           // QuoteBuilder is invisible until they save the quote first.
-          const dbIds = new Set(styles.map(s => s.lineItemId));
+          // 2026-06-02 v4 — dedupe by (item_number+color) instead of lineItemId.
+          // After save, QuoteBuilder's local items keep their temp IDs while
+          // DB rows get new Postgres UUIDs, so id-based dedup never matched
+          // and every saved item showed up twice in the sidebar.
+          const dedupKey = (style: string, color: string) =>
+            `${(style || '').toLowerCase().trim()}|${(color || '').toLowerCase().trim()}`;
+          const dbKeys = new Set(styles.map(s => dedupKey(s.style, s.color)));
           if (localLineItems && localLineItems.length > 0) {
             for (const local of localLineItems) {
-              if (local.id && dbIds.has(local.id)) continue;
               if (!local.item_number && !local.garment_front_image_url) continue;
+              if (dbKeys.has(dedupKey(local.item_number || '', local.color || ''))) continue;
               styles.push({
                 lineItemId: local.id || '',
                 style: local.item_number || '',
@@ -668,7 +674,54 @@ export default function MockupGenerator({
             setGarmentDescription(firstFallback.description || garmentStyle || '');
           }
         }
+      } else if ((localLineItems && localLineItems.length > 0) || garmentStyle || garmentFrontImageUrl) {
+        // 2026-06-02 v4 — brand-new quote that has no quoteId yet (or quote
+        // not persisted at all). The outer `if (quoteId)` skipped the entire
+        // load block, so the sidebar was empty even when the user just added
+        // styles in QuoteBuilder. Mirror the same local/props fallback here.
+        let fallbackStyles: any[] = [];
+        if (localLineItems && localLineItems.length > 0) {
+          fallbackStyles = localLineItems
+            .filter(li => li.item_number || li.garment_front_image_url)
+            .map(li => ({
+              lineItemId: li.id || '',
+              style: li.item_number || '',
+              color: li.color || '',
+              description: li.description || li.item_number || '',
+              itemNumber: li.item_number || '',
+              frontImage: li.garment_front_image_url || '',
+              rearImage: li.garment_rear_image_url || '',
+              sideImage: li.garment_side_image_url || '',
+              lifestyleImage: li.garment_lifestyle_image_url || '',
+              imagesData: li.garment_images_data || null,
+            }));
+        }
+        if (fallbackStyles.length === 0) {
+          fallbackStyles = [{
+            lineItemId: '',
+            style: garmentStyle || '',
+            color: garmentColor || '',
+            description: garmentStyle || '',
+            itemNumber: garmentStyle || '',
+            frontImage: garmentFrontImageUrl || '',
+            rearImage: garmentBackImageUrl || '',
+            sideImage: '',
+            lifestyleImage: '',
+            imagesData: null,
+          }];
+        }
+        setGarmentStyles(fallbackStyles);
+        const firstFallback = fallbackStyles[0];
+        const sanitizedUrl = sanitizeImageUrl(firstFallback.frontImage)
+                          || sanitizeImageUrl(firstFallback.rearImage)
+                          || sanitizeImageUrl(garmentFrontImageUrl);
+        if (sanitizedUrl) {
+          setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
+          setGarmentDescription(firstFallback.description || garmentStyle || '');
+        }
+      }
 
+      if (quoteId) {
         // Load imprints for this group or quote
         let imprintsQuery = supabase
           .from('quote_imprints')
