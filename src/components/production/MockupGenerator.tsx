@@ -2079,7 +2079,31 @@ export default function MockupGenerator({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (garmentImageCache.current && garmentImageCache.current.complete) {
-      ctx.drawImage(garmentImageCache.current, 0, 0, canvas.width, canvas.height);
+      // 2026-06-02 — preserve aspect ratio (letterbox) instead of stretching
+      // the source into the canvas. Previously we drew at (0,0)→(w,h) which
+      // forced every garment into the 600×700 canvas aspect, visibly
+      // squishing SanMar's taller source images vs how the product looks
+      // on sanmar.com. Now we fit the image inside the canvas centered.
+      const img = garmentImageCache.current;
+      const naturalW = img.naturalWidth || img.width || canvas.width;
+      const naturalH = img.naturalHeight || img.height || canvas.height;
+      const canvasAspect = canvas.width / canvas.height;
+      const imgAspect = naturalW / naturalH;
+      let drawW: number, drawH: number, drawX: number, drawY: number;
+      if (imgAspect > canvasAspect) {
+        drawW = canvas.width;
+        drawH = canvas.width / imgAspect;
+        drawX = 0;
+        drawY = (canvas.height - drawH) / 2;
+      } else {
+        drawH = canvas.height;
+        drawW = canvas.height * imgAspect;
+        drawX = (canvas.width - drawW) / 2;
+        drawY = 0;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
     } else if (garmentImageUrl) {
       ctx.fillStyle = '#f3f4f6';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
