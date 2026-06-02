@@ -204,6 +204,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   const [availableFees, setAvailableFees] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
   const draftCreatedRef = useRef(false);
+  // 2026-06-02 — debounce maps for per-keystroke side effects in updateItem.
+  // Without debouncing, every character typed in a size/qty/price cell fires
+  // a Supabase UPDATE round-trip AND a price-matrix recalc, causing fast
+  // typing/tabbing to glitch (Jamie 2026-06-02 video report).
+  const pendingDbWritesRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingPriceRecalcRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Helper to get ordered size columns for a specific group based on size mode
   const getSizeColumns = (group: LineItemGroup) => {
@@ -983,27 +989,40 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     updatedGroups = newGroups;
     setItemGroups(newGroups);
 
-    // If the quote is saved, persist the change to the database immediately
+    // 2026-06-02 — debounce the persist + price recalc. Previously this
+    // awaited a Supabase UPDATE per keystroke, so fast typing/tabbing
+    // through size cells fired racing network calls (Jamie's video).
+    // Now we wait 400ms after the last keystroke before writing.
     const group = updatedGroups.find(g => g.id === groupId);
     if (group && quoteId && !quoteId.startsWith('temp-')) {
       const item = group.items[itemIndex];
       if (item.id) {
-        // Update the line item in the database
-        const { error } = await supabase
-          .from('quote_line_items')
-          .update({ [field]: value })
-          .eq('id', item.id);
-
-        if (error) {
-          console.error('Error updating line item:', error);
-        }
+        const writeKey = `${item.id}|${String(field)}`;
+        const pending = pendingDbWritesRef.current.get(writeKey);
+        if (pending) clearTimeout(pending);
+        const timeoutId = setTimeout(async () => {
+          pendingDbWritesRef.current.delete(writeKey);
+          const { error } = await supabase
+            .from('quote_line_items')
+            .update({ [field]: value })
+            .eq('id', item.id);
+          if (error) {
+            console.error('Error updating line item:', error);
+          }
+        }, 400);
+        pendingDbWritesRef.current.set(writeKey, timeoutId);
       }
     }
 
     if (field.startsWith('qty_') || field === 'total_quantity' || field === 'wholesale_price') {
-      setTimeout(() => {
+      const recalcKey = `${groupId}|${itemIndex}`;
+      const pendingRecalc = pendingPriceRecalcRef.current.get(recalcKey);
+      if (pendingRecalc) clearTimeout(pendingRecalc);
+      const recalcTimeout = setTimeout(() => {
+        pendingPriceRecalcRef.current.delete(recalcKey);
         updatePriceFromMatrixWithGroups(newGroups, groupId, itemIndex, true);
       }, 500);
+      pendingPriceRecalcRef.current.set(recalcKey, recalcTimeout);
     }
   };
 
