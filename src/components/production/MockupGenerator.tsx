@@ -2613,41 +2613,68 @@ export default function MockupGenerator({
 
           <div className="flex-1 flex flex-col bg-gray-100 dark:bg-slate-950">
             {/* Front/Back Toggle */}
-            <div className="flex justify-center gap-1 py-1.5 bg-white dark:bg-slate-800 border-b dark:border-slate-600">
-              <button
-                onClick={() => {
-                  setGarmentView('front');
-                  if (garmentFrontImageUrl) {
-                    setGarmentImageUrl(garmentFrontImageUrl);
-                  }
-                }}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  garmentView === 'front'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
-                }`}
-              >
-                Front
-              </button>
-              <button
-                onClick={() => {
-                  if (garmentBackImageUrlState) {
-                    setGarmentView('back');
-                    setGarmentImageUrl(garmentBackImageUrlState);
-                  }
-                }}
-                disabled={!garmentBackImageUrlState}
-                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  garmentView === 'back'
-                    ? 'bg-blue-600 text-white'
-                    : garmentBackImageUrlState
-                      ? 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
-                      : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                Back
-              </button>
-            </div>
+            {(() => {
+              // 2026-06-02 — derive Front/Back URLs from the currently-active
+              // style, not the parent props. Previously these buttons hard-read
+              // garmentFrontImageUrl / garmentBackImageUrlState (both set from
+              // props at mount), so clicking Back while a non-first style was
+              // selected showed the first style's back image (e.g. F281's
+              // black hoodie back when PC54 Gold was selected).
+              const activeStyle: any = garmentStyles[activeGarmentIndex] || {};
+              const activeImagesData: any = activeStyle.imagesData || {};
+              const activeFront =
+                activeStyle.frontImage
+                || activeImagesData.frontImages?.[0]
+                || garmentFrontImageUrl
+                || '';
+              const activeBack =
+                activeStyle.rearImage
+                || activeImagesData.rearImages?.[0]
+                || garmentBackImageUrlState
+                || '';
+              const applyView = (url: string) => {
+                if (!url) return;
+                garmentImageCache.current = null;
+                setGarmentImageUrl(proxySanMarImageUrl(url));
+                setGarmentLoadVersion((v) => v + 1);
+              };
+              return (
+                <div className="flex justify-center gap-1 py-1.5 bg-white dark:bg-slate-800 border-b dark:border-slate-600">
+                  <button
+                    onClick={() => {
+                      setGarmentView('front');
+                      applyView(activeFront);
+                    }}
+                    disabled={!activeFront}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                      garmentView === 'front'
+                        ? 'bg-blue-600 text-white'
+                        : activeFront
+                          ? 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+                          : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                    }`}
+                  >
+                    Front
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGarmentView('back');
+                      applyView(activeBack);
+                    }}
+                    disabled={!activeBack}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                      garmentView === 'back'
+                        ? 'bg-blue-600 text-white'
+                        : activeBack
+                          ? 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+                          : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                    }`}
+                  >
+                    Back
+                  </button>
+                </div>
+              );
+            })()}
             <div className="flex-1 flex items-center justify-center">
               <canvas
                 ref={canvasRef}
