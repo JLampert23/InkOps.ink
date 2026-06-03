@@ -31,13 +31,38 @@ const STATUS_LABELS: Record<string, string> = {
   art_declined: 'Art Declined',
 };
 
+// 2026-06-03 v2 — Jamie asked for granular labels instead of every save
+// rendering as "Quote saved". Activity entries come from THREE sources:
+//   1. DB trigger on quotes (created / updated / status_changed_to_<x>)
+//   2. Edge functions (Email sent / Payment applied / artwork_approval_resent /
+//      followup_sent / followup_failed)
+//   3. activity-logger.ts service (Quote opened for editing / Quote edited /
+//      Quote sent / Text sent / Payment request sent)
+// Mapping every variant (lower-cased) so each entry gets a clean distinct label.
 const ACTION_LABELS: Record<string, string> = {
+  // DB-trigger actions (quotes table)
   created: 'Quote created',
-  updated: 'Quote saved',
-  quote_edited: 'Quote edited',
+  updated: 'Quote edited',
   status_changed: 'Status changed',
-  sent: 'Quote sent to customer',
-  quote_sent: 'Quote sent to customer',
+
+  // activity-logger natural-language actions (matched lower-cased)
+  'quote opened for editing': 'Opened for editing',
+  'quote edited': 'Quote edited',
+  'quote sent': 'Sent to customer',
+  'email sent': 'Email sent',
+  'text sent': 'Text sent',
+  'payment request sent': 'Payment request sent',
+  'payment applied': 'Payment received',
+
+  // Edge-function snake_case actions
+  artwork_approval_resent: 'Artwork approval re-sent',
+  followup_sent: 'Follow-up email sent',
+  followup_failed: 'Follow-up failed',
+  payment_received: 'Payment received',
+
+  // Customer-portal / approval actions
+  sent: 'Sent to customer',
+  quote_sent: 'Sent to customer',
   approved: 'Approved by customer',
   declined: 'Declined by customer',
   converted: 'Converted to work order',
@@ -46,7 +71,6 @@ const ACTION_LABELS: Record<string, string> = {
   deleted: 'Deleted',
   artwork_approved: 'Artwork approved by customer',
   artwork_declined: 'Artwork declined by customer',
-  payment_received: 'Payment received',
 };
 
 const titleCase = (s: string) =>
@@ -54,20 +78,51 @@ const titleCase = (s: string) =>
 
 const prettyStatus = (s: string) => STATUS_LABELS[s] ?? titleCase(s);
 
+// 2026-06-03 v2 — DB trigger uses status_changed_to_<status> as the action
+// (e.g. status_changed_to_approved). Parse it dynamically into a clean
+// "Status: X → Approved" so the user sees what actually happened.
+function parseStatusChangeAction(action: string): { newStatus: string } | null {
+  const match = action.match(/^status_changed_to_(.+)$/);
+  return match ? { newStatus: match[1] } : null;
+}
+
 function formatActivity(log: { action?: string; meta?: any }): {
   label: string;
   description: string | null;
 } {
-  const action = log.action || 'updated';
+  const rawAction = log.action || 'updated';
   const meta = log.meta || {};
-  const label = ACTION_LABELS[action] ?? titleCase(action);
+
+  // 1) Dynamic status change: status_changed_to_<x>
+  const statusChange = parseStatusChangeAction(rawAction);
+  if (statusChange) {
+    const newLabel = prettyStatus(statusChange.newStatus);
+    const oldLabel = meta.old_status ? prettyStatus(meta.old_status) : null;
+    return {
+      label: `Status: ${newLabel}`,
+      description: oldLabel && oldLabel !== newLabel ? `Changed from ${oldLabel}` : null,
+    };
+  }
+
+  // 2) Direct or lower-cased map lookup
+  const label =
+    ACTION_LABELS[rawAction]
+    ?? ACTION_LABELS[rawAction.toLowerCase()]
+    ?? titleCase(rawAction);
 
   let description: string | null = null;
-
   if (meta.old_status && meta.new_status && meta.old_status !== meta.new_status) {
     description = `Status changed from ${prettyStatus(meta.old_status)} to ${prettyStatus(meta.new_status)}`;
   } else if (meta.amount && meta.currency) {
     description = `Amount: ${meta.currency.toUpperCase()} ${Number(meta.amount).toFixed(2)}`;
+  } else if (typeof meta.amount === 'number') {
+    description = `Amount: $${Number(meta.amount).toFixed(2)}`;
+  } else if (meta.subject) {
+    description = `Subject: ${String(meta.subject)}`;
+  } else if (meta.recipient_email) {
+    description = `To: ${String(meta.recipient_email)}`;
+  } else if (meta.followup_number) {
+    description = `Follow-up #${meta.followup_number}`;
   } else if (meta.note) {
     description = String(meta.note);
   }
