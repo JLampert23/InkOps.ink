@@ -5922,50 +5922,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </p>
                 </div>
 
-                {/* T3-A — Auto Payment Link settings (2026-05-09).
-                    When enabled, approving a quote auto-creates a Stripe
-                    Payment Link with a customer-chosen amount (minimum %
-                    enforced). Customer can pay any amount >= minimum. */}
-                <div className="p-4 border border-gray-200 dark:border-slate-700 rounded-lg space-y-4 bg-gray-50/40 dark:bg-slate-900/30">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Auto Payment Link</h3>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Automatically generate and email a Stripe payment link to the customer when a quote is approved. The customer can pay any amount above the minimum deposit you set below.
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoSendPaymentLink}
-                      onChange={(e) => setAutoSendPaymentLink(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-900 dark:text-white">
-                      Enable auto payment link on quote approval
-                    </span>
-                  </label>
-                  <div className={autoSendPaymentLink ? '' : 'opacity-50 pointer-events-none'}>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Minimum deposit percent
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={minimumDepositPercent}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value, 10);
-                          if (!isNaN(v)) setMinimumDepositPercent(v);
-                        }}
-                        className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-600 dark:text-gray-400">% of grand total (after tax)</span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      e.g. set to 50 to require a 50% deposit. After production is marked Complete, a second payment link is auto-sent for the remaining balance.
-                    </p>
-                  </div>
+                {/* 2026-06-10 [3.2-2] — Auto Payment Link is now controlled
+                    per-customer (Customer profile → "Payment Request" toggle).
+                    The 50% deposit minimum is fixed by spec and no longer
+                    configurable per-company. State + save logic are kept so a
+                    flag rollback doesn't require schema work, but the UI is
+                    hidden here. Setup info block below replaces the toggle UI. */}
+                <div className="p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/40 dark:bg-blue-900/10">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Auto Payment Link</h3>
+                  <p className="text-xs text-gray-700 dark:text-gray-300">
+                    Payment requests are now managed <strong>per customer</strong>. Go to any customer's profile
+                    and use the <strong>Payment Request</strong> toggle to enable or disable auto payment links for that customer.
+                    Deposits are a fixed <strong>50% minimum</strong>; the customer can pay 50%, in full, or any custom amount above 50% at Stripe checkout.
+                  </p>
                 </div>
 
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">

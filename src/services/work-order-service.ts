@@ -556,12 +556,25 @@ export class WorkOrderService {
       .maybeSingle();
     if (!wo?.quote_id || !wo?.company_id) return;
 
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('auto_send_payment_link')
-      .eq('id', wo.company_id)
+    // 2026-06-10 [3.2-2] — gate on the customer-level toggle, not the legacy
+    // company-level one. Pull customer_id from the parent quote then look up
+    // the flag on that customer. If anything is missing in the chain, bail
+    // (no accidental link generation for customers who opted out).
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('customer_id')
+      .eq('id', wo.quote_id)
       .maybeSingle();
-    if (!settings?.auto_send_payment_link) return;
+    if (!quote?.customer_id) return;
+
+    const { data: customerRow } = await supabase
+      .from('customers')
+      .select('payment_request_enabled')
+      .eq('id', quote.customer_id)
+      .maybeSingle();
+    // Treat null as enabled (covers rows from before the migration ran).
+    const paymentRequestEnabled = customerRow?.payment_request_enabled ?? true;
+    if (!paymentRequestEnabled) return;
 
     // Find the invoice linked to this quote. printavo_invoices stores the
     // quote_id on raw_data on creation (see quote-actions approve flow).

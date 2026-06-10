@@ -91,6 +91,11 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
   const [sendingWelcome, setSendingWelcome] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
 
+  // 2026-06-10 [3.2-2] — per-customer payment request toggle. Default true
+  // so newly-created customers behave like the prior global default; existing
+  // customers are backfilled from company_settings via migration.
+  const [paymentRequestEnabled, setPaymentRequestEnabled] = useState(true);
+
   const [companyId, setCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -167,6 +172,11 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
       // Notes
       setNotes(customer.notes || '');
       setInternalNotes(customer.internal_notes || '');
+
+      // 2026-06-10 [3.2-2] — payment request toggle. `?? true` covers rows
+      // saved before the migration (where the column is null) — defaults to
+      // on, matching the new-customer default.
+      setPaymentRequestEnabled(customer.payment_request_enabled ?? true);
 
       // Portal Access
       setPortalAccessEnabled(customer.portal_access_enabled || false);
@@ -508,7 +518,9 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
           payment_terms: finalPaymentTerms,
           notes: notes,
           internal_notes: internalNotes,
-          portal_access_enabled: portalAccessEnabled
+          portal_access_enabled: portalAccessEnabled,
+          // 2026-06-10 [3.2-2] — persist per-customer payment request toggle.
+          payment_request_enabled: paymentRequestEnabled,
         })
         .eq('id', customerId);
 
@@ -1239,6 +1251,33 @@ export default function EditCustomerModal({ isOpen, onClose, onSuccess, customer
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 2026-06-10 [3.2-2] — SECTION: PAYMENT REQUEST */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-slate-700">
+                  <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Payment Request</h3>
+                </div>
+
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentRequestEnabled}
+                    onChange={(e) => setPaymentRequestEnabled(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Send payment requests to this customer
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      When enabled, approving a quote auto-generates a Stripe payment link for this customer.
+                      They must pay <strong>at least 50%</strong> of the total as a deposit, and may choose to pay in full
+                      or any custom amount above 50%. Turn off to skip payment requests for this customer.
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {/* SECTION: PORTAL ACCESS */}

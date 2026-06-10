@@ -1118,23 +1118,30 @@ Deno.serve(async (req: Request) => {
         invoice = newInvoice;
       }
 
-      // T3-A: Auto-create a deposit payment link if the company has the
-      // setting enabled. Customer can pay any amount >= minimum_deposit_percent
-      // of the invoice total (after tax). Link id+url stored on the invoice
-      // row so the UI can show / copy it; webhook records actual payments.
+      // 2026-06-10 [3.2-2] — Auto-create a deposit payment link if the customer
+      // has payment requests ENABLED. Replaces the prior company-level
+      // auto_send_payment_link toggle (still in DB for compatibility, no
+      // longer consulted). Deposit minimum is fixed at 50% per Jamie's spec.
+      // Customer chooses at the Stripe checkout step whether to pay 50%, in
+      // full, or any custom amount above the 50% minimum.
       // Skip if a deposit link already exists (e.g. re-running approval).
       try {
-        if (!invoice?.deposit_payment_link_url && (invoice?.total || 0) > 0) {
-          const { data: settings } = await supabaseAdmin
-            .from("company_settings")
-            .select("auto_send_payment_link, minimum_deposit_percent")
-            .eq("id", profile.company_id)
+        if (!invoice?.deposit_payment_link_url && (invoice?.total || 0) > 0 && quote.customer_id) {
+          const { data: customerRow } = await supabaseAdmin
+            .from("customers")
+            .select("payment_request_enabled")
+            .eq("id", quote.customer_id)
             .maybeSingle();
 
-          if (settings?.auto_send_payment_link) {
-            const minPct = Math.max(1, Math.min(100, settings.minimum_deposit_percent ?? 50));
+          // Treat null as enabled (covers rows from before the migration ran).
+          const paymentRequestEnabled = customerRow?.payment_request_enabled ?? true;
+
+          if (paymentRequestEnabled) {
+            // Mandatory 50% minimum deposit per spec. Hard-coded — no longer
+            // a per-company configurable percentage.
+            const MIN_DEPOSIT_PCT = 50;
             const totalCents = Math.round(Number(invoice.total) * 100);
-            const minimumCents = Math.round(totalCents * (minPct / 100));
+            const minimumCents = Math.round(totalCents * (MIN_DEPOSIT_PCT / 100));
 
             const linkResp = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
               method: "POST",
@@ -1149,7 +1156,7 @@ Deno.serve(async (req: Request) => {
                 minimumAmount: minimumCents,
                 currency: "usd",
                 customerEmail: invoice.customer_email || quote.customer_email || undefined,
-                description: `Deposit for ${invoice.invoice_number || invoice.id} — ${invoice.customer_name || quote.customer_name || ""}`.trim(),
+                description: `Deposit (50% minimum) for ${invoice.invoice_number || invoice.id} — ${invoice.customer_name || quote.customer_name || ""}`.trim(),
                 metadata: {
                   // Existing stripe-webhook checkout.session.completed handler
                   // (line 568) reads `printavo_invoice_id` to look up the
