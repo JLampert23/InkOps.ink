@@ -199,7 +199,7 @@ export function PriceMatricesManager() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showNotification('success', 'Template Downloaded', 'Fill the columns in then use Import CSV');
+    showNotification('success', 'Template Downloaded', 'Fill in your prices, then use Import CSV to load it back.');
   };
 
   return (
@@ -446,11 +446,16 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
 
   // 2026-06-10 [3.2-1] — apply a +/- percentage to every populated cell in
   // the matrix. Empty cells stay empty (don't materialize zero where nothing
-  // existed). Rounds to nearest cent so output stays clean.
+  // existed). Rounds to nearest cent. Refuses values <= -100% (which would
+  // zero everything out or go negative — almost always a typo for pricing).
   const applyBulkPercent = () => {
     const pct = parseFloat(bulkPercent);
     if (isNaN(pct) || pct === 0) {
       showNotification('error', 'Invalid Percentage', 'Enter a non-zero number (e.g. 5 for +5%, -3 for -3%)');
+      return;
+    }
+    if (pct <= -100) {
+      showNotification('error', 'Percentage Too Low', 'A value of -100% or lower would zero out or invert your prices. Use a smaller decrease.');
       return;
     }
     const cellCount = Object.keys(cells).length;
@@ -467,7 +472,9 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
     const multiplier = 1 + pct / 100;
     const newCells: Record<string, number> = {};
     Object.keys(cells).forEach((key) => {
-      const updated = cells[key] * multiplier;
+      // Floor at zero — pricing should never go negative even if rounding
+      // edges into the red.
+      const updated = Math.max(0, cells[key] * multiplier);
       newCells[key] = Math.round(updated * 100) / 100;
     });
     setCells(newCells);
