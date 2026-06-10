@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Grid3x3, Upload } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Grid3x3, Upload, Download, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -176,6 +176,32 @@ export function PriceMatricesManager() {
     }
   };
 
+  // 2026-06-10 [3.2-1] — CSV template download. Generates a sample file matching
+  // the exact column shape the importer expects (Quantity + Column N headers, as
+  // enforced by handleCSVUpload above), so users know how to format their data
+  // before re-uploading.
+  const downloadCSVTemplate = () => {
+    const headers = ['Quantity', 'Column 1', 'Column 2', 'Column 3', 'Column 4', 'Column 5'];
+    const sampleRows = [
+      ['12', '7.50', '7.00', '6.50', '6.00', '5.50'],
+      ['24', '6.50', '6.00', '5.50', '5.00', '4.50'],
+      ['48', '5.50', '5.00', '4.50', '4.00', '3.50'],
+      ['72', '4.50', '4.00', '3.50', '3.00', '2.50'],
+      ['144', '3.50', '3.00', '2.50', '2.00', '1.50'],
+    ];
+    const csv = [headers.join(','), ...sampleRows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'price-matrix-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotification('success', 'Template Downloaded', 'Fill the columns in then use Import CSV');
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
@@ -192,6 +218,14 @@ export function PriceMatricesManager() {
               onChange={handleCSVUpload}
               className="hidden"
             />
+            <button
+              onClick={downloadCSVTemplate}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
+              title="Download a sample CSV with the correct column headers"
+            >
+              <Download className="w-4 h-4" />
+              CSV Template
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -322,6 +356,8 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   const [isActive, setIsActive] = useState(matrix.is_active);
   const [saving, setSaving] = useState(false);
   const [typesOfWork, setTypesOfWork] = useState<string[]>([]);
+  // 2026-06-10 [3.2-1] — % bulk update. Signed input (negative = decrease).
+  const [bulkPercent, setBulkPercent] = useState('');
 
   useEffect(() => {
     const loadTypesOfWork = async () => {
@@ -406,6 +442,37 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
       delete newCells[`${rowIndex}-${colIndex}`];
       setCells(newCells);
     }
+  };
+
+  // 2026-06-10 [3.2-1] — apply a +/- percentage to every populated cell in
+  // the matrix. Empty cells stay empty (don't materialize zero where nothing
+  // existed). Rounds to nearest cent so output stays clean.
+  const applyBulkPercent = () => {
+    const pct = parseFloat(bulkPercent);
+    if (isNaN(pct) || pct === 0) {
+      showNotification('error', 'Invalid Percentage', 'Enter a non-zero number (e.g. 5 for +5%, -3 for -3%)');
+      return;
+    }
+    const cellCount = Object.keys(cells).length;
+    if (cellCount === 0) {
+      showNotification('error', 'No Cells to Update', 'Add some values to the matrix first');
+      return;
+    }
+    const sign = pct > 0 ? '+' : '';
+    const confirmed = window.confirm(
+      `Apply ${sign}${pct}% to all ${cellCount} populated cell${cellCount === 1 ? '' : 's'}? This overwrites the current values.`
+    );
+    if (!confirmed) return;
+
+    const multiplier = 1 + pct / 100;
+    const newCells: Record<string, number> = {};
+    Object.keys(cells).forEach((key) => {
+      const updated = cells[key] * multiplier;
+      newCells[key] = Math.round(updated * 100) / 100;
+    });
+    setCells(newCells);
+    setBulkPercent('');
+    showNotification('success', 'Applied', `${sign}${pct}% applied to ${cellCount} cell${cellCount === 1 ? '' : 's'}`);
   };
 
   const handleSave = async () => {
@@ -548,6 +615,35 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                 placeholder="0.00"
               />
             </div>
+          </div>
+
+          {/* 2026-06-10 [3.2-1] — bulk % update. Negative = decrease. */}
+          <div className="flex flex-wrap items-center gap-2 p-2 bg-blue-50 dark:bg-slate-900 border border-blue-200 dark:border-slate-700 rounded-lg">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+              <Percent className="w-3.5 h-3.5" />
+              Bulk update all cells by:
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              value={bulkPercent}
+              onChange={(e) => setBulkPercent(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyBulkPercent(); } }}
+              placeholder="e.g. 5 or -3"
+              className="w-28 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-600 dark:text-gray-400">%</span>
+            <button
+              type="button"
+              onClick={applyBulkPercent}
+              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+              disabled={!bulkPercent}
+            >
+              Apply
+            </button>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 ml-auto">
+              Positive = increase · Negative = decrease · Rounded to nearest cent
+            </span>
           </div>
 
           <div className="border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
