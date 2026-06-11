@@ -3,7 +3,7 @@ import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
 import { Mail, Loader2, LogIn, Lock, Eye, EyeOff } from 'lucide-react';
 
 export function PortalLogin() {
-  const { user, loginWithToken, loginWithEmail, loginWithPassword, loading } = useCustomerPortal();
+  const { user, branding, loginWithToken, loginWithEmail, loginWithPassword, loading } = useCustomerPortal();
   const [loginMethod, setLoginMethod] = useState<'password' | 'magic-link'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -112,10 +112,23 @@ export function PortalLogin() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <LogIn className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Customer Portal</h1>
+          {/* 2026-06-11 [3.2-3] — company branding on the login screen.
+              Resolved pre-auth from the subdomain (CustomerPortalContext).
+              Falls back to the generic icon when no company matches. */}
+          {(branding?.company_logo_primary_url || branding?.logo_url) ? (
+            <img
+              src={branding.company_logo_primary_url || branding.logo_url || ''}
+              alt={branding.company_name}
+              className="h-14 w-auto mx-auto mb-4 object-contain"
+            />
+          ) : (
+            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <LogIn className="w-8 h-8 text-white" />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {branding?.company_name ? `${branding.company_name} Customer Portal` : 'Customer Portal'}
+          </h1>
           <p className="text-gray-600">
             Access your invoices, quotes, proofs, and order history
           </p>

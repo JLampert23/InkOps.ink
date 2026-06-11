@@ -50,6 +50,23 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
       if (storedUser && storedBranding) {
         setUser(JSON.parse(storedUser));
         setBranding(JSON.parse(storedBranding));
+      } else {
+        // 2026-06-11 [3.2-3] — pre-auth branding from the subdomain so the
+        // LOGIN screen shows the company's logo/name (Jamie: "my customers
+        // should see a todds logo"). Portal URLs are <subdomain>.inkops.ink
+        // (see send-magic-link), so the hostname identifies the company
+        // before any login. RPC returns name + logo only.
+        const host = window.location.hostname.toLowerCase();
+        const match = host.match(/^([a-z0-9-]+)\.inkops\.ink$/);
+        const sub = match?.[1];
+        if (sub && !['www', 'devs', 'app'].includes(sub)) {
+          const { data, error } = await supabase.rpc('get_portal_branding_by_subdomain', {
+            p_subdomain: sub,
+          });
+          if (!error && data && (data as any).company_name) {
+            setBranding(data as any);
+          }
+        }
       }
     } catch (error) {
       console.error('Error checking session:', error);
