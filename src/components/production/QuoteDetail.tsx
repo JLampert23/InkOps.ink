@@ -86,48 +86,178 @@ function parseStatusChangeAction(action: string): { newStatus: string } | null {
   return match ? { newStatus: match[1] } : null;
 }
 
-function formatActivity(log: { action?: string; meta?: any }): {
-  label: string;
-  description: string | null;
-} {
+// 2026-06-11 [3.2-4] — value formatting for the new field-level entries.
+// The DB trigger stores old/new raw (as text); humanize here.
+const MONEY_FIELDS = new Set(['total', 'subtotal', 'tax_amount', 'discount', 'unit_price', 'amount_paid']);
+
+function formatFieldValue(field: string, value: any): string {
+  if (value === null || value === undefined || value === '') return '(empty)';
+  const str = String(value);
+  if (MONEY_FIELDS.has(field)) {
+    const n = Number(str);
+    if (!isNaN(n)) return `$${n.toFixed(2)}`;
+  }
+  // ISO date / timestamp → "June 3, 2026"
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const d = new Date(str.length === 10 ? `${str}T00:00:00` : str);
+    if (!isNaN(d.getTime())) return format(d, 'MMMM d, yyyy');
+  }
+  return str;
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  production_due_date: 'Production due date',
+  customer_due_date: 'Customer due date',
+  payment_due_date: 'Payment due date',
+  valid_until: 'Valid until date',
+  total: 'Total',
+  subtotal: 'Subtotal',
+  tax_amount: 'Tax',
+  discount: 'Discount',
+  terms: 'Terms',
+  delivery_method: 'Delivery method',
+  po_number: 'PO number',
+  customer_name: 'Customer name',
+  notes: 'Notes',
+  customer_notes: 'Customer notes',
+  nickname: 'Nickname',
+  unit_price: 'Unit price',
+  total_quantity: 'Quantity',
+  description: 'Description',
+  color: 'Color',
+  item_number: 'Style #',
+  location: 'Location',
+  type_of_work: 'Type of work',
+  thread_ink_color: 'Thread/ink color',
+  details: 'Details',
+  amount_paid: 'Amount paid',
+  status_stage: 'Status',
+  due_date: 'Due date',
+  priority: 'Priority',
+  assigned_to: 'Assignee',
+};
+
+const fieldLabel = (f: string) => FIELD_LABELS[f] ?? titleCase(f);
+
+// Rich result for the compact one-line renderer. When oldStatus/newStatus
+// are present the renderer shows them as colored pills; `source` drives the
+// "by <user>" vs "via automation" chip; `text` is the plain sentence.
+interface ActivityLine {
+  text: string;
+  oldStatus?: string | null;
+  newStatus?: string | null;
+  source: 'user' | 'automation';
+}
+
+function formatActivity(log: { action?: string; meta?: any; performed_by_name?: string | null }): ActivityLine {
   const rawAction = log.action || 'updated';
   const meta = log.meta || {};
 
-  // 1) Dynamic status change: status_changed_to_<x>
+  // Attribution: new entries carry meta.source; legacy entries fall back to
+  // the performed_by_name heuristic (null/System → automation).
+  const source: 'user' | 'automation' =
+    meta.source === 'user' || meta.source === 'automation'
+      ? meta.source
+      : (log.performed_by_name && log.performed_by_name !== 'System' && log.performed_by_name !== 'Automation')
+        ? 'user'
+        : 'automation';
+
+  const entityPrefix =
+    meta.entity === 'work_order' ? `Work order ${meta.work_order_number || ''}`.trim()
+    : meta.entity === 'invoice' ? `Invoice ${meta.invoice_number || ''}`.trim()
+    : 'Quote';
+
+  // --- New field-level actions (2026-06-11 triggers) ---
+  if (rawAction === 'quote_field_changed' || rawAction === 'work_order_field_changed' || rawAction === 'invoice_field_changed') {
+    const f = meta.field || 'field';
+    const subject = rawAction === 'quote_field_changed' ? fieldLabel(f) : `${entityPrefix} ${fieldLabel(f).toLowerCase()}`;
+    return {
+      text: `${subject} changed from ${formatFieldValue(f, meta.old_value)} to ${formatFieldValue(f, meta.new_value)}`,
+      source,
+    };
+  }
+  if (rawAction === 'status_changed' && meta.old_status !== undefined) {
+    return {
+      text: 'Quote status was changed from',
+      oldStatus: meta.old_status,
+      newStatus: meta.new_status,
+      source,
+    };
+  }
+  if (rawAction === 'work_order_status_changed') {
+    return {
+      text: `${entityPrefix} status was changed from`,
+      oldStatus: meta.old_status ?? meta.old_value,
+      newStatus: meta.new_status ?? meta.new_value,
+      source,
+    };
+  }
+  if (rawAction === 'line_item_added') return { text: `Line item added: ${meta.item_label || ''}`.trim(), source };
+  if (rawAction === 'line_item_removed') return { text: `Line item removed: ${meta.item_label || ''}`.trim(), source };
+  if (rawAction === 'line_item_updated') {
+    const f = meta.field || 'field';
+    return {
+      text: `${meta.item_label || 'Line item'}: ${fieldLabel(f).toLowerCase()} changed from ${formatFieldValue(f, meta.old_value)} to ${formatFieldValue(f, meta.new_value)}`,
+      source,
+    };
+  }
+  if (rawAction === 'imprint_added') return { text: `Imprint added: ${meta.imprint_label || ''}`.trim(), source };
+  if (rawAction === 'imprint_removed') return { text: `Imprint removed: ${meta.imprint_label || ''}`.trim(), source };
+  if (rawAction === 'imprint_updated') {
+    const f = meta.field || 'field';
+    return {
+      text: `Imprint ${meta.imprint_label || ''}: ${fieldLabel(f).toLowerCase()} changed from ${formatFieldValue(f, meta.old_value)} to ${formatFieldValue(f, meta.new_value)}`,
+      source,
+    };
+  }
+  if (rawAction === 'mockup_updated') return { text: `Mockup updated on imprint ${meta.imprint_label || ''}`.trim(), source };
+
+  // --- Legacy actions ---
   const statusChange = parseStatusChangeAction(rawAction);
   if (statusChange) {
-    const newLabel = prettyStatus(statusChange.newStatus);
-    const oldLabel = meta.old_status ? prettyStatus(meta.old_status) : null;
     return {
-      label: `Status: ${newLabel}`,
-      description: oldLabel && oldLabel !== newLabel ? `Changed from ${oldLabel}` : null,
+      text: 'Quote status was changed',
+      oldStatus: meta.old_status || null,
+      newStatus: statusChange.newStatus,
+      source,
     };
   }
 
-  // 2) Direct or lower-cased map lookup
   const label =
     ACTION_LABELS[rawAction]
     ?? ACTION_LABELS[rawAction.toLowerCase()]
     ?? titleCase(rawAction);
 
-  let description: string | null = null;
+  let suffix = '';
   if (meta.old_status && meta.new_status && meta.old_status !== meta.new_status) {
-    description = `Status changed from ${prettyStatus(meta.old_status)} to ${prettyStatus(meta.new_status)}`;
+    return { text: label, oldStatus: meta.old_status, newStatus: meta.new_status, source };
   } else if (meta.amount && meta.currency) {
-    description = `Amount: ${meta.currency.toUpperCase()} ${Number(meta.amount).toFixed(2)}`;
+    suffix = ` — ${meta.currency.toUpperCase()} ${Number(meta.amount).toFixed(2)}`;
   } else if (typeof meta.amount === 'number') {
-    description = `Amount: $${Number(meta.amount).toFixed(2)}`;
+    suffix = ` — $${Number(meta.amount).toFixed(2)}`;
   } else if (meta.subject) {
-    description = `Subject: ${String(meta.subject)}`;
+    suffix = ` — "${String(meta.subject)}"`;
   } else if (meta.recipient_email) {
-    description = `To: ${String(meta.recipient_email)}`;
+    suffix = ` — to ${String(meta.recipient_email)}`;
   } else if (meta.followup_number) {
-    description = `Follow-up #${meta.followup_number}`;
+    suffix = ` — follow-up #${meta.followup_number}`;
   } else if (meta.note) {
-    description = String(meta.note);
+    suffix = ` — ${String(meta.note)}`;
   }
 
-  return { label, description };
+  return { text: `${label}${suffix}`, source };
+}
+
+// Status pill color theme — matches the badge colors used elsewhere in the
+// app (Sent = orange, Approved = green, etc.). Unknown statuses get blue.
+function statusPillClasses(status: string): string {
+  const s = (status || '').toLowerCase();
+  if (['approved', 'completed', 'paid'].includes(s)) return 'bg-green-600 text-white';
+  if (['sent', 'pending_approval', 'partial'].includes(s)) return 'bg-orange-500 text-white';
+  if (['declined', 'rejected', 'art_declined', 'cancelled', 'overdue'].includes(s)) return 'bg-red-600 text-white';
+  if (['converted', 'in_progress'].includes(s)) return 'bg-purple-600 text-white';
+  if (['draft', 'expired', 'archived', 'on_hold'].includes(s)) return 'bg-gray-500 text-white';
+  return 'bg-blue-600 text-white';
 }
 
 interface QuoteDetailProps {
@@ -289,6 +419,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
   const [sendingFollowup, setSendingFollowup] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [showActivity, setShowActivity] = useState(false);
+  // 2026-06-11 [3.2-4] — filter to hide automation-generated entries.
+  // Shown by default per Jamie's doc ("Optional filtering to hide").
+  const [hideAutomation, setHideAutomation] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -1547,43 +1680,72 @@ export default function QuoteDetail({ quoteId, onBack, onEdit, onViewCustomer }:
             </span>
           </button>
           
-          {showActivity && (
-            <div className="space-y-4">
-              {activityLogs.length > 0 ? (
-                activityLogs.map((log) => {
-                  const { label, description } = formatActivity(log);
-                  return (
-                    <div key={log.id} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                        <div className="w-px h-full bg-gray-300 dark:bg-slate-600 my-1 pb-4"></div>
-                      </div>
-                      <div className="flex-1 pb-4">
-                        <div className="flex items-baseline justify-between">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {label}
-                          </p>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {format(new Date(log.performed_at), 'MMM d, h:mm a')}
+          {showActivity && (() => {
+            // 2026-06-11 [3.2-4] — compact one-line rows with status pills +
+            // user/automation attribution chip + automation filter. Matches
+            // the Printavo-style History screenshot Jamie sent 2026-06-03.
+            const formatted = activityLogs.map((log) => ({ log, line: formatActivity(log) }));
+            const visible = hideAutomation
+              ? formatted.filter(({ line }) => line.source !== 'automation')
+              : formatted;
+            return (
+              <div>
+                <div className="flex items-center justify-end mb-2">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={hideAutomation}
+                      onChange={(e) => setHideAutomation(e.target.checked)}
+                      className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    Hide automation events
+                  </label>
+                </div>
+                {visible.length > 0 ? (
+                  <div className="divide-y divide-gray-100 dark:divide-slate-700/60">
+                    {visible.map(({ log, line }) => (
+                      <div key={log.id} className="flex items-center gap-2 py-1.5 flex-wrap">
+                        <span className="text-sm text-gray-800 dark:text-gray-200">
+                          {line.text}
+                        </span>
+                        {(line.oldStatus || line.newStatus) && (
+                          <span className="inline-flex items-center gap-1.5">
+                            {line.oldStatus && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${statusPillClasses(line.oldStatus)}`}>
+                                {prettyStatus(line.oldStatus)}
+                              </span>
+                            )}
+                            {line.oldStatus && line.newStatus && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">to</span>
+                            )}
+                            {line.newStatus && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${statusPillClasses(line.newStatus)}`}>
+                                {prettyStatus(line.newStatus)}
+                              </span>
+                            )}
                           </span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                          by {log.performed_by_name || 'System'}
-                        </p>
-                        {description && (
-                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
-                            {description}
-                          </p>
                         )}
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                          line.source === 'automation'
+                            ? 'border-gray-300 dark:border-slate-600 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-800'
+                            : 'border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20'
+                        }`}>
+                          {line.source === 'automation' ? 'via automation' : `by ${log.performed_by_name || 'User'}`}
+                        </span>
+                        <span className="ml-auto text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                          {format(new Date(log.performed_at), 'MMM d, yyyy · h:mm a')}
+                        </span>
                       </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-gray-500 italic">No activity recorded yet.</p>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">
+                    {activityLogs.length > 0 ? 'All entries are automation events (unhide to view).' : 'No activity recorded yet.'}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
