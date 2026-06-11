@@ -137,7 +137,11 @@ const FIELD_LABELS: Record<string, string> = {
   assigned_to: 'Assignee',
 };
 
-const fieldLabel = (f: string) => FIELD_LABELS[f] ?? titleCase(f);
+const fieldLabel = (f: string) => {
+  // 2026-06-11 — size qty columns (qty_m, qty_2xl, ...) → "Qty (M)", "Qty (2XL)"
+  if (/^qty_/.test(f)) return `Qty (${f.slice(4).toUpperCase()})`;
+  return FIELD_LABELS[f] ?? titleCase(f);
+};
 
 // Rich result for the compact one-line renderer. When oldStatus/newStatus
 // are present the renderer shows them as colored pills; `source` drives the
