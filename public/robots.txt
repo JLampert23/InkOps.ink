@@ -1,0 +1,8 @@
+# 2026-06-11 [3.2-3] — deliberately permissive. The sensitive paths
+# (/quote-approval/*, /portal/*) are de-indexed via X-Robots-Tag headers
+# (see _headers) and meta robots tags. They are NOT Disallowed here on
+# purpose: a robots.txt block would stop crawlers from ever SEEING the
+# noindex directive, and externally-linked URLs could still show up as
+# stub results — the exact Printavo problem we're avoiding.
+User-agent: *
+Allow: /

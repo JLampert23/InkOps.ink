@@ -1,0 +1,18 @@
+# 2026-06-11 [3.2-3] — keep customer-facing pages OUT of search engines.
+# Jamie: "PRINTAVO PUBLIC INVOICE VIEW IS SEARCHABLE ON GOOGLE AND BING.
+# I DO NOT WANT THAT."
+#
+# X-Robots-Tag at the edge is the bulletproof variant: it applies even when
+# a page is reached via an external link (the exact way Printavo invoices
+# leak into Google). NOTE: these paths are deliberately NOT blocked in
+# robots.txt — crawlers must be able to fetch the page to see the noindex,
+# otherwise a robots-blocked URL can still appear as a stub result.
+
+/quote-approval/*
+  X-Robots-Tag: noindex, nofollow
+
+/portal/*
+  X-Robots-Tag: noindex, nofollow
+
+/customer/*
+  X-Robots-Tag: noindex, nofollow

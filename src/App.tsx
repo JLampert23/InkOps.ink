@@ -849,6 +849,20 @@ function App() {
   const isQuoteApprovalPage = path.startsWith('/quote-approval/');
   const isPortalPage = path.startsWith('/portal');
   const isDirectCustomerPage = path.match(/^\/customer\/([^/]+)/);
+
+  // 2026-06-11 [3.2-3] — keep customer-facing pages out of search engines
+  // (Jamie: Printavo's public invoices are searchable on Google/Bing — he
+  // does not want that here). Edge-level X-Robots-Tag headers live in
+  // public/_headers; this meta tag is the in-document backup. Idempotent —
+  // App() renders once per full page load on these routes.
+  if (isQuoteApprovalPage || isPortalPage || isDirectCustomerPage) {
+    if (!document.querySelector('meta[name="robots"]')) {
+      const robotsMeta = document.createElement('meta');
+      robotsMeta.name = 'robots';
+      robotsMeta.content = 'noindex, nofollow';
+      document.head.appendChild(robotsMeta);
+    }
+  }
   const isFeaturesPage = path === '/features' || path === '/features/';
   // 2026-05-14 — admin password recovery landing (Phase 3.1 T1-D).
   // Supabase's resetPasswordForEmail redirects here with a recovery
