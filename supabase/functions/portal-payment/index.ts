@@ -125,7 +125,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: companySettings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("stripe_secret_key, stripe_public_key")
+      .select("stripe_secret_key, stripe_public_key, inkops_subdomain, company_name")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -155,6 +155,21 @@ Deno.serve(async (req: Request) => {
 
       const price = await priceResponse.json();
 
+      // 2026-06-12 [3.2-3] — post-payment redirect. Prefer the requesting
+      // origin (the portal page the customer is on). Previously the fallback
+      // was supabaseUrl — the API host, which has no portal — so customers
+      // paying from a context with no Origin header landed on a 404 after
+      // paying. Now fall back to the company's portal subdomain (same
+      // construction as send-magic-link), then inkops.ink as last resort.
+      let portalBaseUrl = req.headers.get("origin");
+      if (!portalBaseUrl) {
+        let subdomain = companySettings.inkops_subdomain;
+        if (!subdomain && companySettings.company_name) {
+          subdomain = companySettings.company_name.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 30);
+        }
+        portalBaseUrl = subdomain ? `https://${subdomain}.inkops.ink` : "https://inkops.ink";
+      }
+
       const paymentLinkBody: Record<string, unknown> = {
         "line_items[0][price]": price.id,
         "line_items[0][quantity]": 1,
@@ -165,7 +180,7 @@ Deno.serve(async (req: Request) => {
         after_completion: {
           type: "redirect",
           redirect: {
-            url: `${req.headers.get("origin") || supabaseUrl}/portal/customer/${customerId}?payment=success`,
+            url: `${portalBaseUrl}/portal/customer/${customerId}?payment=success`,
           },
         },
       };

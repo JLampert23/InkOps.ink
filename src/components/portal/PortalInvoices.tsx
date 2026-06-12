@@ -3,7 +3,7 @@ import { PortalLayout } from './PortalLayout';
 import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
 import { supabase } from '../../lib/supabase-client';
 import { FileText, Download, CreditCard, Eye, Loader2 } from 'lucide-react';
-import { PaymentModal } from './PaymentModal';
+import { PortalPaymentModal } from './PortalPaymentModal';
 import { portalAnalyticsService } from '../../services/portal-analytics-service';
 
 interface Invoice {
@@ -293,14 +293,24 @@ export function PortalInvoices() {
         )}
       </div>
 
+      {/* 2026-06-12 [3.2-3] — swapped the old PaymentModal (a demo stub
+          that always errored "Payment processing is not yet implemented")
+          for PortalPaymentModal — the working Stripe payment-link flow the
+          main portal page already uses. */}
       {paymentInvoice && user && (
-        <PaymentModal
-          invoiceId={paymentInvoice.id}
-          invoiceNumber={paymentInvoice.invoice_number}
-          amount={getInvoiceBalance(paymentInvoice)}
+        <PortalPaymentModal
+          invoice={{
+            id: paymentInvoice.id,
+            invoice_number: paymentInvoice.invoice_number,
+            total: getInvoiceTotal(paymentInvoice),
+            balance_remaining: getInvoiceBalance(paymentInvoice),
+          }}
           companyId={user.company_id}
+          customerId={user.customer_id || ''}
+          customerEmail={user.email || paymentInvoice.customer_email || null}
+          customerName={user.name || paymentInvoice.customer_name || null}
           onClose={() => setPaymentInvoice(null)}
-          onSuccess={() => {
+          onPaymentSuccess={() => {
             setPaymentInvoice(null);
             loadInvoices();
           }}

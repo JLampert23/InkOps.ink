@@ -22,6 +22,33 @@ interface SetDefaultPaymentMethodRequest {
   customer_id: string;
 }
 
+// 2026-06-12 [3.2-3] — company_settings.stripe_secret_key is stored ENCRYPTED
+// (crypto-service). This function was passing the encrypted blob straight to
+// Stripe as the bearer token, so every payment-method save failed with an
+// auth error. Decrypt the same way portal-payment does.
+async function getDecryptedStripeKey(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  encryptedKey: string,
+): Promise<string> {
+  const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({ action: "decrypt", token: encryptedKey }),
+  });
+  if (!decryptResponse.ok) {
+    throw new Error("Failed to decrypt Stripe key");
+  }
+  const decryptResult = await decryptResponse.json();
+  if (!decryptResult.success || !decryptResult.result) {
+    throw new Error("Decryption failed");
+  }
+  return decryptResult.result;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -122,11 +149,17 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      const stripeSecretKey = await getDecryptedStripeKey(
+        supabaseUrl,
+        supabaseServiceKey,
+        companySettings.stripe_secret_key,
+      );
+
       const stripeResponse = await fetch(
         `https://api.stripe.com/v1/payment_methods/${stripe_payment_method_id}`,
         {
           headers: {
-            "Authorization": `Bearer ${companySettings.stripe_secret_key}`,
+            "Authorization": `Bearer ${stripeSecretKey}`,
           },
         }
       );

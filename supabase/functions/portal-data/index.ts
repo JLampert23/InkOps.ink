@@ -44,6 +44,11 @@ Deno.serve(async (req: Request) => {
       .eq('magic_token', customerToken)
       .single();
 
+    // NOTE (2026-06-12 review): the -24h offset is INTENTIONAL. expires_at is
+    // the magic-link token's 15-minute login window; the established session
+    // stays valid for ~24h beyond it so customers aren't logged out minutes
+    // after clicking their email link. Do not "fix" this to a strict
+    // expires_at check — that regresses the portal into 15-minute sessions.
     if (!session || new Date(session.expires_at) < new Date(Date.now() - 24 * 60 * 60 * 1000)) {
       return new Response(
         JSON.stringify({ error: "Invalid or expired session" }),
